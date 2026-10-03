@@ -116,33 +116,37 @@ function AppContent() {
   const activeViolationsCount = qcResults.reduce((acc, r) => acc + (r.violations?.length || 0), 0);
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col antialiased">
+    <div className="min-h-screen bg-slate-50 flex flex-col antialiased print:bg-white print:min-h-0 print:block">
       {/* Top Navbar */}
-      <Navbar
-        labInfo={labInfo}
-        activeTab={activeTab}
-        onSelectTab={setActiveTab}
-        notifications={notifications}
-        onOpenNotifications={() => setIsNotificationDrawerOpen(true)}
-        onOpenDatabaseSettings={() => setIsDatabaseSettingsOpen(true)}
-        onToggleSidebarMobile={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
-      />
-
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left Sidebar */}
-        <Sidebar
+      <div className="print:hidden">
+        <Navbar
+          labInfo={labInfo}
           activeTab={activeTab}
           onSelectTab={setActiveTab}
-          isOpenMobile={isMobileSidebarOpen}
-          onCloseMobile={() => setIsMobileSidebarOpen(false)}
-          pendingReviewCount={pendingReviewCount}
-          openCapaCount={openCapaCount}
-          activeViolationsCount={activeViolationsCount}
+          notifications={notifications}
+          onOpenNotifications={() => setIsNotificationDrawerOpen(true)}
+          onOpenDatabaseSettings={() => setIsDatabaseSettingsOpen(true)}
+          onToggleSidebarMobile={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
         />
+      </div>
+
+      <div className="flex flex-1 overflow-hidden print:block print:overflow-visible">
+        {/* Left Sidebar */}
+        <div className="print:hidden">
+          <Sidebar
+            activeTab={activeTab}
+            onSelectTab={setActiveTab}
+            isOpenMobile={isMobileSidebarOpen}
+            onCloseMobile={() => setIsMobileSidebarOpen(false)}
+            pendingReviewCount={pendingReviewCount}
+            openCapaCount={openCapaCount}
+            activeViolationsCount={activeViolationsCount}
+          />
+        </div>
 
         {/* Main Content Viewport */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
-          <div className="mx-auto max-w-7xl">
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 print:p-0 print:m-0 print:overflow-visible print:w-full">
+          <div className="mx-auto max-w-7xl print:max-w-none print:w-full print:m-0 print:p-0">
             {/* 1. Dashboard View */}
             {activeTab === 'dashboard' && (
               <DashboardView

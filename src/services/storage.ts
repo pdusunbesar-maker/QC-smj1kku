@@ -65,7 +65,7 @@ function setStored<T>(key: string, data: T): void {
 }
 
 // Data Mappers: TypeScript (camelCase) <-> Supabase PostgreSQL (snake_case)
-function mapLabToDb(info: LaboratoryInfo) {
+function mapLabToDbFull(info: LaboratoryInfo) {
   return {
     id: info.id || 'lab-rsud-smj1',
     name: info.name,
@@ -85,23 +85,42 @@ function mapLabToDb(info: LaboratoryInfo) {
   };
 }
 
+function mapLabToDbBase(info: LaboratoryInfo) {
+  return {
+    id: info.id || 'lab-rsud-smj1',
+    name: info.name,
+    hospital_name: info.hospitalName,
+    regency: info.regency,
+    province: info.province,
+    room_unit: info.roomUnit,
+    head_of_lab: info.headOfLab,
+    head_nip: info.headNip,
+    address: info.address,
+    phone: info.phone,
+    email: info.email,
+    accreditation: info.accreditation,
+    logo_url: info.logoUrl,
+  };
+}
+
 function mapDbToLab(row: any): LaboratoryInfo {
+  const current = getStored<LaboratoryInfo>(KEYS.LAB_INFO, INITIAL_LAB_INFO);
   return {
     id: row.id || 'lab-rsud-smj1',
-    name: row.name,
-    hospitalName: row.hospital_name || row.hospitalName,
-    regency: row.regency,
-    province: row.province,
-    roomUnit: row.room_unit || row.roomUnit,
-    headOfLab: row.head_of_lab || row.headOfLab,
-    headNip: row.head_nip || row.headNip,
-    headOfQuality: row.head_of_quality || row.headOfQuality || 'Siti Rahmawati, S.Tr.Kes',
-    qualityNip: row.quality_nip || row.qualityNip || '19850914 201001 2 015',
-    address: row.address,
-    phone: row.phone,
-    email: row.email,
-    accreditation: row.accreditation,
-    logoUrl: row.logo_url || row.logoUrl,
+    name: row.name || current.name,
+    hospitalName: row.hospital_name || row.hospitalName || current.hospitalName,
+    regency: row.regency || current.regency,
+    province: row.province || current.province,
+    roomUnit: row.room_unit || row.roomUnit || current.roomUnit,
+    headOfLab: row.head_of_lab || row.headOfLab || current.headOfLab,
+    headNip: row.head_nip || row.headNip || current.headNip,
+    headOfQuality: row.head_of_quality || row.headOfQuality || current.headOfQuality || 'Siti Rahmawati, S.Tr.Kes',
+    qualityNip: row.quality_nip || row.qualityNip || current.qualityNip || '19850914 201001 2 015',
+    address: row.address || current.address,
+    phone: row.phone || current.phone,
+    email: row.email || current.email,
+    accreditation: row.accreditation || current.accreditation,
+    logoUrl: row.logo_url || row.logoUrl || current.logoUrl,
   };
 }
 
@@ -595,7 +614,11 @@ export class StorageService {
 
     try {
       // 1. Lab Profile
-      await sb.from('laboratories').upsert(mapLabToDb(this.getLabInfo()));
+      const labInfo = this.getLabInfo();
+      const { error: labFullErr } = await sb.from('laboratories').upsert(mapLabToDbFull(labInfo));
+      if (labFullErr && (labFullErr.code === 'PGRST204' || labFullErr.message?.includes('head_of_quality'))) {
+        await sb.from('laboratories').upsert(mapLabToDbBase(labInfo));
+      }
 
       // 2. Users & Roles
       const users = this.getUsers().map(mapUserToDb);
@@ -782,11 +805,19 @@ export class StorageService {
     setStored(KEYS.LAB_INFO, completeInfo);
     const sb = getSupabase();
     if (sb) {
-      sb.from('laboratories')
-        .upsert(mapLabToDb(completeInfo))
-        .then(({ error }) => {
-          if (error) console.error('Supabase updateLabInfo error:', error);
-        });
+      Promise.resolve(sb.from('laboratories').upsert(mapLabToDbFull(completeInfo)))
+        .then(({ error }: { error: any }) => {
+          if (error) {
+            if (error.code === 'PGRST204' || error.message?.includes('head_of_quality') || error.message?.includes('quality_nip')) {
+              // Remote table does not have head_of_quality column yet -> save base columns to remote, keep local values intact
+              Promise.resolve(sb.from('laboratories').upsert(mapLabToDbBase(completeInfo)))
+                .catch(() => {});
+            } else {
+              console.warn('Supabase updateLabInfo notice:', error.message);
+            }
+          }
+        })
+        .catch(() => {});
     }
   }
 

@@ -623,9 +623,9 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       {/* ========================================================================= */}
       {/* OFFICIAL PRINTABLE REPORT SHEET (WITH HOSPITAL KOP SURAT)                  */}
       {/* ========================================================================= */}
-      <div className="rounded-xl border border-slate-200 bg-white p-8 shadow-xs print:border-none print:shadow-none print:p-0">
+      <div className="rounded-xl border border-slate-200 bg-white p-8 shadow-xs print:border-none print:shadow-none print:p-0 print:m-0 print:w-full print:max-w-none">
         {/* KOP SURAT RESMI RSUD SULTAN MUHAMMAD JAMALUDIN I */}
-        <div className="flex items-center justify-between border-b-2 border-slate-900 pb-4 mb-6">
+        <div className="flex items-center justify-between border-b-2 border-slate-900 pb-4 mb-6 kop-surat print-avoid-break">
           <img
             src={labInfo.logoUrl || '/logo_kayong_utara.png'}
             alt="Lambang Daerah Kabupaten Kayong Utara"
@@ -1068,13 +1068,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         </div>
 
         {/* OFFICIAL SIGNATURE FOOTER */}
-        <div className="mt-12 grid grid-cols-2 text-center text-xs pt-6 border-t-2 border-slate-900">
+        <div className="mt-10 grid grid-cols-2 text-center text-xs pt-6 border-t-2 border-slate-900 signature-block print-avoid-break">
           <div>
             <p className="text-slate-600">Mengetahui & Menyetujui,</p>
             <p className="font-bold text-slate-900 mt-1">Penanggung Jawab Laboratorium</p>
-            <div className="h-20 flex items-center justify-center">
-              <span className="text-[11px] text-slate-300 font-mono">[Tanda Tangan & Cap Laboratorium]</span>
-            </div>
+            <div className="h-20" />
             <p className="font-bold underline text-slate-900">{labInfo.headOfLab}</p>
             <p className="text-[11px] font-mono text-slate-500">NIP: {labInfo.headNip}</p>
           </div>
@@ -1082,9 +1080,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           <div className="relative group">
             <p className="text-slate-600">Sukadana, {new Date().toISOString().split('T')[0]}</p>
             <p className="font-bold text-slate-900 mt-1">Penanggung Jawab Mutu</p>
-            <div className="h-20 flex items-center justify-center">
-              <span className="text-[11px] text-slate-300 font-mono">[Tanda Tangan PJ Mutu]</span>
-            </div>
+            <div className="h-20" />
             <p className="font-bold underline text-slate-900">
               {labInfo.headOfQuality || 'Siti Rahmawati, S.Tr.Kes'}
             </p>

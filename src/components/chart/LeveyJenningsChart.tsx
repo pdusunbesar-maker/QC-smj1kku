@@ -197,7 +197,7 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
         </div>
 
         {/* Action buttons (Zoom, PNG, Print) */}
-        <div className="flex items-center gap-1.5 self-start md:self-auto">
+        <div className="flex items-center gap-1.5 self-start md:self-auto print:hidden">
           {/* Zoom controls */}
           <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg text-slate-600">
             <button
@@ -249,7 +249,7 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
       </div>
 
       {/* Precise Date Range & Level Filter Card */}
-      <div className="rounded-lg bg-slate-50 border border-slate-200 p-3 text-xs space-y-3">
+      <div className="rounded-lg bg-slate-50 border border-slate-200 p-3 text-xs space-y-3 print:hidden">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 font-bold text-slate-800">
             <Calendar className="h-4 w-4 text-emerald-700" />
