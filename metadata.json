@@ -1,0 +1,6 @@
+{
+  "name": "Laboratory Quality Control Management System (L-QCMS)",
+  "description": "Sistem Pemantauan, Analisis Westgard, Levey-Jennings & CAPA Mutu Laboratorium Patologi Klinik RSUD Sultan Muhammad Jamaludin I",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
