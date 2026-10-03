@@ -75,6 +75,8 @@ function mapLabToDb(info: LaboratoryInfo) {
     room_unit: info.roomUnit,
     head_of_lab: info.headOfLab,
     head_nip: info.headNip,
+    head_of_quality: info.headOfQuality || 'Siti Rahmawati, S.Tr.Kes',
+    quality_nip: info.qualityNip || '19850914 201001 2 015',
     address: info.address,
     phone: info.phone,
     email: info.email,
@@ -85,7 +87,7 @@ function mapLabToDb(info: LaboratoryInfo) {
 
 function mapDbToLab(row: any): LaboratoryInfo {
   return {
-    id: row.id,
+    id: row.id || 'lab-rsud-smj1',
     name: row.name,
     hospitalName: row.hospital_name || row.hospitalName,
     regency: row.regency,
@@ -93,6 +95,8 @@ function mapDbToLab(row: any): LaboratoryInfo {
     roomUnit: row.room_unit || row.roomUnit,
     headOfLab: row.head_of_lab || row.headOfLab,
     headNip: row.head_nip || row.headNip,
+    headOfQuality: row.head_of_quality || row.headOfQuality || 'Siti Rahmawati, S.Tr.Kes',
+    qualityNip: row.quality_nip || row.qualityNip || '19850914 201001 2 015',
     address: row.address,
     phone: row.phone,
     email: row.email,
@@ -759,15 +763,27 @@ export class StorageService {
 
   // --- Laboratory Info ---
   static getLabInfo(): LaboratoryInfo {
-    return getStored<LaboratoryInfo>(KEYS.LAB_INFO, INITIAL_LAB_INFO);
+    const stored = getStored<LaboratoryInfo>(KEYS.LAB_INFO, INITIAL_LAB_INFO);
+    return {
+      ...INITIAL_LAB_INFO,
+      ...stored,
+      headOfQuality: stored.headOfQuality || INITIAL_LAB_INFO.headOfQuality || 'Siti Rahmawati, S.Tr.Kes',
+      qualityNip: stored.qualityNip || INITIAL_LAB_INFO.qualityNip || '19850914 201001 2 015',
+    };
   }
 
   static updateLabInfo(info: LaboratoryInfo): void {
-    setStored(KEYS.LAB_INFO, info);
+    const completeInfo: LaboratoryInfo = {
+      ...INITIAL_LAB_INFO,
+      ...info,
+      headOfQuality: info.headOfQuality || 'Siti Rahmawati, S.Tr.Kes',
+      qualityNip: info.qualityNip || '19850914 201001 2 015',
+    };
+    setStored(KEYS.LAB_INFO, completeInfo);
     const sb = getSupabase();
     if (sb) {
       sb.from('laboratories')
-        .upsert(mapLabToDb(info))
+        .upsert(mapLabToDb(completeInfo))
         .then(({ error }) => {
           if (error) console.error('Supabase updateLabInfo error:', error);
         });

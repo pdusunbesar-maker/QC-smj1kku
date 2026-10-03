@@ -48,6 +48,11 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
   const [labForm, setLabForm] = useState<LaboratoryInfo>(labInfo);
   const [labSaved, setLabSaved] = useState(false);
 
+  // Sync with prop changes
+  React.useEffect(() => {
+    setLabForm(labInfo);
+  }, [labInfo]);
+
   // Instrument Modal
   const [showInstrumentModal, setShowInstrumentModal] = useState(false);
   const [editingInstrument, setEditingInstrument] = useState<Instrument | null>(null);

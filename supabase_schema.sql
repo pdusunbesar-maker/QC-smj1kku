@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS laboratories (
     room_unit TEXT NOT NULL DEFAULT 'Laboratorium Sentral Lantai 1',
     head_of_lab TEXT NOT NULL DEFAULT 'dr. Hendra Wijaya, Sp.PK',
     head_nip TEXT NOT NULL DEFAULT '19800512 200801 1 008',
+    head_of_quality TEXT NOT NULL DEFAULT 'Siti Rahmawati, S.Tr.Kes',
+    quality_nip TEXT NOT NULL DEFAULT '19850914 201001 2 015',
     address TEXT NOT NULL DEFAULT 'Jl. Provinsi Sukadana - Teluk Batang KM. 3, Sukadana, Kayong Utara 78852',
     phone TEXT DEFAULT '(0534) 770123 / Ext. 108',
     email TEXT DEFAULT 'lab.patklin@rsudsultanmuhammadjamaludin1.go.id',
