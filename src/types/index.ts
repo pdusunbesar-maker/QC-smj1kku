@@ -37,6 +37,8 @@ export interface LaboratoryInfo {
   roomUnit: string;
   headOfLab: string;
   headNip: string;
+  headOfQuality?: string;
+  qualityNip?: string;
   address: string;
   phone: string;
   email: string;

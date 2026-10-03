@@ -306,6 +306,7 @@ function AppContent() {
                 instruments={instruments}
                 capas={capas}
                 nonConformities={nonConformities}
+                onLabInfoUpdated={(info) => setLabInfo(info)}
               />
             )}
 

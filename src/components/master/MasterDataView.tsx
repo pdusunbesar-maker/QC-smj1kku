@@ -273,12 +273,37 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
               />
             </div>
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">NIP Penanggung Jawab</label>
+              <label className="block font-semibold text-slate-700 mb-1">NIP Penanggung Jawab Lab</label>
               <input
                 type="text"
                 value={labForm.headNip}
                 onChange={(e) => setLabForm({ ...labForm, headNip: e.target.value })}
                 disabled={!canEdit}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 font-mono disabled:bg-slate-50"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Penanggung Jawab Mutu</label>
+              <input
+                type="text"
+                value={labForm.headOfQuality || 'Siti Rahmawati, S.Tr.Kes'}
+                onChange={(e) => setLabForm({ ...labForm, headOfQuality: e.target.value })}
+                disabled={!canEdit}
+                placeholder="Contoh: Siti Rahmawati, S.Tr.Kes"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 disabled:bg-slate-50"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">NIP Penanggung Jawab Mutu</label>
+              <input
+                type="text"
+                value={labForm.qualityNip || '19850914 201001 2 015'}
+                onChange={(e) => setLabForm({ ...labForm, qualityNip: e.target.value })}
+                disabled={!canEdit}
+                placeholder="Contoh: 19850914 201001 2 015"
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 font-mono disabled:bg-slate-50"
               />
             </div>

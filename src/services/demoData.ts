@@ -21,6 +21,8 @@ export const INITIAL_LAB_INFO: LaboratoryInfo = {
   roomUnit: 'Laboratorium Sentral Lantai 1',
   headOfLab: 'dr. Hendra Wijaya, Sp.PK',
   headNip: '19800512 200801 1 008',
+  headOfQuality: 'Siti Rahmawati, S.Tr.Kes',
+  qualityNip: '19850914 201001 2 015',
   address: 'Jl. Provinsi Sukadana - Teluk Batang KM. 3, Sukadana, Kayong Utara 78852',
   phone: '(0534) 770123 / Ext. 108',
   email: 'lab.patklin@rsudsultanmuhammadjamaludin1.go.id',

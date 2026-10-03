@@ -8,8 +8,20 @@ import {
   FileText, 
   Layers, 
   Building2,
-  CheckCircle,
-  AlertTriangle
+  CheckCircle2,
+  AlertTriangle,
+  AlertOctagon,
+  Search,
+  RefreshCw,
+  Clock,
+  UserCheck,
+  ShieldAlert,
+  ClipboardCheck,
+  FileCheck,
+  ArrowUpDown,
+  Edit3,
+  X,
+  Save
 } from 'lucide-react';
 import { 
   QCResult, 
@@ -20,6 +32,7 @@ import {
   NonConformity 
 } from '../../types';
 import { calculateQCStatistics } from '../../utils/qcCalculations';
+import { StorageService } from '../../services/storage';
 
 interface ReportsViewProps {
   labInfo: LaboratoryInfo;
@@ -28,6 +41,7 @@ interface ReportsViewProps {
   instruments: Instrument[];
   capas: CAPA[];
   nonConformities: NonConformity[];
+  onLabInfoUpdated?: (info: LaboratoryInfo) => void;
 }
 
 export const ReportsView: React.FC<ReportsViewProps> = ({
@@ -37,31 +51,247 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   instruments,
   capas,
   nonConformities,
+  onLabInfoUpdated,
 }) => {
-  const [reportType, setReportType] = useState<'qc' | 'westgard' | 'capa' | 'nc'>('qc');
+  // Report category
+  const [reportType, setReportType] = useState<'qc' | 'westgard' | 'nc' | 'capa'>('qc');
+  
+  // Date Range Search ("Dari Tanggal" - "Sampai Tanggal")
+  const [startDate, setStartDate] = useState<string>('2026-09-01');
+  const [endDate, setEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  
+  // Additional Filters
+  const [searchKeyword, setSearchKeyword] = useState<string>('');
   const [selectedParameterId, setSelectedParameterId] = useState<string>('all');
-  const [selectedPeriod, setSelectedPeriod] = useState<'today' | '7d' | '30d' | 'all'>('30d');
+  const [selectedInstrumentId, setSelectedInstrumentId] = useState<string>('all');
+  const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [selectedSeverity, setSelectedSeverity] = useState<string>('all');
 
-  // Filter Results
+  // Signatories modal edit state (Penanggung Jawab Mutu & Pimpinan Lab)
+  const [isSignatoriesModalOpen, setIsSignatoriesModalOpen] = useState(false);
+  const [signatoriesForm, setSignatoriesForm] = useState({
+    headOfLab: labInfo.headOfLab || 'dr. Hendra Wijaya, Sp.PK',
+    headNip: labInfo.headNip || '19800512 200801 1 008',
+    headOfQuality: labInfo.headOfQuality || 'Siti Rahmawati, S.Tr.Kes',
+    qualityNip: labInfo.qualityNip || '19850914 201001 2 015',
+  });
+
+  const handleOpenSignatoriesModal = () => {
+    setSignatoriesForm({
+      headOfLab: labInfo.headOfLab || 'dr. Hendra Wijaya, Sp.PK',
+      headNip: labInfo.headNip || '19800512 200801 1 008',
+      headOfQuality: labInfo.headOfQuality || 'Siti Rahmawati, S.Tr.Kes',
+      qualityNip: labInfo.qualityNip || '19850914 201001 2 015',
+    });
+    setIsSignatoriesModalOpen(true);
+  };
+
+  const handleSaveSignatories = (e: React.FormEvent) => {
+    e.preventDefault();
+    const updatedLab: LaboratoryInfo = {
+      ...labInfo,
+      headOfLab: signatoriesForm.headOfLab.trim(),
+      headNip: signatoriesForm.headNip.trim(),
+      headOfQuality: signatoriesForm.headOfQuality.trim(),
+      qualityNip: signatoriesForm.qualityNip.trim(),
+    };
+    StorageService.updateLabInfo(updatedLab);
+    if (onLabInfoUpdated) {
+      onLabInfoUpdated(updatedLab);
+    }
+    setIsSignatoriesModalOpen(false);
+  };
+
+  // Quick Date Preset Handler
+  const handleSetPreset = (preset: 'today' | '7d' | 'this_month' | 'last_month' | 'all') => {
+    const todayStr = '2026-10-03'; // current context date or dynamic
+    if (preset === 'today') {
+      setStartDate(todayStr);
+      setEndDate(todayStr);
+    } else if (preset === '7d') {
+      setStartDate('2026-09-26');
+      setEndDate(todayStr);
+    } else if (preset === 'this_month') {
+      setStartDate('2026-10-01');
+      setEndDate('2026-10-31');
+    } else if (preset === 'last_month') {
+      setStartDate('2026-09-01');
+      setEndDate('2026-09-30');
+    } else if (preset === 'all') {
+      setStartDate('2026-01-01');
+      setEndDate('2026-12-31');
+    }
+  };
+
+  // 1. FILTERED QC RESULTS
   const filteredQC = useMemo(() => {
-    let list = results;
-    if (selectedParameterId !== 'all') {
-      list = list.filter(r => r.parameterId === selectedParameterId);
-    }
+    return results.filter(r => {
+      // Date range check
+      if (startDate && r.date < startDate) return false;
+      if (endDate && r.date > endDate) return false;
 
-    if (selectedPeriod !== 'all') {
-      const now = new Date('2026-10-03T12:00:00Z').getTime();
-      const days = selectedPeriod === 'today' ? 1 : selectedPeriod === '7d' ? 7 : 30;
-      const cutoff = now - days * 24 * 3600 * 1000;
-      list = list.filter(r => r.timestamp >= cutoff);
-    }
-    return list;
-  }, [results, selectedParameterId, selectedPeriod]);
+      // Parameter filter
+      if (selectedParameterId !== 'all' && r.parameterId !== selectedParameterId) return false;
 
-  // Overall Stats
+      // Instrument filter
+      if (selectedInstrumentId !== 'all' && r.instrumentId !== selectedInstrumentId) return false;
+
+      // Status filter
+      if (selectedStatus !== 'all' && r.status !== selectedStatus) return false;
+
+      // Keyword search
+      if (searchKeyword.trim()) {
+        const query = searchKeyword.toLowerCase();
+        const matchParam = r.parameterName.toLowerCase().includes(query) || r.parameterCode.toLowerCase().includes(query);
+        const matchInst = r.instrumentName.toLowerCase().includes(query);
+        const matchOp = r.operatorName.toLowerCase().includes(query);
+        const matchLot = r.lotNumber.toLowerCase().includes(query);
+        const matchNotes = (r.notes || '').toLowerCase().includes(query);
+        if (!matchParam && !matchInst && !matchOp && !matchLot && !matchNotes) return false;
+      }
+
+      return true;
+    });
+  }, [results, startDate, endDate, selectedParameterId, selectedInstrumentId, selectedStatus, searchKeyword]);
+
+  // 2. FILTERED WESTGARD VIOLATIONS
+  const filteredWestgard = useMemo(() => {
+    const violationItems: Array<{
+      qcId: string;
+      date: string;
+      time: string;
+      instrumentName: string;
+      parameterName: string;
+      parameterCode: string;
+      controlLevel: string;
+      lotNumber: string;
+      value: number;
+      unit: string;
+      zScore: number;
+      sdPosition: string;
+      ruleKey: string;
+      ruleName: string;
+      type: 'warning' | 'reject';
+      description: string;
+      operatorName: string;
+      reviewStatus: string;
+      linkedNCId?: string;
+      linkedCAPAId?: string;
+    }> = [];
+
+    results.forEach(r => {
+      // Date range check
+      if (startDate && r.date < startDate) return;
+      if (endDate && r.date > endDate) return;
+
+      // Parameter & Instrument filter
+      if (selectedParameterId !== 'all' && r.parameterId !== selectedParameterId) return;
+      if (selectedInstrumentId !== 'all' && r.instrumentId !== selectedInstrumentId) return;
+
+      if (r.violations && r.violations.length > 0) {
+        r.violations.forEach(v => {
+          if (selectedStatus !== 'all' && v.type !== selectedStatus) return;
+
+          if (searchKeyword.trim()) {
+            const q = searchKeyword.toLowerCase();
+            const match = r.parameterName.toLowerCase().includes(q) ||
+                          r.parameterCode.toLowerCase().includes(q) ||
+                          v.ruleName.toLowerCase().includes(q) ||
+                          v.description.toLowerCase().includes(q) ||
+                          r.operatorName.toLowerCase().includes(q);
+            if (!match) return;
+          }
+
+          violationItems.push({
+            qcId: r.id,
+            date: r.date,
+            time: r.time,
+            instrumentName: r.instrumentName,
+            parameterName: r.parameterName,
+            parameterCode: r.parameterCode,
+            controlLevel: r.controlLevel,
+            lotNumber: r.lotNumber,
+            value: r.value,
+            unit: r.unit,
+            zScore: r.zScore,
+            sdPosition: r.sdPosition,
+            ruleKey: v.rule,
+            ruleName: v.ruleName,
+            type: v.type,
+            description: v.description,
+            operatorName: r.operatorName,
+            reviewStatus: r.reviewStatus,
+            linkedNCId: r.linkedNonConformityId,
+            linkedCAPAId: r.linkedCapaId,
+          });
+        });
+      }
+    });
+
+    return violationItems;
+  }, [results, startDate, endDate, selectedParameterId, selectedInstrumentId, selectedStatus, searchKeyword]);
+
+  // 3. FILTERED NON-CONFORMITIES (NC)
+  const filteredNC = useMemo(() => {
+    return nonConformities.filter(nc => {
+      // Date check
+      if (startDate && nc.date < startDate) return false;
+      if (endDate && nc.date > endDate) return false;
+
+      // Instrument filter
+      if (selectedInstrumentId !== 'all' && nc.instrumentId !== selectedInstrumentId) return false;
+
+      // Parameter filter
+      if (selectedParameterId !== 'all' && nc.parameterId !== selectedParameterId) return false;
+
+      // Severity filter
+      if (selectedSeverity !== 'all' && nc.severity !== selectedSeverity) return false;
+
+      // Status filter
+      if (selectedStatus !== 'all' && nc.status !== selectedStatus) return false;
+
+      // Keyword search
+      if (searchKeyword.trim()) {
+        const q = searchKeyword.toLowerCase();
+        const matchId = nc.id.toLowerCase().includes(q);
+        const matchDesc = nc.description.toLowerCase().includes(q);
+        const matchParam = nc.parameterName.toLowerCase().includes(q);
+        const matchInst = nc.instrumentName.toLowerCase().includes(q);
+        const matchReporter = nc.reportedByName.toLowerCase().includes(q);
+        const matchImpact = nc.impact.toLowerCase().includes(q);
+        if (!matchId && !matchDesc && !matchParam && !matchInst && !matchReporter && !matchImpact) return false;
+      }
+
+      return true;
+    });
+  }, [nonConformities, startDate, endDate, selectedInstrumentId, selectedParameterId, selectedSeverity, selectedStatus, searchKeyword]);
+
+  // 4. FILTERED CAPA DOCUMENTS
+  const filteredCAPA = useMemo(() => {
+    return capas.filter(c => {
+      const createdDate = c.createdAt ? c.createdAt.substring(0, 10) : '';
+      if (startDate && createdDate < startDate) return false;
+      if (endDate && createdDate > endDate) return false;
+
+      if (selectedStatus !== 'all' && c.status !== selectedStatus) return false;
+
+      if (searchKeyword.trim()) {
+        const q = searchKeyword.toLowerCase();
+        const matchId = c.id.toLowerCase().includes(q);
+        const matchProblem = c.problemStatement.toLowerCase().includes(q);
+        const matchPIC = c.pic.toLowerCase().includes(q);
+        const matchRoot = (c.identifiedRootCause || '').toLowerCase().includes(q);
+        if (!matchId && !matchProblem && !matchPIC && !matchRoot) return false;
+      }
+
+      return true;
+    });
+  }, [capas, startDate, endDate, selectedStatus, searchKeyword]);
+
+  // Stats calculation for QC
   const firstParam = parameters.find(p => p.id === selectedParameterId) || parameters[0];
-  const stats = useMemo(() => {
-    if (!firstParam) return null;
+  const qcStats = useMemo(() => {
+    if (!firstParam || filteredQC.length === 0) return null;
     return calculateQCStatistics(
       filteredQC,
       firstParam.targetMean,
@@ -70,34 +300,35 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
     );
   }, [filteredQC, firstParam]);
 
-  // CSV Export
+  // Export CSV Handler
   const handleExportCSV = () => {
     let csvContent = '';
     let filename = '';
+    const dateRangeLabel = `${startDate}_sd_${endDate}`;
 
     if (reportType === 'qc') {
-      filename = `Laporan_QC_${new Date().toISOString().split('T')[0]}.csv`;
-      csvContent = 'ID,Tanggal,Jam,Instrumen,Parameter,Level,Lot,Nilai,Satuan,Mean,SD,Z_Score,Status,Reviewer\n';
-      filteredQC.forEach(r => {
-        csvContent += `"${r.id}","${r.date}","${r.time}","${r.instrumentName}","${r.parameterName}","${r.controlLevel}","${r.lotNumber}",${r.value},"${r.unit}",${r.mean},${r.sd},${r.zScore},"${r.status}","${r.reviewedByName || '-'}"\n`;
+      filename = `Laporan_QC_Harian_RSUD_SMJ1_${dateRangeLabel}.csv`;
+      csvContent = 'No,ID,Tanggal,Jam,Instrumen,Parameter,Kode_Parameter,Level_Kontrol,Nomor_Lot,Nilai,Satuan,Target_Mean,Target_SD,Z_Score,Posisi_SD,Status_QC,Petugas_ATLM,Review_Supervisor,Catatan\n';
+      filteredQC.forEach((r, idx) => {
+        csvContent += `"${idx + 1}","${r.id}","${r.date}","${r.time}","${r.instrumentName}","${r.parameterName}","${r.parameterCode}","${r.controlLevel}","${r.lotNumber}",${r.value},"${r.unit}",${r.mean},${r.sd},${r.zScore},"${r.sdPosition}","${r.status}","${r.operatorName}","${r.reviewStatus}","${(r.notes || '').replace(/"/g, '""')}"\n`;
       });
-    } else if (reportType === 'capa') {
-      filename = `Laporan_CAPA_${new Date().toISOString().split('T')[0]}.csv`;
-      csvContent = 'ID,Tanggal,Sumber,PIC,Masalah,Status,Efektivitas,DueDate\n';
-      capas.forEach(c => {
-        csvContent += `"${c.id}","${c.createdAt}","${c.source}","${c.pic}","${c.problemStatement.replace(/"/g, '""')}","${c.status}","${c.effectiveness}","${c.overallDueDate}"\n`;
+    } else if (reportType === 'westgard') {
+      filename = `Laporan_Pelanggaran_Westgard_RSUD_SMJ1_${dateRangeLabel}.csv`;
+      csvContent = 'No,ID_QC,Tanggal,Jam,Instrumen,Parameter,Kode,Level,Lot,Nilai,Z_Score,Aturan_Westgard,Tipe,Deskripsi_Pelanggaran,Petugas_ATLM,Status_Review\n';
+      filteredWestgard.forEach((v, idx) => {
+        csvContent += `"${idx + 1}","${v.qcId}","${v.date}","${v.time}","${v.instrumentName}","${v.parameterName}","${v.parameterCode}","${v.controlLevel}","${v.lotNumber}",${v.value},${v.zScore},"${v.ruleName}","${v.type}","${v.description.replace(/"/g, '""')}","${v.operatorName}","${v.reviewStatus}"\n`;
       });
     } else if (reportType === 'nc') {
-      filename = `Laporan_Penyimpangan_${new Date().toISOString().split('T')[0]}.csv`;
-      csvContent = 'ID,Tanggal,Waktu,Instrumen,Parameter,Severity,Pelapor,Status\n';
-      nonConformities.forEach(n => {
-        csvContent += `"${n.id}","${n.date}","${n.time}","${n.instrumentName}","${n.parameterName}","${n.severity}","${n.reportedByName}","${n.status}"\n`;
+      filename = `Laporan_Penyimpangan_Mutu_NC_RSUD_SMJ1_${dateRangeLabel}.csv`;
+      csvContent = 'No,ID_NC,Tanggal,Waktu,Unit,Instrumen,Parameter,Aturan_Terkait,Tingkat_Keparahan,Kategori,Deskripsi_Penyimpangan,Dampak_Hasil_Pasien,Tindakan_Segera,Pelapor,Status,Tanggal_Selesai\n';
+      filteredNC.forEach((nc, idx) => {
+        csvContent += `"${idx + 1}","${nc.id}","${nc.date}","${nc.time}","${nc.unit}","${nc.instrumentName}","${nc.parameterName}","${nc.westgardRule || '-'}","${nc.severity}","${nc.category}","${nc.description.replace(/"/g, '""')}","${nc.impact.replace(/"/g, '""')}","${nc.immediateAction.replace(/"/g, '""')}","${nc.reportedByName}","${nc.status}","${nc.resolvedAt || '-'}"\n`;
       });
-    } else {
-      filename = `Laporan_Westgard_${new Date().toISOString().split('T')[0]}.csv`;
-      csvContent = 'Tanggal,Jam,Parameter,Aturan,Tipe,Deskripsi\n';
-      filteredQC.flatMap(r => r.violations.map(v => ({ ...v, r }))).forEach(item => {
-        csvContent += `"${item.r.date}","${item.r.time}","${item.r.parameterName}","${item.ruleName}","${item.type}","${item.description.replace(/"/g, '""')}"\n`;
+    } else if (reportType === 'capa') {
+      filename = `Laporan_Dokumen_CAPA_RSUD_SMJ1_${dateRangeLabel}.csv`;
+      csvContent = 'No,ID_CAPA,Tanggal_Dibuat,Sumber_Masalah,Departemen,PIC,Pernyataan_Masalah,Akar_Masalah_RCA,Jumlah_Tindakan_Korektif,Jumlah_Tindakan_Preventif,Batas_Waktu_DueDate,Status,Efektivitas\n';
+      filteredCAPA.forEach((c, idx) => {
+        csvContent += `"${idx + 1}","${c.id}","${c.createdAt}","${c.source}","${c.department}","${c.pic}","${c.problemStatement.replace(/"/g, '""')}","${(c.identifiedRootCause || '-').replace(/"/g, '""')}",${c.correctiveActions.length},${c.preventiveActions.length},"${c.overallDueDate}","${c.status}","${c.effectiveness}"\n`;
       });
     }
 
@@ -117,31 +348,48 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between border-b border-slate-200 pb-4 print:hidden">
+      {/* Top Header - Screen Only */}
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between border-b border-slate-200 pb-4 print:hidden">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-            Laporan Mutu & Ekspor Dokumen Resmi
-          </h1>
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded-lg bg-emerald-700 flex items-center justify-center text-white shadow-xs">
+              <FileSpreadsheet className="h-4 w-4" />
+            </div>
+            <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+              Laporan & Ekspor Kontrol Mutu Laboratorium
+            </h1>
+          </div>
           <p className="text-xs text-slate-500 mt-1">
-            Pencetakan lembar kontrol mutu resmi dengan KOP Surat RSUD Sultan Muhammad Jamaludin I dan ekspor format CSV/Excel.
+            Pencarian data presisi dari rentang tanggal, filter parameter, pratinjau lembar resmi KOP Surat RSUD Sultan Muhammad Jamaludin I, dan ekspor data.
           </p>
         </div>
 
-        {/* Action buttons */}
-        <div className="flex items-center gap-2 self-start md:self-auto">
+        {/* Action Buttons */}
+        <div className="flex flex-wrap items-center gap-2.5 self-start md:self-auto">
+          {/* Button Ubah Penanggung Jawab Mutu & Pimpinan */}
+          <button
+            type="button"
+            onClick={handleOpenSignatoriesModal}
+            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg shadow-2xs transition-colors"
+            title="Ubah Penanggung Jawab Mutu & Penanggung Jawab Laboratorium"
+          >
+            <Edit3 className="h-4 w-4 text-slate-600" />
+            <span>Ubah PJ Mutu & Pimpinan</span>
+          </button>
+
           <button
             type="button"
             onClick={handleExportCSV}
-            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-colors"
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-lg shadow-2xs transition-colors"
           >
-            <Download className="h-4 w-4" />
-            <span>Ekspor Excel (CSV)</span>
+            <Download className="h-4 w-4 text-emerald-700" />
+            <span>Ekspor Excel (.CSV)</span>
           </button>
+          
           <button
             type="button"
             onClick={handlePrint}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-xs transition-colors"
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-2xs transition-colors"
           >
             <Printer className="h-4 w-4" />
             <span>Cetak / Cetak PDF</span>
@@ -149,61 +397,232 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         </div>
       </div>
 
-      {/* Filter Toolbar (Hidden on Print) */}
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs flex flex-wrap items-center justify-between gap-3 print:hidden text-xs">
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Report Type */}
-          <div className="flex items-center rounded-lg bg-slate-100 p-0.5 font-medium text-slate-600">
+      {/* Report Navigation Tabs - Screen Only */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2 print:hidden">
+        {[
+          { id: 'qc', label: '1. Laporan QC Harian', icon: FileCheck, count: filteredQC.length },
+          { id: 'westgard', label: '2. Pelanggaran Westgard', icon: AlertTriangle, count: filteredWestgard.length },
+          { id: 'nc', label: '3. Penyimpangan Mutu (NC)', icon: AlertOctagon, count: filteredNC.length },
+          { id: 'capa', label: '4. Dokumen CAPA', icon: ClipboardCheck, count: filteredCAPA.length },
+        ].map(t => {
+          const Icon = t.icon;
+          const isActive = reportType === t.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setReportType(t.id as any)}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all ${
+                isActive
+                  ? 'bg-emerald-700 text-white shadow-xs'
+                  : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+              <span>{t.label}</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                isActive ? 'bg-emerald-900 text-emerald-100' : 'bg-slate-200 text-slate-800'
+              }`}>
+                {t.count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Date Range & Comprehensive Filter Card - Screen Only */}
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs space-y-4 print:hidden">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
+            <Calendar className="h-4 w-4 text-emerald-700" />
+            <span>Pencarian Rentang Tanggal & Filter Laporan</span>
+          </div>
+
+          {/* Quick Presets */}
+          <div className="flex items-center gap-1.5 text-xs">
+            <span className="text-slate-400 text-[11px] font-medium mr-1">Preset:</span>
             {[
-              { id: 'qc', label: 'Laporan QC Harian' },
-              { id: 'westgard', label: 'Pelanggaran Westgard' },
-              { id: 'nc', label: 'Penyimpangan (NC)' },
-              { id: 'capa', label: 'Dokumen CAPA' },
-            ].map((t) => (
+              { id: 'today', label: 'Hari Ini' },
+              { id: '7d', label: '7 Hari' },
+              { id: 'this_month', label: 'Bulan Ini' },
+              { id: 'last_month', label: 'Bulan Lalu' },
+              { id: 'all', label: 'Semua Data' },
+            ].map(p => (
               <button
-                key={t.id}
+                key={p.id}
                 type="button"
-                onClick={() => setReportType(t.id as any)}
-                className={`px-3 py-1.5 rounded-md transition-colors ${
-                  reportType === t.id
-                    ? 'bg-white text-slate-900 shadow-xs font-semibold'
-                    : 'hover:text-slate-900'
-                }`}
+                onClick={() => handleSetPreset(p.id as any)}
+                className="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-medium transition-colors"
               >
-                {t.label}
+                {p.label}
               </button>
             ))}
           </div>
+        </div>
 
-          {/* Parameter filter (for QC) */}
-          {reportType === 'qc' && (
-            <select
-              value={selectedParameterId}
-              onChange={(e) => setSelectedParameterId(e.target.value)}
-              className="rounded-lg border border-slate-200 px-3 py-1.5 bg-white font-medium focus:outline-none"
-            >
-              <option value="all">Semua Parameter</option>
-              {parameters.map(p => (
-                <option key={p.id} value={p.id}>{p.name} ({p.code})</option>
-              ))}
-            </select>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 text-xs">
+          {/* Dari Tanggal */}
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+              Dari Tanggal:
+            </label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 px-3 py-1.5 font-mono text-xs focus:border-emerald-500 focus:outline-none bg-slate-50"
+            />
+          </div>
+
+          {/* Sampai Tanggal */}
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+              Sampai Tanggal:
+            </label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 px-3 py-1.5 font-mono text-xs focus:border-emerald-500 focus:outline-none bg-slate-50"
+            />
+          </div>
+
+          {/* Parameter Filter */}
+          {(reportType === 'qc' || reportType === 'westgard' || reportType === 'nc') && (
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                Parameter Pemeriksaan:
+              </label>
+              <select
+                value={selectedParameterId}
+                onChange={(e) => setSelectedParameterId(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs focus:border-emerald-500 focus:outline-none bg-white"
+              >
+                <option value="all">Semua Parameter ({parameters.length})</option>
+                {parameters.map(p => (
+                  <option key={p.id} value={p.id}>{p.name} ({p.code})</option>
+                ))}
+              </select>
+            </div>
           )}
 
-          {/* Period Filter */}
-          <select
-            value={selectedPeriod}
-            onChange={(e) => setSelectedPeriod(e.target.value as any)}
-            className="rounded-lg border border-slate-200 px-3 py-1.5 bg-white font-medium focus:outline-none"
-          >
-            <option value="today">Hari Ini</option>
-            <option value="7d">7 Hari Terakhir</option>
-            <option value="30d">30 Hari Terakhir (Bulanan)</option>
-            <option value="all">Semua Periode</option>
-          </select>
+          {/* Instrument Filter */}
+          {(reportType === 'qc' || reportType === 'westgard' || reportType === 'nc') && (
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                Instrumen / Alat:
+              </label>
+              <select
+                value={selectedInstrumentId}
+                onChange={(e) => setSelectedInstrumentId(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs focus:border-emerald-500 focus:outline-none bg-white"
+              >
+                <option value="all">Semua Alat ({instruments.length})</option>
+                {instruments.map(i => (
+                  <option key={i.id} value={i.id}>{i.name} ({i.code})</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Severity filter (NC only) */}
+          {reportType === 'nc' && (
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                Tingkat Keparahan:
+              </label>
+              <select
+                value={selectedSeverity}
+                onChange={(e) => setSelectedSeverity(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs focus:border-emerald-500 focus:outline-none bg-white"
+              >
+                <option value="all">Semua Severity</option>
+                <option value="critical">Critical (Kritis)</option>
+                <option value="major">Major (Mayor)</option>
+                <option value="minor">Minor (Minor)</option>
+              </select>
+            </div>
+          )}
+
+          {/* Status Filter */}
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+              Status Laporan:
+            </label>
+            <select
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs focus:border-emerald-500 focus:outline-none bg-white"
+            >
+              <option value="all">Semua Status</option>
+              {reportType === 'qc' && (
+                <>
+                  <option value="pass">Pass (Lolos)</option>
+                  <option value="warning">Warning (Peringatan)</option>
+                  <option value="reject">Reject (Ditolak)</option>
+                </>
+              )}
+              {reportType === 'westgard' && (
+                <>
+                  <option value="reject">Reject Rule (Pelanggaran Penolakan)</option>
+                  <option value="warning">Warning Rule (Peringatan 1:2s)</option>
+                </>
+              )}
+              {reportType === 'nc' && (
+                <>
+                  <option value="open">Open (Terbuka)</option>
+                  <option value="resolved">Resolved (Terselesaikan)</option>
+                  <option value="escalated_to_capa">Eskalasi ke CAPA</option>
+                </>
+              )}
+              {reportType === 'capa' && (
+                <>
+                  <option value="open">Open (Baru)</option>
+                  <option value="investigation">Investigation (Investigasi)</option>
+                  <option value="action_in_progress">Action in Progress</option>
+                  <option value="closed">Closed (Selesai/Efektif)</option>
+                </>
+              )}
+            </select>
+          </div>
+
+          {/* Keyword Search */}
+          <div className={reportType === 'capa' ? 'sm:col-span-2' : ''}>
+            <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+              Kata Kunci Pencarian:
+            </label>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Cari parameter, nomor lot, PIC, atau masalah..."
+                value={searchKeyword}
+                onChange={(e) => setSearchKeyword(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 pl-8 pr-3 py-1.5 text-xs focus:border-emerald-500 focus:outline-none bg-white"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Results count indicator */}
+        <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px] text-slate-500 font-mono">
+          <span>
+            Menampilkan data periode: <strong className="text-slate-800">{startDate}</strong> s/d <strong className="text-slate-800">{endDate}</strong>
+          </span>
+          <span>
+            Ditemukan: <strong className="text-emerald-700 font-bold">
+              {reportType === 'qc' && filteredQC.length}
+              {reportType === 'westgard' && filteredWestgard.length}
+              {reportType === 'nc' && filteredNC.length}
+              {reportType === 'capa' && filteredCAPA.length}
+            </strong> rekaman data
+          </span>
         </div>
       </div>
 
-      {/* Official Printable Report Sheet (Hospital Letterhead / KOP Surat) */}
+      {/* ========================================================================= */}
+      {/* OFFICIAL PRINTABLE REPORT SHEET (WITH HOSPITAL KOP SURAT)                  */}
+      {/* ========================================================================= */}
       <div className="rounded-xl border border-slate-200 bg-white p-8 shadow-xs print:border-none print:shadow-none print:p-0">
         {/* KOP SURAT RESMI RSUD SULTAN MUHAMMAD JAMALUDIN I */}
         <div className="flex items-center justify-between border-b-2 border-slate-900 pb-4 mb-6">
@@ -229,144 +648,579 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
               Telp: {labInfo.phone} · Surel: {labInfo.email} · Akreditasi: {labInfo.accreditation}
             </p>
           </div>
-          <div className="w-20 shrink-0 text-right">
-            <span className="font-mono text-[10px] text-slate-400 block">KARS MUTU</span>
-            <span className="font-mono text-[10px] text-slate-400 block">ISO 15189</span>
+          <div className="w-24 shrink-0 text-right">
+            <span className="font-mono text-[9px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-300 block mb-1">
+              KARS PARIPURNA
+            </span>
+            <span className="font-mono text-[9px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-300 block">
+              ISO 15189:2022
+            </span>
           </div>
         </div>
 
         {/* Title of Document */}
         <div className="text-center my-4">
           <h2 className="text-base font-bold uppercase text-slate-900 tracking-wide underline underline-offset-4">
-            {reportType === 'qc'
-              ? 'LEMBAR LAPORAN PEMERIKSAAN QUALITY CONTROL (QC)'
-              : reportType === 'westgard'
-              ? 'REKAPITULASI PELANGGARAN ATURAN WESTGARD'
-              : reportType === 'nc'
-              ? 'LAPORAN KETIDAKSESUAIAN MUTU (NON-CONFORMITY)'
-              : 'LAPORAN CORRECTIVE & PREVENTIVE ACTION (CAPA)'}
+            {reportType === 'qc' && 'LEMBAR LAPORAN REKAPITULASI QUALITY CONTROL (QC) HARIAN'}
+            {reportType === 'westgard' && 'LEMBAR REKAPITULASI PELANGGARAN ATURAN WESTGARD'}
+            {reportType === 'nc' && 'LEMBAR LAPORAN KETIDAKSESUAIAN MUTU (NON-CONFORMITY / NC)'}
+            {reportType === 'capa' && 'LEMBAR DOKUMEN CORRECTIVE & PREVENTIVE ACTION (CAPA)'}
           </h2>
-          <p className="text-xs text-slate-600 font-mono mt-1">
-            Periode: {selectedPeriod.toUpperCase()} · Tanggal Cetak: {new Date().toISOString().split('T')[0]}
+          <p className="text-xs text-slate-600 font-mono mt-1.5">
+            Rentang Tanggal: <strong>{startDate}</strong> s/d <strong>{endDate}</strong> · Tanggal Cetak: {new Date().toISOString().split('T')[0]} · Unit: {labInfo.roomUnit}
           </p>
         </div>
 
-        {/* Statistical Summary Box (for QC) */}
-        {reportType === 'qc' && stats && (
-          <div className="mb-4 grid grid-cols-6 gap-2 rounded-lg border border-slate-300 p-2.5 text-center text-xs font-mono">
+        {/* Statistical Summary Bar for QC */}
+        {reportType === 'qc' && qcStats && (
+          <div className="mb-5 grid grid-cols-2 sm:grid-cols-6 gap-2 rounded-lg border border-slate-300 bg-slate-50 p-3 text-center text-xs font-mono">
             <div>
-              <p className="text-[10px] text-slate-500 uppercase">Total Run (N)</p>
-              <p className="font-bold text-slate-900">{stats.count}</p>
+              <p className="text-[10px] text-slate-500 uppercase">Total Pemeriksaan</p>
+              <p className="font-bold text-sm text-slate-900">{filteredQC.length}</p>
             </div>
             <div>
               <p className="text-[10px] text-slate-500 uppercase">Mean Aktual</p>
-              <p className="font-bold text-slate-900">{stats.mean}</p>
+              <p className="font-bold text-sm text-slate-900">{qcStats.mean}</p>
             </div>
             <div>
               <p className="text-[10px] text-slate-500 uppercase">SD Aktual</p>
-              <p className="font-bold text-slate-900">{stats.sd}</p>
+              <p className="font-bold text-sm text-slate-900">{qcStats.sd}</p>
             </div>
             <div>
               <p className="text-[10px] text-slate-500 uppercase">CV% Aktual</p>
-              <p className="font-bold text-emerald-700">{stats.cv}%</p>
+              <p className="font-bold text-sm text-emerald-700">{qcStats.cv}%</p>
             </div>
             <div>
-              <p className="text-[10px] text-slate-500 uppercase">Pass Rate</p>
-              <p className="font-bold text-slate-900">
-                {stats.count > 0 ? Math.round((stats.passCount / stats.count) * 100) : 0}%
+              <p className="text-[10px] text-slate-500 uppercase">Lolos Mutu (Pass)</p>
+              <p className="font-bold text-sm text-emerald-700">
+                {qcStats.count > 0 ? Math.round((qcStats.passCount / qcStats.count) * 100) : 0}% ({qcStats.passCount})
               </p>
             </div>
             <div>
-              <p className="text-[10px] text-slate-500 uppercase">Reject</p>
-              <p className="font-bold text-rose-700">{stats.rejectCount}</p>
+              <p className="text-[10px] text-slate-500 uppercase">Penolakan (Reject)</p>
+              <p className="font-bold text-sm text-rose-700">{qcStats.rejectCount}</p>
             </div>
           </div>
         )}
 
-        {/* Content Table */}
+        {/* Summary Bar for Westgard Violations */}
+        {reportType === 'westgard' && (
+          <div className="mb-5 grid grid-cols-3 gap-3 rounded-lg border border-slate-300 bg-slate-50 p-3 text-center text-xs font-mono">
+            <div>
+              <p className="text-[10px] text-slate-500 uppercase">Total Insiden Westgard</p>
+              <p className="font-bold text-sm text-slate-900">{filteredWestgard.length}</p>
+            </div>
+            <div>
+              <p className="text-[10px] text-slate-500 uppercase">Kategori Reject Rule</p>
+              <p className="font-bold text-sm text-rose-700">
+                {filteredWestgard.filter(w => w.type === 'reject').length}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] text-slate-500 uppercase">Kategori Warning Rule (1:2s)</p>
+              <p className="font-bold text-sm text-amber-700">
+                {filteredWestgard.filter(w => w.type === 'warning').length}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Summary Bar for Non-Conformities */}
+        {reportType === 'nc' && (
+          <div className="mb-5 grid grid-cols-4 gap-3 rounded-lg border border-slate-300 bg-slate-50 p-3 text-center text-xs font-mono">
+            <div>
+              <p className="text-[10px] text-slate-500 uppercase">Total Laporan NC</p>
+              <p className="font-bold text-sm text-slate-900">{filteredNC.length}</p>
+            </div>
+            <div>
+              <p className="text-[10px] text-slate-500 uppercase">Status Open</p>
+              <p className="font-bold text-sm text-rose-700">
+                {filteredNC.filter(n => n.status === 'open').length}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] text-slate-500 uppercase">Terselesaikan (Resolved)</p>
+              <p className="font-bold text-sm text-emerald-700">
+                {filteredNC.filter(n => n.status === 'resolved').length}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] text-slate-500 uppercase">Eskalasi ke CAPA</p>
+              <p className="font-bold text-sm text-indigo-700">
+                {filteredNC.filter(n => n.status === 'escalated_to_capa').length}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Summary Bar for CAPA */}
+        {reportType === 'capa' && (
+          <div className="mb-5 grid grid-cols-4 gap-3 rounded-lg border border-slate-300 bg-slate-50 p-3 text-center text-xs font-mono">
+            <div>
+              <p className="text-[10px] text-slate-500 uppercase">Total Dokumen CAPA</p>
+              <p className="font-bold text-sm text-slate-900">{filteredCAPA.length}</p>
+            </div>
+            <div>
+              <p className="text-[10px] text-slate-500 uppercase">Sedang Berjalan</p>
+              <p className="font-bold text-sm text-amber-700">
+                {filteredCAPA.filter(c => c.status !== 'closed').length}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] text-slate-500 uppercase">Selesai (Closed)</p>
+              <p className="font-bold text-sm text-emerald-700">
+                {filteredCAPA.filter(c => c.status === 'closed').length}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] text-slate-500 uppercase">Efektif Terverifikasi</p>
+              <p className="font-bold text-sm text-emerald-700">
+                {filteredCAPA.filter(c => c.effectiveness === 'effective').length}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* DATA TABLES BY REPORT TYPE                                                */}
+        {/* ========================================================================= */}
         <div className="overflow-x-auto">
+          {/* TAB 1: LAPORAN QC HARIAN */}
           {reportType === 'qc' && (
-            <table className="w-full text-left text-xs border border-slate-200">
-              <thead className="bg-slate-100 font-bold text-slate-800 border-b">
+            <table className="w-full text-left text-xs border border-slate-300">
+              <thead className="bg-slate-100 font-bold text-slate-800 border-b border-slate-300">
                 <tr>
-                  <th className="p-2 border">No</th>
-                  <th className="p-2 border">Tanggal/Jam</th>
-                  <th className="p-2 border">Parameter</th>
-                  <th className="p-2 border">Level/Lot</th>
-                  <th className="p-2 border text-right">Hasil</th>
-                  <th className="p-2 border text-right">Target Mean</th>
-                  <th className="p-2 border text-center">Z-Score</th>
-                  <th className="p-2 border">Status</th>
-                  <th className="p-2 border">Pemeriksa / Reviewer</th>
+                  <th className="p-2 border border-slate-300 text-center w-10">No</th>
+                  <th className="p-2 border border-slate-300">Tanggal / Jam</th>
+                  <th className="p-2 border border-slate-300">Instrumen</th>
+                  <th className="p-2 border border-slate-300">Parameter</th>
+                  <th className="p-2 border border-slate-300">Level / Lot</th>
+                  <th className="p-2 border border-slate-300 text-right">Hasil QC</th>
+                  <th className="p-2 border border-slate-300 text-right">Target Mean</th>
+                  <th className="p-2 border border-slate-300 text-center">Z-Score</th>
+                  <th className="p-2 border border-slate-300 text-center">Status</th>
+                  <th className="p-2 border border-slate-300">Petugas ATLM</th>
+                  <th className="p-2 border border-slate-300">Validasi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 font-mono">
-                {filteredQC.map((r, i) => (
-                  <tr key={r.id} className="text-[11px]">
-                    <td className="p-2 border text-center">{i + 1}</td>
-                    <td className="p-2 border whitespace-nowrap">{r.date} {r.time}</td>
-                    <td className="p-2 border font-sans font-semibold">{r.parameterName} ({r.parameterCode})</td>
-                    <td className="p-2 border">{r.controlLevel}</td>
-                    <td className="p-2 border text-right font-bold">{r.value} {r.unit}</td>
-                    <td className="p-2 border text-right">{r.mean}</td>
-                    <td className="p-2 border text-center font-bold">{r.sdPosition}</td>
-                    <td className="p-2 border font-bold uppercase">{r.status}</td>
-                    <td className="p-2 border font-sans">{r.operatorName}</td>
+                {filteredQC.length === 0 ? (
+                  <tr>
+                    <td colSpan={11} className="p-6 text-center text-slate-500 font-sans">
+                      Tidak ada data QC yang ditemukan pada rentang tanggal {startDate} s/d {endDate}.
+                    </td>
                   </tr>
-                ))}
+                ) : (
+                  filteredQC.map((r, idx) => (
+                    <tr key={r.id} className="text-[11px] hover:bg-slate-50">
+                      <td className="p-2 border border-slate-200 text-center">{idx + 1}</td>
+                      <td className="p-2 border border-slate-200 whitespace-nowrap">{r.date} {r.time}</td>
+                      <td className="p-2 border border-slate-200 font-sans">{r.instrumentName}</td>
+                      <td className="p-2 border border-slate-200 font-sans font-semibold">
+                        {r.parameterName} <span className="text-[10px] text-slate-500 font-mono">({r.parameterCode})</span>
+                      </td>
+                      <td className="p-2 border border-slate-200">
+                        {r.controlLevel} <span className="text-[10px] text-slate-500">[{r.lotNumber}]</span>
+                      </td>
+                      <td className="p-2 border border-slate-200 text-right font-bold">
+                        {r.value} {r.unit}
+                      </td>
+                      <td className="p-2 border border-slate-200 text-right">{r.mean}</td>
+                      <td className={`p-2 border border-slate-200 text-center font-bold ${
+                        Math.abs(r.zScore) > 3 ? 'text-rose-700 bg-rose-50' : Math.abs(r.zScore) > 2 ? 'text-amber-700 bg-amber-50' : 'text-slate-800'
+                      }`}>
+                        {r.sdPosition}
+                      </td>
+                      <td className="p-2 border border-slate-200 text-center">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                          r.status === 'pass'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : r.status === 'warning'
+                            ? 'bg-amber-100 text-amber-800'
+                            : 'bg-rose-100 text-rose-800'
+                        }`}>
+                          {r.status}
+                        </span>
+                      </td>
+                      <td className="p-2 border border-slate-200 font-sans">{r.operatorName}</td>
+                      <td className="p-2 border border-slate-200 font-sans text-[10px] uppercase">
+                        {r.reviewStatus === 'accepted' ? (
+                          <span className="text-emerald-700 font-bold">Disetujui</span>
+                        ) : r.reviewStatus === 'rejected' ? (
+                          <span className="text-rose-700 font-bold">Ditolak</span>
+                        ) : (
+                          <span className="text-slate-500">Pending</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           )}
 
-          {reportType === 'capa' && (
-            <table className="w-full text-left text-xs border border-slate-200">
-              <thead className="bg-slate-100 font-bold text-slate-800 border-b">
+          {/* TAB 2: LAPORAN PELANGGARAN WESTGARD */}
+          {reportType === 'westgard' && (
+            <table className="w-full text-left text-xs border border-slate-300">
+              <thead className="bg-slate-100 font-bold text-slate-800 border-b border-slate-300">
                 <tr>
-                  <th className="p-2 border">No</th>
-                  <th className="p-2 border">ID CAPA</th>
-                  <th className="p-2 border">Tanggal</th>
-                  <th className="p-2 border">PIC</th>
-                  <th className="p-2 border">Pernyataan Masalah</th>
-                  <th className="p-2 border">Status</th>
-                  <th className="p-2 border">Efektivitas</th>
+                  <th className="p-2 border border-slate-300 text-center w-10">No</th>
+                  <th className="p-2 border border-slate-300">Tanggal / Jam</th>
+                  <th className="p-2 border border-slate-300">Parameter & Alat</th>
+                  <th className="p-2 border border-slate-300">Level / Lot</th>
+                  <th className="p-2 border border-slate-300 text-center">Aturan Westgard</th>
+                  <th className="p-2 border border-slate-300 text-center">Tipe</th>
+                  <th className="p-2 border border-slate-300">Deskripsi Pelanggaran & Rekomendasi</th>
+                  <th className="p-2 border border-slate-300 text-center">Z-Score</th>
+                  <th className="p-2 border border-slate-300">Petugas ATLM</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 font-mono">
+                {filteredWestgard.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="p-6 text-center text-slate-500 font-sans">
+                      Tidak ada pelanggaran aturan Westgard yang tercatat pada rentang tanggal terpilih.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredWestgard.map((v, idx) => (
+                    <tr key={`${v.qcId}-${idx}`} className="text-[11px] hover:bg-slate-50">
+                      <td className="p-2 border border-slate-200 text-center">{idx + 1}</td>
+                      <td className="p-2 border border-slate-200 whitespace-nowrap">{v.date} {v.time}</td>
+                      <td className="p-2 border border-slate-200 font-sans">
+                        <div className="font-semibold text-slate-900">{v.parameterName} ({v.parameterCode})</div>
+                        <div className="text-[10px] text-slate-500">{v.instrumentName}</div>
+                      </td>
+                      <td className="p-2 border border-slate-200">
+                        {v.controlLevel} <span className="text-[10px] text-slate-500">[{v.lotNumber}]</span>
+                      </td>
+                      <td className="p-2 border border-slate-200 text-center font-bold text-slate-900 font-mono">
+                        {v.ruleName}
+                      </td>
+                      <td className="p-2 border border-slate-200 text-center">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                          v.type === 'reject'
+                            ? 'bg-rose-100 text-rose-800'
+                            : 'bg-amber-100 text-amber-800'
+                        }`}>
+                          {v.type}
+                        </span>
+                      </td>
+                      <td className="p-2 border border-slate-200 font-sans">
+                        <p className="text-slate-900">{v.description}</p>
+                      </td>
+                      <td className="p-2 border border-slate-200 text-center font-bold text-rose-700 font-mono">
+                        {v.sdPosition}
+                      </td>
+                      <td className="p-2 border border-slate-200 font-sans">{v.operatorName}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          )}
+
+          {/* TAB 3: LAPORAN PENYIMPANGAN MUTU (NC) */}
+          {reportType === 'nc' && (
+            <table className="w-full text-left text-xs border border-slate-300">
+              <thead className="bg-slate-100 font-bold text-slate-800 border-b border-slate-300">
+                <tr>
+                  <th className="p-2 border border-slate-300 text-center w-10">No</th>
+                  <th className="p-2 border border-slate-300">No. Dokumen NC</th>
+                  <th className="p-2 border border-slate-300">Tanggal / Waktu</th>
+                  <th className="p-2 border border-slate-300">Parameter & Alat</th>
+                  <th className="p-2 border border-slate-300 text-center">Severity</th>
+                  <th className="p-2 border border-slate-300">Kategori & Deskripsi Masalah</th>
+                  <th className="p-2 border border-slate-300">Dampak & Tindakan Segera</th>
+                  <th className="p-2 border border-slate-300">Pelapor</th>
+                  <th className="p-2 border border-slate-300 text-center">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {capas.map((c, i) => (
-                  <tr key={c.id} className="text-[11px]">
-                    <td className="p-2 border text-center font-mono">{i + 1}</td>
-                    <td className="p-2 border font-mono font-bold">{c.id}</td>
-                    <td className="p-2 border font-mono">{c.createdAt}</td>
-                    <td className="p-2 border font-semibold">{c.pic}</td>
-                    <td className="p-2 border">{c.problemStatement}</td>
-                    <td className="p-2 border font-bold uppercase">{c.status}</td>
-                    <td className="p-2 border font-bold uppercase">{c.effectiveness}</td>
+                {filteredNC.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="p-6 text-center text-slate-500">
+                      Tidak ada laporan penyimpangan mutu (Non-Conformity) pada rentang tanggal terpilih.
+                    </td>
                   </tr>
-                ))}
+                ) : (
+                  filteredNC.map((nc, idx) => (
+                    <tr key={nc.id} className="text-[11px] hover:bg-slate-50">
+                      <td className="p-2 border border-slate-200 text-center font-mono">{idx + 1}</td>
+                      <td className="p-2 border border-slate-200 font-mono font-bold text-slate-900">{nc.id}</td>
+                      <td className="p-2 border border-slate-200 font-mono whitespace-nowrap">{nc.date} {nc.time}</td>
+                      <td className="p-2 border border-slate-200">
+                        <div className="font-semibold text-slate-900">{nc.parameterName}</div>
+                        <div className="text-[10px] text-slate-500 font-mono">{nc.instrumentName}</div>
+                      </td>
+                      <td className="p-2 border border-slate-200 text-center">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                          nc.severity === 'critical'
+                            ? 'bg-rose-100 text-rose-800'
+                            : nc.severity === 'major'
+                            ? 'bg-amber-100 text-amber-800'
+                            : 'bg-slate-100 text-slate-800'
+                        }`}>
+                          {nc.severity}
+                        </span>
+                      </td>
+                      <td className="p-2 border border-slate-200 max-w-xs">
+                        <span className="font-semibold text-slate-800 block text-[10px] uppercase text-emerald-800">{nc.category}</span>
+                        <span className="text-slate-700">{nc.description}</span>
+                      </td>
+                      <td className="p-2 border border-slate-200 max-w-xs">
+                        <p className="text-slate-900 font-medium">Tindakan: {nc.immediateAction}</p>
+                        <p className="text-[10px] text-slate-500 mt-0.5">Dampak: {nc.impact}</p>
+                      </td>
+                      <td className="p-2 border border-slate-200">{nc.reportedByName}</td>
+                      <td className="p-2 border border-slate-200 text-center font-mono font-bold uppercase text-[10px]">
+                        <span className={`px-2 py-0.5 rounded ${
+                          nc.status === 'resolved'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : nc.status === 'escalated_to_capa'
+                            ? 'bg-indigo-100 text-indigo-800'
+                            : 'bg-rose-100 text-rose-800'
+                        }`}>
+                          {nc.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          )}
+
+          {/* TAB 4: LAPORAN DOKUMEN CAPA */}
+          {reportType === 'capa' && (
+            <table className="w-full text-left text-xs border border-slate-300">
+              <thead className="bg-slate-100 font-bold text-slate-800 border-b border-slate-300">
+                <tr>
+                  <th className="p-2 border border-slate-300 text-center w-10">No</th>
+                  <th className="p-2 border border-slate-300">No. CAPA</th>
+                  <th className="p-2 border border-slate-300">Tanggal</th>
+                  <th className="p-2 border border-slate-300">PIC & Unit</th>
+                  <th className="p-2 border border-slate-300">Pernyataan Masalah & Akar Masalah</th>
+                  <th className="p-2 border border-slate-300">Tindakan Korektif & Preventif</th>
+                  <th className="p-2 border border-slate-300 text-center">Batas Waktu</th>
+                  <th className="p-2 border border-slate-300 text-center">Status</th>
+                  <th className="p-2 border border-slate-300 text-center">Efektivitas</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {filteredCAPA.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="p-6 text-center text-slate-500">
+                      Tidak ada dokumen CAPA yang tercatat pada rentang tanggal terpilih.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredCAPA.map((c, idx) => (
+                    <tr key={c.id} className="text-[11px] hover:bg-slate-50">
+                      <td className="p-2 border border-slate-200 text-center font-mono">{idx + 1}</td>
+                      <td className="p-2 border border-slate-200 font-mono font-bold text-slate-900">{c.id}</td>
+                      <td className="p-2 border border-slate-200 font-mono whitespace-nowrap">{c.createdAt.substring(0, 10)}</td>
+                      <td className="p-2 border border-slate-200">
+                        <div className="font-semibold text-slate-900">{c.pic}</div>
+                        <div className="text-[10px] text-slate-500">{c.department}</div>
+                      </td>
+                      <td className="p-2 border border-slate-200 max-w-xs">
+                        <p className="font-semibold text-slate-900">{c.problemStatement}</p>
+                        {c.identifiedRootCause && (
+                          <p className="text-[10px] text-slate-600 mt-1 italic">
+                            Akar Masalah: {c.identifiedRootCause}
+                          </p>
+                        )}
+                      </td>
+                      <td className="p-2 border border-slate-200">
+                        <span className="inline-block px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 text-[10px] font-bold mr-1">
+                          {c.correctiveActions.length} Korektif
+                        </span>
+                        <span className="inline-block px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-bold">
+                          {c.preventiveActions.length} Preventif
+                        </span>
+                      </td>
+                      <td className="p-2 border border-slate-200 text-center font-mono">{c.overallDueDate}</td>
+                      <td className="p-2 border border-slate-200 text-center font-mono uppercase font-bold text-[10px]">
+                        <span className={`px-2 py-0.5 rounded ${
+                          c.status === 'closed'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-amber-100 text-amber-800'
+                        }`}>
+                          {c.status}
+                        </span>
+                      </td>
+                      <td className="p-2 border border-slate-200 text-center font-mono uppercase font-bold text-[10px]">
+                        <span className={`px-2 py-0.5 rounded ${
+                          c.effectiveness === 'effective'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-slate-100 text-slate-700'
+                        }`}>
+                          {c.effectiveness}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           )}
         </div>
 
-        {/* Official Signatures Footer */}
-        <div className="mt-12 grid grid-cols-2 text-center text-xs pt-4 border-t border-slate-200">
+        {/* OFFICIAL SIGNATURE FOOTER */}
+        <div className="mt-12 grid grid-cols-2 text-center text-xs pt-6 border-t-2 border-slate-900">
           <div>
-            <p className="text-slate-600">Mengetahui,</p>
+            <p className="text-slate-600">Mengetahui & Menyetujui,</p>
             <p className="font-bold text-slate-900 mt-1">Penanggung Jawab Laboratorium</p>
-            <div className="h-16" />
+            <div className="h-20 flex items-center justify-center">
+              <span className="text-[11px] text-slate-300 font-mono">[Tanda Tangan & Cap Laboratorium]</span>
+            </div>
             <p className="font-bold underline text-slate-900">{labInfo.headOfLab}</p>
             <p className="text-[11px] font-mono text-slate-500">NIP: {labInfo.headNip}</p>
           </div>
 
-          <div>
+          <div className="relative group">
             <p className="text-slate-600">Sukadana, {new Date().toISOString().split('T')[0]}</p>
-            <p className="font-bold text-slate-900 mt-1">Supervisor / PJ Mutu Laboratorium</p>
-            <div className="h-16" />
-            <p className="font-bold underline text-slate-900">Siti Rahmawati, S.Tr.Kes</p>
-            <p className="text-[11px] font-mono text-slate-500">NIP: 19880315 201101 2 004</p>
+            <p className="font-bold text-slate-900 mt-1">Penanggung Jawab Mutu</p>
+            <div className="h-20 flex items-center justify-center">
+              <span className="text-[11px] text-slate-300 font-mono">[Tanda Tangan PJ Mutu]</span>
+            </div>
+            <p className="font-bold underline text-slate-900">
+              {labInfo.headOfQuality || 'Siti Rahmawati, S.Tr.Kes'}
+            </p>
+            <p className="text-[11px] font-mono text-slate-500">
+              NIP: {labInfo.qualityNip || '19850914 201001 2 015'}
+            </p>
+            
+            {/* Quick edit trigger on hover (Hidden on Print) */}
+            <button
+              type="button"
+              onClick={handleOpenSignatoriesModal}
+              className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity p-1 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded text-slate-600 text-[10px] flex items-center gap-1 print:hidden"
+              title="Klik untuk mengubah nama/NIP Penanggung Jawab Mutu"
+            >
+              <Edit3 className="h-3 w-3" />
+              <span>Ubah</span>
+            </button>
           </div>
         </div>
       </div>
+
+      {/* ========================================================================= */}
+      {/* MODAL EDIT PENANGGUNG JAWAB MUTU & PIMPINAN LAB                           */}
+      {/* ========================================================================= */}
+      {isSignatoriesModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <UserCheck className="h-5 w-5 text-emerald-700" />
+                <h3 className="font-bold text-slate-900 text-sm">
+                  Ubah Penanggung Jawab Mutu & Pimpinan Lab
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSignatoriesModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveSignatories} className="space-y-4 text-xs">
+              <div className="rounded-lg bg-emerald-50/70 border border-emerald-200 p-3 text-emerald-900 text-[11px]">
+                Perubahan data di bawah akan langsung diterapkan pada seluruh dokumen cetak laporan QC, Westgard, NC, dan CAPA.
+              </div>
+
+              {/* Penanggung Jawab Mutu */}
+              <div className="p-3 rounded-lg border border-slate-200 bg-slate-50 space-y-2.5">
+                <div className="font-bold text-slate-900 text-xs flex items-center gap-1 text-emerald-800">
+                  <UserCheck className="h-3.5 w-3.5" />
+                  <span>1. Penanggung Jawab Mutu</span>
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Nama Lengkap & Gelar Penanggung Jawab Mutu:
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={signatoriesForm.headOfQuality}
+                    onChange={(e) => setSignatoriesForm({ ...signatoriesForm, headOfQuality: e.target.value })}
+                    placeholder="Contoh: Siti Rahmawati, S.Tr.Kes"
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    NIP Penanggung Jawab Mutu:
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={signatoriesForm.qualityNip}
+                    onChange={(e) => setSignatoriesForm({ ...signatoriesForm, qualityNip: e.target.value })}
+                    placeholder="Contoh: 19850914 201001 2 015"
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-xs focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Penanggung Jawab Laboratorium */}
+              <div className="p-3 rounded-lg border border-slate-200 bg-slate-50 space-y-2.5">
+                <div className="font-bold text-slate-900 text-xs flex items-center gap-1 text-slate-800">
+                  <Building2 className="h-3.5 w-3.5" />
+                  <span>2. Penanggung Jawab Laboratorium (Pimpinan)</span>
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Nama Penanggung Jawab Laboratorium:
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={signatoriesForm.headOfLab}
+                    onChange={(e) => setSignatoriesForm({ ...signatoriesForm, headOfLab: e.target.value })}
+                    placeholder="Contoh: dr. Hendra Wijaya, Sp.PK"
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    NIP Penanggung Jawab Laboratorium:
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={signatoriesForm.headNip}
+                    onChange={(e) => setSignatoriesForm({ ...signatoriesForm, headNip: e.target.value })}
+                    placeholder="Contoh: 19800512 200801 1 008"
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-xs focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsSignatoriesModalOpen(false)}
+                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-xs font-semibold"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="flex items-center gap-1.5 px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-semibold shadow-xs"
+                >
+                  <Save className="h-3.5 w-3.5" />
+                  <span>Simpan Perubahan</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

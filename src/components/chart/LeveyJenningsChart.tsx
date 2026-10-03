@@ -9,10 +9,13 @@ import {
   Calendar,
   Layers,
   Activity,
-  CheckCircle,
+  CheckCircle2,
   AlertTriangle,
   XCircle,
-  ShieldAlert
+  ShieldAlert,
+  Search,
+  SlidersHorizontal,
+  ChevronRight
 } from 'lucide-react';
 import { QCResult, Parameter, QCStatistics } from '../../types';
 import { calculateQCStatistics } from '../../utils/qcCalculations';
@@ -33,7 +36,11 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
   onCreateNC,
 }) => {
   const [selectedLevel, setSelectedLevel] = useState<'all' | 'Level 1' | 'Level 2' | 'Level 3'>('all');
-  const [dateFilter, setDateFilter] = useState<'all' | '7d' | '30d' | '90d'>('30d');
+  
+  // Precise Date Range Search ("Dari Tanggal" s/d "Sampai Tanggal")
+  const [startDate, setStartDate] = useState<string>('2026-09-01');
+  const [endDate, setEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [hoveredPoint, setHoveredPoint] = useState<{
     result: QCResult;
@@ -44,7 +51,31 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
-  // Filter results by parameter, level, and date
+  // Quick preset button handler
+  const handleSetPreset = (preset: 'today' | '7d' | 'this_month' | 'last_month' | '90d' | 'all') => {
+    const todayStr = '2026-10-03';
+    if (preset === 'today') {
+      setStartDate(todayStr);
+      setEndDate(todayStr);
+    } else if (preset === '7d') {
+      setStartDate('2026-09-26');
+      setEndDate(todayStr);
+    } else if (preset === 'this_month') {
+      setStartDate('2026-10-01');
+      setEndDate('2026-10-31');
+    } else if (preset === 'last_month') {
+      setStartDate('2026-09-01');
+      setEndDate('2026-09-30');
+    } else if (preset === '90d') {
+      setStartDate('2026-07-01');
+      setEndDate(todayStr);
+    } else if (preset === 'all') {
+      setStartDate('2026-01-01');
+      setEndDate('2026-12-31');
+    }
+  };
+
+  // Filter results by parameter, level, and exact date range
   const filteredResults = useMemo(() => {
     let list = results.filter(r => r.parameterId === parameter.id);
 
@@ -52,16 +83,17 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
       list = list.filter(r => r.controlLevel === selectedLevel);
     }
 
-    if (dateFilter !== 'all') {
-      const now = new Date('2026-10-03T12:00:00Z').getTime(); // anchored to current context date
-      const days = dateFilter === '7d' ? 7 : dateFilter === '30d' ? 30 : 90;
-      const cutoff = now - days * 24 * 3600 * 1000;
-      list = list.filter(r => r.timestamp >= cutoff);
+    if (startDate) {
+      list = list.filter(r => r.date >= startDate);
+    }
+
+    if (endDate) {
+      list = list.filter(r => r.date <= endDate);
     }
 
     // Sort chronologically
     return [...list].sort((a, b) => a.timestamp - b.timestamp);
-  }, [results, parameter.id, selectedLevel, dateFilter]);
+  }, [results, parameter.id, selectedLevel, startDate, endDate]);
 
   // Compute live statistics for current selection
   const stats: QCStatistics = useMemo(() => {
@@ -77,7 +109,7 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
   const width = 960;
   const height = 400;
   const padding = { top: 40, right: 90, bottom: 50, left: 70 };
-  const chartWidth = (width - padding.left - padding.right) * zoomLevel;
+  const chartWidth = Math.max(width - padding.left - padding.right, filteredResults.length * 32) * zoomLevel;
   const chartHeight = height - padding.top - padding.bottom;
 
   // Y Scale based on Mean +/- 3.5 SD
@@ -97,7 +129,7 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
     return padding.left + (index / (total - 1)) * chartWidth;
   };
 
-  // Lines definition
+  // Reference lines definition
   const lines = [
     { label: '+3 SD', value: targetMean + 3 * targetSD, color: '#e11d48', strokeWidth: 1.5, strokeDash: '4,4' },
     { label: '+2 SD', value: targetMean + 2 * targetSD, color: '#f59e0b', strokeWidth: 1.5, strokeDash: '4,4' },
@@ -113,7 +145,7 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
     if (!svgRef.current) return;
     const svgData = new XMLSerializer().serializeToString(svgRef.current);
     const canvas = document.createElement('canvas');
-    canvas.width = width * 2;
+    canvas.width = (padding.left + chartWidth + padding.right) * 2;
     canvas.height = height * 2;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -129,7 +161,7 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
       URL.revokeObjectURL(url);
       const pngUrl = canvas.toDataURL('image/png');
       const link = document.createElement('a');
-      link.download = `Levey_Jennings_${parameter.code}_${new Date().toISOString().split('T')[0]}.png`;
+      link.download = `Levey_Jennings_${parameter.code}_${startDate}_sd_${endDate}.png`;
       link.href = pngUrl;
       link.click();
     };
@@ -141,15 +173,18 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
   };
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
-      {/* Header & Controls */}
-      <div className="flex flex-col gap-4 border-b border-slate-100 pb-4 lg:flex-row lg:items-center lg:justify-between">
+    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
+      {/* Header Info */}
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between border-b border-slate-100 pb-3">
         <div>
           <div className="flex items-center gap-2">
+            <div className="h-7 w-7 rounded-lg bg-emerald-700 flex items-center justify-center text-white shadow-2xs">
+              <Activity className="h-4 w-4" />
+            </div>
             <h2 className="text-base font-bold text-slate-900">
-              Grafik Levey-Jennings: {parameter.name}
+              Grafik Kendali Mutu Levey-Jennings: {parameter.name}
             </h2>
-            <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
+            <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
               {parameter.code}
             </span>
             <span className="text-xs text-slate-500 font-mono">
@@ -157,138 +192,180 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Metode: {parameter.method} · Mean Target: {parameter.targetMean} {parameter.unit} (SD: {parameter.targetSD})
+            Metode: <strong className="text-slate-700">{parameter.method}</strong> · Mean Target: <strong className="text-slate-700">{parameter.targetMean} {parameter.unit}</strong> (SD: {parameter.targetSD}, CV: {parameter.targetCV}%)
           </p>
         </div>
 
-        {/* Filter controls & Buttons */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Level Filter */}
-          <div className="flex items-center rounded-lg bg-slate-100 p-0.5 text-xs font-medium text-slate-600">
-            {(['all', 'Level 1', 'Level 2'] as const).map((lvl) => (
-              <button
-                key={lvl}
-                type="button"
-                onClick={() => setSelectedLevel(lvl)}
-                className={`px-2.5 py-1 rounded-md transition-colors ${
-                  selectedLevel === lvl
-                    ? 'bg-white text-slate-900 shadow-xs font-semibold'
-                    : 'hover:text-slate-900'
-                }`}
-              >
-                {lvl === 'all' ? 'Semua Level' : lvl}
-              </button>
-            ))}
-          </div>
-
-          {/* Date Filter */}
-          <div className="flex items-center rounded-lg bg-slate-100 p-0.5 text-xs font-medium text-slate-600">
-            {[
-              { id: '7d', label: '7 Hari' },
-              { id: '30d', label: '30 Hari' },
-              { id: '90d', label: '3 Bulan' },
-              { id: 'all', label: 'Semua' },
-            ].map((d) => (
-              <button
-                key={d.id}
-                type="button"
-                onClick={() => setDateFilter(d.id as any)}
-                className={`px-2 py-1 rounded-md transition-colors ${
-                  dateFilter === d.id
-                    ? 'bg-white text-slate-900 shadow-xs font-semibold'
-                    : 'hover:text-slate-900'
-                }`}
-              >
-                {d.label}
-              </button>
-            ))}
-          </div>
-
+        {/* Action buttons (Zoom, PNG, Print) */}
+        <div className="flex items-center gap-1.5 self-start md:self-auto">
           {/* Zoom controls */}
-          <div className="flex items-center gap-1 border-l border-slate-200 pl-2">
+          <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg text-slate-600">
             <button
               type="button"
-              onClick={() => setZoomLevel(prev => Math.min(prev + 0.3, 2.5))}
-              className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md"
+              onClick={() => setZoomLevel(prev => Math.min(prev + 0.3, 3))}
+              className="p-1.5 hover:text-slate-900 hover:bg-white rounded-md transition-colors"
               title="Perbesar Grafik"
             >
-              <ZoomIn className="h-4 w-4" />
+              <ZoomIn className="h-3.5 w-3.5" />
             </button>
             <button
               type="button"
               onClick={() => setZoomLevel(prev => Math.max(prev - 0.3, 1))}
-              className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md"
+              className="p-1.5 hover:text-slate-900 hover:bg-white rounded-md transition-colors"
               title="Perkecil Grafik"
             >
-              <ZoomOut className="h-4 w-4" />
+              <ZoomOut className="h-3.5 w-3.5" />
             </button>
             <button
               type="button"
               onClick={() => setZoomLevel(1)}
-              className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md"
+              className="p-1.5 hover:text-slate-900 hover:bg-white rounded-md transition-colors"
               title="Reset Zoom"
             >
-              <RotateCcw className="h-4 w-4" />
+              <RotateCcw className="h-3.5 w-3.5" />
             </button>
           </div>
 
-          {/* Export & Print */}
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={handleExportPNG}
-              className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 border border-slate-200 rounded-lg"
-              title="Ekspor Gambar PNG"
+          <button
+            type="button"
+            onClick={handleExportPNG}
+            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-2xs transition-colors"
+            title="Ekspor Gambar Grafik (PNG)"
+          >
+            <Download className="h-3.5 w-3.5 text-slate-600" />
+            <span>Ekspor PNG</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handlePrint}
+            className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-2xs transition-colors"
+            title="Cetak Lembar Grafik Levey-Jennings"
+          >
+            <Printer className="h-3.5 w-3.5" />
+            <span>Cetak</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Precise Date Range & Level Filter Card */}
+      <div className="rounded-lg bg-slate-50 border border-slate-200 p-3 text-xs space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 font-bold text-slate-800">
+            <Calendar className="h-4 w-4 text-emerald-700" />
+            <span>Pencarian Rentang Tanggal Grafik:</span>
+          </div>
+
+          {/* Quick preset buttons */}
+          <div className="flex flex-wrap items-center gap-1 text-[11px]">
+            <span className="text-slate-400 font-medium mr-1">Preset:</span>
+            {[
+              { id: 'today', label: 'Hari Ini' },
+              { id: '7d', label: '7 Hari' },
+              { id: 'this_month', label: 'Bulan Ini' },
+              { id: 'last_month', label: 'Bulan Lalu' },
+              { id: '90d', label: '3 Bulan' },
+              { id: 'all', label: 'Semua Data' },
+            ].map(p => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => handleSetPreset(p.id as any)}
+                className="px-2 py-0.5 rounded bg-white hover:bg-slate-200 text-slate-700 font-medium border border-slate-200 transition-colors"
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+          {/* Dari Tanggal */}
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+              Dari Tanggal (Start Date):
+            </label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 px-3 py-1.5 font-mono text-xs focus:border-emerald-500 focus:outline-none bg-white"
+            />
+          </div>
+
+          {/* Sampai Tanggal */}
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+              Sampai Tanggal (End Date):
+            </label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 px-3 py-1.5 font-mono text-xs focus:border-emerald-500 focus:outline-none bg-white"
+            />
+          </div>
+
+          {/* Level Kontrol */}
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+              Level Bahan Kontrol:
+            </label>
+            <select
+              value={selectedLevel}
+              onChange={(e) => setSelectedLevel(e.target.value as any)}
+              className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs focus:border-emerald-500 focus:outline-none bg-white font-medium"
             >
-              <Download className="h-3.5 w-3.5" />
-              <span>PNG</span>
-            </button>
-            <button
-              type="button"
-              onClick={handlePrint}
-              className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 border border-slate-200 rounded-lg"
-              title="Cetak Grafik"
-            >
-              <Printer className="h-3.5 w-3.5" />
-              <span>Cetak</span>
-            </button>
+              <option value="all">Semua Level (Level 1, 2, 3)</option>
+              <option value="Level 1">Level 1 (Normal)</option>
+              <option value="Level 2">Level 2 (Patologis)</option>
+              <option value="Level 3">Level 3 (Tinggi)</option>
+            </select>
+          </div>
+
+          {/* Filter Status Indicator */}
+          <div className="flex flex-col justify-end">
+            <div className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 flex items-center justify-between font-mono text-[11px]">
+              <span className="text-slate-500">Titik Terpilih:</span>
+              <span className="font-bold text-emerald-700">{filteredResults.length} Hasil QC</span>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Summary Stats Strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 py-3 border-b border-slate-100 text-xs">
-        <div className="bg-slate-50 p-2 rounded-lg border border-slate-200/60">
+      {/* Summary Stats Strip for Date Range */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5 py-2 text-xs">
+        <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
           <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Total Run (N)</p>
           <p className="text-base font-bold font-mono text-slate-900">{stats.count}</p>
         </div>
-        <div className="bg-slate-50 p-2 rounded-lg border border-slate-200/60">
+        <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
           <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Mean Aktual</p>
           <p className="text-base font-bold font-mono text-slate-900">{stats.mean}</p>
         </div>
-        <div className="bg-slate-50 p-2 rounded-lg border border-slate-200/60">
+        <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
           <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">SD Aktual</p>
           <p className="text-base font-bold font-mono text-slate-900">{stats.sd}</p>
         </div>
-        <div className="bg-slate-50 p-2 rounded-lg border border-slate-200/60">
+        <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
           <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">CV% Aktual</p>
           <p className={`text-base font-bold font-mono ${stats.cv > parameter.targetCV ? 'text-amber-600' : 'text-emerald-700'}`}>
             {stats.cv}%
           </p>
         </div>
-        <div className="bg-slate-50 p-2 rounded-lg border border-slate-200/60">
+        <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
           <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Target CV%</p>
           <p className="text-base font-bold font-mono text-slate-600">{parameter.targetCV}%</p>
         </div>
-        <div className="bg-emerald-50/70 p-2 rounded-lg border border-emerald-200/60">
+        <div className="bg-emerald-50/70 p-2 rounded-lg border border-emerald-200">
           <p className="text-[10px] text-emerald-700 uppercase tracking-wider font-semibold">Pass (Normal)</p>
           <p className="text-base font-bold font-mono text-emerald-800">{stats.passCount}</p>
         </div>
-        <div className="bg-amber-50/70 p-2 rounded-lg border border-amber-200/60">
+        <div className="bg-amber-50/70 p-2 rounded-lg border border-amber-200">
           <p className="text-[10px] text-amber-700 uppercase tracking-wider font-semibold">Warning (±2SD)</p>
           <p className="text-base font-bold font-mono text-amber-800">{stats.warningCount}</p>
         </div>
-        <div className="bg-rose-50/70 p-2 rounded-lg border border-rose-200/60">
+        <div className="bg-rose-50/70 p-2 rounded-lg border border-rose-200">
           <p className="text-[10px] text-rose-700 uppercase tracking-wider font-semibold">Reject / Out</p>
           <p className="text-base font-bold font-mono text-rose-800">{stats.rejectCount}</p>
         </div>
@@ -297,188 +374,198 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
       {/* SVG Canvas Area */}
       <div 
         ref={containerRef}
-        className="relative mt-4 overflow-x-auto select-none rounded-lg border border-slate-100 bg-slate-50/40 p-2"
+        className="relative mt-2 overflow-x-auto select-none rounded-xl border border-slate-200 bg-slate-50/50 p-3"
       >
-        <svg
-          ref={svgRef}
-          width={padding.left + chartWidth + padding.right}
-          height={height}
-          className="overflow-visible"
-        >
-          {/* Background Shaded Safety Zones */}
-          {/* 1. Normal safe zone (+1SD to -1SD) */}
-          <rect
-            x={padding.left}
-            y={getY(targetMean + targetSD)}
-            width={chartWidth}
-            height={getY(targetMean - targetSD) - getY(targetMean + targetSD)}
-            fill="#10b981"
-            fillOpacity="0.05"
-          />
-          {/* 2. Warning zone top (+1SD to +2SD) */}
-          <rect
-            x={padding.left}
-            y={getY(targetMean + 2 * targetSD)}
-            width={chartWidth}
-            height={getY(targetMean + targetSD) - getY(targetMean + 2 * targetSD)}
-            fill="#f59e0b"
-            fillOpacity="0.06"
-          />
-          {/* 3. Warning zone bottom (-1SD to -2SD) */}
-          <rect
-            x={padding.left}
-            y={getY(targetMean - targetSD)}
-            width={chartWidth}
-            height={getY(targetMean - 2 * targetSD) - getY(targetMean - targetSD)}
-            fill="#f59e0b"
-            fillOpacity="0.06"
-          />
-          {/* 4. Reject zone top (+2SD to +3.5SD) */}
-          <rect
-            x={padding.left}
-            y={getY(yMax)}
-            width={chartWidth}
-            height={getY(targetMean + 2 * targetSD) - getY(yMax)}
-            fill="#f43f5e"
-            fillOpacity="0.05"
-          />
-          {/* 5. Reject zone bottom (-2SD to -3.5SD) */}
-          <rect
-            x={padding.left}
-            y={getY(targetMean - 2 * targetSD)}
-            width={chartWidth}
-            height={getY(yMin) - getY(targetMean - 2 * targetSD)}
-            fill="#f43f5e"
-            fillOpacity="0.05"
-          />
-
-          {/* Reference SD and Mean Lines */}
-          {lines.map((line, idx) => {
-            const y = getY(line.value);
-            return (
-              <g key={idx}>
-                {/* Horizontal guide line */}
-                <line
-                  x1={padding.left}
-                  y1={y}
-                  x2={padding.left + chartWidth}
-                  y2={y}
-                  stroke={line.color}
-                  strokeWidth={line.strokeWidth}
-                  strokeDasharray={line.strokeDash}
-                  opacity={line.label === 'Mean' ? 0.9 : 0.65}
-                />
-                {/* Left Label (+3SD, Mean, etc) */}
-                <text
-                  x={padding.left - 8}
-                  y={y + 4}
-                  textAnchor="end"
-                  fontSize="11"
-                  fontFamily="monospace"
-                  fill={line.color}
-                  fontWeight={line.label === 'Mean' ? 'bold' : 'normal'}
-                >
-                  {line.label}
-                </text>
-                {/* Right Value (e.g. 107.0 mg/dL) */}
-                <text
-                  x={padding.left + chartWidth + 8}
-                  y={y + 4}
-                  textAnchor="start"
-                  fontSize="10"
-                  fontFamily="monospace"
-                  fill={line.color}
-                  fontWeight={line.label === 'Mean' ? 'bold' : 'normal'}
-                >
-                  {line.value.toFixed(parameter.decimalPlaces)}
-                </text>
-              </g>
-            );
-          })}
-
-          {/* Connecting Trend Polyline */}
-          {filteredResults.length > 1 && (
-            <path
-              d={filteredResults.reduce((acc, pt, i) => {
-                const x = getX(i, filteredResults.length);
-                const y = getY(pt.value);
-                return i === 0 ? `M ${x} ${y}` : `${acc} L ${x} ${y}`;
-              }, '')}
-              fill="none"
-              stroke="#475569"
-              strokeWidth="1.75"
-              strokeLinejoin="round"
-              strokeLinecap="round"
+        {filteredResults.length === 0 ? (
+          <div className="h-64 flex flex-col items-center justify-center text-slate-400 text-xs">
+            <Info className="h-8 w-8 text-slate-300 mb-2" />
+            <p className="font-semibold text-slate-700">Tidak ada data QC pada rentang tanggal ini.</p>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              Coba perluas rentang tanggal ({startDate} s/d {endDate}) atau ubah filter level kontrol.
+            </p>
+          </div>
+        ) : (
+          <svg
+            ref={svgRef}
+            width={padding.left + chartWidth + padding.right}
+            height={height}
+            className="overflow-visible"
+          >
+            {/* Background Shaded Safety Zones */}
+            {/* 1. Normal safe zone (+1SD to -1SD) */}
+            <rect
+              x={padding.left}
+              y={getY(targetMean + targetSD)}
+              width={chartWidth}
+              height={getY(targetMean - targetSD) - getY(targetMean + targetSD)}
+              fill="#10b981"
+              fillOpacity="0.05"
             />
-          )}
+            {/* 2. Warning zone top (+1SD to +2SD) */}
+            <rect
+              x={padding.left}
+              y={getY(targetMean + 2 * targetSD)}
+              width={chartWidth}
+              height={getY(targetMean + targetSD) - getY(targetMean + 2 * targetSD)}
+              fill="#f59e0b"
+              fillOpacity="0.06"
+            />
+            {/* 3. Warning zone bottom (-1SD to -2SD) */}
+            <rect
+              x={padding.left}
+              y={getY(targetMean - targetSD)}
+              width={chartWidth}
+              height={getY(targetMean - 2 * targetSD) - getY(targetMean - targetSD)}
+              fill="#f59e0b"
+              fillOpacity="0.06"
+            />
+            {/* 4. Reject zone top (+2SD to +3.5SD) */}
+            <rect
+              x={padding.left}
+              y={getY(yMax)}
+              width={chartWidth}
+              height={getY(targetMean + 2 * targetSD) - getY(yMax)}
+              fill="#f43f5e"
+              fillOpacity="0.05"
+            />
+            {/* 5. Reject zone bottom (-2SD to -3.5SD) */}
+            <rect
+              x={padding.left}
+              y={getY(targetMean - 2 * targetSD)}
+              width={chartWidth}
+              height={getY(yMin) - getY(targetMean - 2 * targetSD)}
+              fill="#f43f5e"
+              fillOpacity="0.05"
+            />
 
-          {/* Data Points */}
-          {filteredResults.map((pt, i) => {
-            const x = getX(i, filteredResults.length);
-            const y = getY(pt.value);
+            {/* Reference SD and Mean Lines */}
+            {lines.map((line, idx) => {
+              const y = getY(line.value);
+              return (
+                <g key={idx}>
+                  {/* Horizontal guide line */}
+                  <line
+                    x1={padding.left}
+                    y1={y}
+                    x2={padding.left + chartWidth}
+                    y2={y}
+                    stroke={line.color}
+                    strokeWidth={line.strokeWidth}
+                    strokeDasharray={line.strokeDash}
+                    opacity={line.label === 'Mean' ? 0.9 : 0.65}
+                  />
+                  {/* Left Label (+3SD, Mean, etc) */}
+                  <text
+                    x={padding.left - 8}
+                    y={y + 4}
+                    textAnchor="end"
+                    fontSize="11"
+                    fontFamily="monospace"
+                    fill={line.color}
+                    fontWeight={line.label === 'Mean' ? 'bold' : 'normal'}
+                  >
+                    {line.label}
+                  </text>
+                  {/* Right Value (e.g. 107.0 mg/dL) */}
+                  <text
+                    x={padding.left + chartWidth + 8}
+                    y={y + 4}
+                    textAnchor="start"
+                    fontSize="10"
+                    fontFamily="monospace"
+                    fill={line.color}
+                    fontWeight={line.label === 'Mean' ? 'bold' : 'normal'}
+                  >
+                    {line.value.toFixed(parameter.decimalPlaces)}
+                  </text>
+                </g>
+              );
+            })}
 
-            let pointFill = '#10b981'; // normal pass
-            let pointStroke = '#047857';
-            let radius = 4.5;
+            {/* Connecting Trend Polyline */}
+            {filteredResults.length > 1 && (
+              <path
+                d={filteredResults.reduce((acc, pt, i) => {
+                  const x = getX(i, filteredResults.length);
+                  const y = getY(pt.value);
+                  return i === 0 ? `M ${x} ${y}` : `${acc} L ${x} ${y}`;
+                }, '')}
+                fill="none"
+                stroke="#475569"
+                strokeWidth="1.75"
+                strokeLinejoin="round"
+                strokeLinecap="round"
+              />
+            )}
 
-            if (pt.status === 'reject') {
-              pointFill = '#f43f5e';
-              pointStroke = '#be123c';
-              radius = 6;
-            } else if (pt.status === 'warning') {
-              pointFill = '#f59e0b';
-              pointStroke = '#b45309';
-              radius = 5.5;
-            }
+            {/* Data Points */}
+            {filteredResults.map((pt, i) => {
+              const x = getX(i, filteredResults.length);
+              const y = getY(pt.value);
 
-            const isHovered = hoveredPoint?.result.id === pt.id;
+              let pointFill = '#10b981'; // normal pass
+              let pointStroke = '#047857';
+              let radius = 4.5;
 
-            return (
-              <g 
-                key={pt.id} 
-                className="cursor-pointer"
-                onMouseEnter={() => setHoveredPoint({ result: pt, x, y })}
-                onClick={() => onSelectResult && onSelectResult(pt)}
-              >
-                {/* Outer halo when hovered or violation */}
-                {(isHovered || pt.status !== 'pass') && (
+              if (pt.status === 'reject') {
+                pointFill = '#f43f5e';
+                pointStroke = '#be123c';
+                radius = 6;
+              } else if (pt.status === 'warning') {
+                pointFill = '#f59e0b';
+                pointStroke = '#b45309';
+                radius = 5.5;
+              }
+
+              const isHovered = hoveredPoint?.result.id === pt.id;
+
+              return (
+                <g 
+                  key={pt.id} 
+                  className="cursor-pointer"
+                  onMouseEnter={() => setHoveredPoint({ result: pt, x, y })}
+                  onClick={() => onSelectResult && onSelectResult(pt)}
+                >
+                  {/* Outer halo when hovered or violation */}
+                  {(isHovered || pt.status !== 'pass') && (
+                    <circle
+                      cx={x}
+                      cy={y}
+                      r={radius + 3.5}
+                      fill={pointFill}
+                      fillOpacity="0.25"
+                      className="animate-pulse"
+                    />
+                  )}
+                  {/* Point */}
                   <circle
                     cx={x}
                     cy={y}
-                    r={radius + 3}
+                    r={isHovered ? radius + 1.5 : radius}
                     fill={pointFill}
-                    fillOpacity="0.25"
-                    className="animate-pulse"
+                    stroke={pointStroke}
+                    strokeWidth="1.5"
+                    className="transition-all"
                   />
-                )}
-                {/* Point */}
-                <circle
-                  cx={x}
-                  cy={y}
-                  r={isHovered ? radius + 1.5 : radius}
-                  fill={pointFill}
-                  stroke={pointStroke}
-                  strokeWidth="1.5"
-                  className="transition-all"
-                />
 
-                {/* X-Axis bottom date labels (subsampled if many) */}
-                {(filteredResults.length <= 15 || i % Math.ceil(filteredResults.length / 12) === 0) && (
-                  <text
-                    x={x}
-                    y={height - padding.bottom + 20}
-                    textAnchor="middle"
-                    fontSize="9.5"
-                    fontFamily="monospace"
-                    fill="#64748b"
-                  >
-                    {pt.date.slice(5)}
-                  </text>
-                )}
-              </g>
-            );
-          })}
-        </svg>
+                  {/* X-Axis bottom date labels */}
+                  {(filteredResults.length <= 18 || i % Math.ceil(filteredResults.length / 15) === 0) && (
+                    <text
+                      x={x}
+                      y={height - padding.bottom + 20}
+                      textAnchor="middle"
+                      fontSize="9.5"
+                      fontFamily="monospace"
+                      fill="#64748b"
+                    >
+                      {pt.date.slice(5)}
+                    </text>
+                  )}
+                </g>
+              );
+            })}
+          </svg>
+        )}
 
         {/* Precision HUD Tooltip */}
         {hoveredPoint && (
@@ -581,7 +668,7 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
       </div>
 
       {/* Legend & Guide Footer */}
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500 pt-3 border-t border-slate-100">
+      <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500 pt-2 border-t border-slate-100">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
@@ -599,7 +686,7 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
 
         <div className="flex items-center gap-1 text-[11px] text-slate-400">
           <Info className="h-3.5 w-3.5" />
-          <span>Arahkan mouse ke titik untuk detail pengukuran & aturan Westgard</span>
+          <span>Klik titik grafik untuk inspeksi detail atau eskalasi ke Penyimpangan Mutu / CAPA</span>
         </div>
       </div>
     </div>
