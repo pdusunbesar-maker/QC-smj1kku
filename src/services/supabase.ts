@@ -3,8 +3,8 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 const STORAGE_KEY_SUPABASE_URL = 'lqcms_supabase_url';
 const STORAGE_KEY_SUPABASE_ANON = 'lqcms_supabase_anon_key';
 
-export const DEFAULT_SUPABASE_URL = 'https://yrjgcnnrwbmftfluaqdu.supabase.co';
-export const DEFAULT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlyamdjbm5yd2JtZnRmbHVhcWR1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEwMDYzMjksImV4cCI6MjEwNjU4MjMyOX0.xX0ivmcwbQezojSTiXkPqykU8aOY1inktO-WaBvoCec';
+export const DEFAULT_SUPABASE_URL = '';
+export const DEFAULT_SUPABASE_ANON_KEY = '';
 
 export function sanitizeSupabaseUrl(url: string): string {
   if (!url) return '';
@@ -79,19 +79,22 @@ export async function testSupabaseConnection(url: string, anonKey: string): Prom
     if (!cleanUrl || !anonKey) {
       return { success: false, message: 'URL atau Anon Key tidak boleh kosong.' };
     }
-    const client = createClient(cleanUrl, anonKey);
+    const client = createClient(cleanUrl, anonKey.trim());
     // Simple ping to check auth or basic table
-    const { error } = await client.from('laboratories').select('count', { count: 'exact', head: true });
+    const { error, status } = await client.from('laboratories').select('count', { count: 'exact', head: true });
     
-    if (error && error.code !== 'PGRST116' && !error.message.includes('relation "laboratories" does not exist')) {
-      return { 
-        success: true, 
-        message: 'Koneksi ke instance Supabase berhasil! (Catatan: Jalankan skrip SQL skema jika tabel belum dibuat).' 
-      };
+    if (error) {
+      if (error.code === 'PGRST301' || error.message?.includes('Invalid API key') || error.message?.includes('JWT') || status === 401) {
+        return { success: false, message: 'Koneksi gagal: Invalid API key (Kunci Anon Supabase tidak valid atau salah).' };
+      }
+      if (error.code === '42P01' || error.message?.includes('relation "laboratories" does not exist')) {
+        return { success: true, message: 'Koneksi ke Supabase berhasil! (Catatan: Tabel laboratories belum dibuat, jalankan skrip SQL skema).' };
+      }
+      return { success: false, message: `Koneksi gagal: ${error.message}` };
     }
     return { success: true, message: 'Koneksi ke Supabase berhasil dan siap digunakan!' };
   } catch (err: any) {
-    return { success: false, message: err.message || 'Gagal terhubung ke Supabase.' };
+    return { success: false, message: err.message || 'Gagal terhubung ke Supabase. Periksa URL dan Anon Key.' };
   }
 }
 

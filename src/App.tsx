@@ -196,7 +196,7 @@ function AppContent() {
             {activeTab === 'levey-jennings' && (
               <div className="space-y-4">
                 {/* Parameter Selection Ribbon */}
-                <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
+                <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs flex flex-wrap items-center justify-between gap-3 print:hidden">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-semibold text-slate-700">Pilih Parameter Uji:</span>
                     <select
@@ -223,6 +223,7 @@ function AppContent() {
                   <LeveyJenningsChart
                     parameter={selectedChartParam}
                     results={qcResults}
+                    labInfo={labInfo}
                     onCreateCapa={(res) => handleNavigateToTab('capa', { fromQc: res })}
                     onCreateNC={(res) => handleNavigateToTab('non-conformity', { fromQc: res })}
                   />

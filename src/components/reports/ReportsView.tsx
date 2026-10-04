@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { 
   FileSpreadsheet, 
   Printer, 
   Download, 
+  FileDown,
   Filter, 
   Calendar, 
   FileText, 
@@ -21,8 +22,11 @@ import {
   ArrowUpDown,
   Edit3,
   X,
-  Save
+  Save,
+  Loader2
 } from 'lucide-react';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
 import { 
   QCResult, 
   LaboratoryInfo, 
@@ -342,6 +346,63 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
     document.body.removeChild(link);
   };
 
+  const printableDocRef = useRef<HTMLDivElement>(null);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+
+  // Direct PDF Export using html2canvas & jsPDF
+  const handleExportPDF = async () => {
+    if (!printableDocRef.current) return;
+    setIsGeneratingPDF(true);
+
+    try {
+      const element = printableDocRef.current;
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        windowWidth: 1200,
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const margin = 10;
+      const contentWidth = pdfWidth - margin * 2;
+      const contentHeight = (canvas.height * contentWidth) / canvas.width;
+
+      if (contentHeight <= pdfHeight - margin * 2) {
+        pdf.addImage(imgData, 'PNG', margin, margin, contentWidth, contentHeight);
+      } else {
+        let heightLeft = contentHeight;
+        let position = margin;
+
+        pdf.addImage(imgData, 'PNG', margin, position, contentWidth, contentHeight);
+        heightLeft -= pdfHeight;
+
+        while (heightLeft > 0) {
+          position = heightLeft - contentHeight + margin;
+          pdf.addPage();
+          pdf.addImage(imgData, 'PNG', margin, position, contentWidth, contentHeight);
+          heightLeft -= pdfHeight;
+        }
+      }
+
+      pdf.save(`Laporan_QC_${reportType.toUpperCase()}_RSUD_SMJ1_${startDate}_sd_${endDate}.pdf`);
+    } catch (err) {
+      console.error('Error generating PDF:', err);
+      window.print();
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
+
   const handlePrint = () => {
     window.print();
   };
@@ -385,6 +446,26 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             <Download className="h-4 w-4 text-emerald-700" />
             <span>Ekspor Excel (.CSV)</span>
           </button>
+
+          <button
+            type="button"
+            onClick={handleExportPDF}
+            disabled={isGeneratingPDF}
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-emerald-700 hover:bg-emerald-800 disabled:bg-emerald-400 rounded-lg shadow-2xs transition-colors"
+            title="Simpan lembar laporan sebagai file PDF"
+          >
+            {isGeneratingPDF ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Membuat PDF...</span>
+              </>
+            ) : (
+              <>
+                <FileDown className="h-4 w-4" />
+                <span>Simpan PDF</span>
+              </>
+            )}
+          </button>
           
           <button
             type="button"
@@ -392,7 +473,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-2xs transition-colors"
           >
             <Printer className="h-4 w-4" />
-            <span>Cetak / Cetak PDF</span>
+            <span>Cetak Lembar</span>
           </button>
         </div>
       </div>
@@ -623,7 +704,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       {/* ========================================================================= */}
       {/* OFFICIAL PRINTABLE REPORT SHEET (WITH HOSPITAL KOP SURAT)                  */}
       {/* ========================================================================= */}
-      <div className="rounded-xl border border-slate-200 bg-white p-8 shadow-xs print:border-none print:shadow-none print:p-0 print:m-0 print:w-full print:max-w-none">
+      <div 
+        ref={printableDocRef}
+        id="printable-report-sheet"
+        className="rounded-xl border border-slate-200 bg-white p-8 shadow-xs print:border-none print:shadow-none print:p-0 print:m-0 print:w-full print:max-w-none"
+      >
         {/* KOP SURAT RESMI RSUD SULTAN MUHAMMAD JAMALUDIN I */}
         <div className="flex items-center justify-between border-b-2 border-slate-900 pb-4 mb-6 kop-surat print-avoid-break">
           <img
