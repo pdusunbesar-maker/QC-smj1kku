@@ -65,25 +65,35 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
 
   // Quick preset button handler
   const handleSetPreset = (preset: 'today' | '7d' | 'this_month' | 'last_month' | '90d' | 'all') => {
-    const todayStr = '2026-10-03';
+    const today = new Date();
+    const todayStr = today.toLocaleDateString('sv-SE');
+
     if (preset === 'today') {
       setStartDate(todayStr);
       setEndDate(todayStr);
     } else if (preset === '7d') {
-      setStartDate('2026-09-26');
+      const d7 = new Date();
+      d7.setDate(d7.getDate() - 6);
+      setStartDate(d7.toLocaleDateString('sv-SE'));
       setEndDate(todayStr);
     } else if (preset === 'this_month') {
-      setStartDate('2026-10-01');
-      setEndDate('2026-10-31');
+      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      setStartDate(startOfMonth.toLocaleDateString('sv-SE'));
+      setEndDate(endOfMonth.toLocaleDateString('sv-SE'));
     } else if (preset === 'last_month') {
-      setStartDate('2026-09-01');
-      setEndDate('2026-09-30');
+      const startOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      const endOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+      setStartDate(startOfLastMonth.toLocaleDateString('sv-SE'));
+      setEndDate(endOfLastMonth.toLocaleDateString('sv-SE'));
     } else if (preset === '90d') {
-      setStartDate('2026-07-01');
+      const d90 = new Date();
+      d90.setDate(d90.getDate() - 89);
+      setStartDate(d90.toLocaleDateString('sv-SE'));
       setEndDate(todayStr);
     } else if (preset === 'all') {
       setStartDate('2026-01-01');
-      setEndDate('2026-12-31');
+      setEndDate(todayStr > '2026-12-31' ? todayStr : '2026-12-31');
     }
   };
 
