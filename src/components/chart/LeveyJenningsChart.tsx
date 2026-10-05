@@ -18,13 +18,15 @@ import {
   SlidersHorizontal,
   ChevronRight,
   Loader2,
-  FileText
+  FileText,
+  Edit3
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { QCResult, Parameter, QCStatistics, LaboratoryInfo } from '../../types';
 import { calculateQCStatistics } from '../../utils/qcCalculations';
 import { StorageService } from '../../services/storage';
+import { KopEditorModal } from '../common/KopEditorModal';
 
 interface LeveyJenningsChartProps {
   parameter: Parameter;
@@ -58,6 +60,7 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
   } | null>(null);
 
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [isKopModalOpen, setIsKopModalOpen] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const printableDocRef = useRef<HTMLDivElement>(null);
@@ -312,6 +315,16 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
                 <RotateCcw className="h-3.5 w-3.5" />
               </button>
             </div>
+
+            <button
+              type="button"
+              onClick={() => setIsKopModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-2xs transition-colors"
+              title="Edit Identitas KOP Surat, Logo, Alamat, dan Tanda Tangan"
+            >
+              <Edit3 className="h-3.5 w-3.5 text-slate-600" />
+              <span>Edit KOP Surat</span>
+            </button>
 
             <button
               type="button"
@@ -958,6 +971,13 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
           </div>
         </div>
       </div>
+
+      {/* MODAL EDIT KOP SURAT LAPORAN */}
+      <KopEditorModal
+        isOpen={isKopModalOpen}
+        onClose={() => setIsKopModalOpen(false)}
+        labInfo={labInfo}
+      />
     </div>
   );
 };

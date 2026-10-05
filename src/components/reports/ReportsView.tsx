@@ -37,6 +37,7 @@ import {
 } from '../../types';
 import { calculateQCStatistics } from '../../utils/qcCalculations';
 import { StorageService } from '../../services/storage';
+import { KopEditorModal } from '../common/KopEditorModal';
 
 interface ReportsViewProps {
   labInfo: LaboratoryInfo;
@@ -435,15 +436,15 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
 
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-2.5 self-start md:self-auto">
-          {/* Button Ubah Penanggung Jawab Mutu & Pimpinan */}
+          {/* Button Edit KOP Surat & Pimpinan */}
           <button
             type="button"
-            onClick={handleOpenSignatoriesModal}
+            onClick={() => setIsSignatoriesModalOpen(true)}
             className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg shadow-2xs transition-colors"
-            title="Ubah Penanggung Jawab Mutu & Penanggung Jawab Laboratorium"
+            title="Edit KOP Surat, Logo, Alamat, dan Pejabat Bertandatangan"
           >
             <Edit3 className="h-4 w-4 text-slate-600" />
-            <span>Ubah PJ Mutu & Pimpinan</span>
+            <span>Edit KOP Surat & Pimpinan</span>
           </button>
 
           <button
@@ -1196,120 +1197,16 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       </div>
 
       {/* ========================================================================= */}
-      {/* MODAL EDIT PENANGGUNG JAWAB MUTU & PIMPINAN LAB                           */}
+      {/* MODAL EDIT KOP SURAT LAPORAN & PEJABAT BERTANDATANGAN                     */}
       {/* ========================================================================= */}
-      {isSignatoriesModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <UserCheck className="h-5 w-5 text-emerald-700" />
-                <h3 className="font-bold text-slate-900 text-sm">
-                  Ubah Penanggung Jawab Mutu & Pimpinan Lab
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsSignatoriesModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveSignatories} className="space-y-4 text-xs">
-              <div className="rounded-lg bg-emerald-50/70 border border-emerald-200 p-3 text-emerald-900 text-[11px]">
-                Perubahan data di bawah akan langsung diterapkan pada seluruh dokumen cetak laporan QC, Westgard, NC, dan CAPA.
-              </div>
-
-              {/* Penanggung Jawab Mutu */}
-              <div className="p-3 rounded-lg border border-slate-200 bg-slate-50 space-y-2.5">
-                <div className="font-bold text-slate-900 text-xs flex items-center gap-1 text-emerald-800">
-                  <UserCheck className="h-3.5 w-3.5" />
-                  <span>1. Penanggung Jawab Mutu</span>
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Nama Lengkap & Gelar Penanggung Jawab Mutu:
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={signatoriesForm.headOfQuality}
-                    onChange={(e) => setSignatoriesForm({ ...signatoriesForm, headOfQuality: e.target.value })}
-                    placeholder="Contoh: Siti Rahmawati, S.Tr.Kes"
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    NIP Penanggung Jawab Mutu:
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={signatoriesForm.qualityNip}
-                    onChange={(e) => setSignatoriesForm({ ...signatoriesForm, qualityNip: e.target.value })}
-                    placeholder="Contoh: 19850914 201001 2 015"
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-xs focus:border-emerald-500 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Penanggung Jawab Laboratorium */}
-              <div className="p-3 rounded-lg border border-slate-200 bg-slate-50 space-y-2.5">
-                <div className="font-bold text-slate-900 text-xs flex items-center gap-1 text-slate-800">
-                  <Building2 className="h-3.5 w-3.5" />
-                  <span>2. Penanggung Jawab Laboratorium (Pimpinan)</span>
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Nama Penanggung Jawab Laboratorium:
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={signatoriesForm.headOfLab}
-                    onChange={(e) => setSignatoriesForm({ ...signatoriesForm, headOfLab: e.target.value })}
-                    placeholder="Contoh: dr. Hendra Wijaya, Sp.PK"
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    NIP Penanggung Jawab Laboratorium:
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={signatoriesForm.headNip}
-                    onChange={(e) => setSignatoriesForm({ ...signatoriesForm, headNip: e.target.value })}
-                    placeholder="Contoh: 19800512 200801 1 008"
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-xs focus:border-emerald-500 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsSignatoriesModalOpen(false)}
-                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-xs font-semibold"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  className="flex items-center gap-1.5 px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-semibold shadow-xs"
-                >
-                  <Save className="h-3.5 w-3.5" />
-                  <span>Simpan Perubahan</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <KopEditorModal
+        isOpen={isSignatoriesModalOpen}
+        onClose={() => setIsSignatoriesModalOpen(false)}
+        labInfo={labInfo}
+        onSaved={(updated) => {
+          if (onLabInfoUpdated) onLabInfoUpdated(updated);
+        }}
+      />
     </div>
   );
 };

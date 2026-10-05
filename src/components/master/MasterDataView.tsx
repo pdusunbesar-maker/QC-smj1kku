@@ -294,7 +294,7 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
               <label className="block font-semibold text-slate-700 mb-1">Penanggung Jawab Mutu</label>
               <input
                 type="text"
-                value={labForm.headOfQuality || 'Siti Rahmawati, S.Tr.Kes'}
+                value={labForm.headOfQuality || ''}
                 onChange={(e) => setLabForm({ ...labForm, headOfQuality: e.target.value })}
                 disabled={!canEdit}
                 placeholder="Contoh: Siti Rahmawati, S.Tr.Kes"
@@ -305,7 +305,7 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
               <label className="block font-semibold text-slate-700 mb-1">NIP Penanggung Jawab Mutu</label>
               <input
                 type="text"
-                value={labForm.qualityNip || '19850914 201001 2 015'}
+                value={labForm.qualityNip || ''}
                 onChange={(e) => setLabForm({ ...labForm, qualityNip: e.target.value })}
                 disabled={!canEdit}
                 placeholder="Contoh: 19850914 201001 2 015"
