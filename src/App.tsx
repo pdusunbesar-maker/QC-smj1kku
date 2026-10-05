@@ -74,20 +74,30 @@ function AppContent() {
     setNotifications(StorageService.getNotifications());
   };
 
-  // Real-time synchronization & initial hydration from Supabase
+  // Real-time synchronization & initial hydration from Supabase & Local Custom Events
   useEffect(() => {
     // 1. Initial hydration from Supabase
     StorageService.syncFromSupabase(() => {
       handleReloadAll();
     });
 
-    // 2. Real-time changes subscription across all tables
+    // 2. Real-time changes subscription across all remote tables
     const unsubscribe = StorageService.subscribeToRealtime(() => {
       handleReloadAll();
     });
 
+    // 3. Listen to local custom data updates and cross-tab storage changes
+    const handleLocalUpdate = () => {
+      handleReloadAll();
+    };
+
+    window.addEventListener('lqcms_data_updated', handleLocalUpdate);
+    window.addEventListener('storage', handleLocalUpdate);
+
     return () => {
       unsubscribe();
+      window.removeEventListener('lqcms_data_updated', handleLocalUpdate);
+      window.removeEventListener('storage', handleLocalUpdate);
     };
   }, []);
 

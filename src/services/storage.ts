@@ -784,14 +784,18 @@ export class StorageService {
     }
   }
 
+  static notifyDataChanged(type?: string): void {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('lqcms_data_updated', { detail: { type } }));
+    }
+  }
+
   // --- Laboratory Info ---
   static getLabInfo(): LaboratoryInfo {
     const stored = getStored<LaboratoryInfo>(KEYS.LAB_INFO, INITIAL_LAB_INFO);
     return {
       ...INITIAL_LAB_INFO,
       ...stored,
-      headOfQuality: stored.headOfQuality || INITIAL_LAB_INFO.headOfQuality || 'Siti Rahmawati, S.Tr.Kes',
-      qualityNip: stored.qualityNip || INITIAL_LAB_INFO.qualityNip || '19850914 201001 2 015',
     };
   }
 
@@ -799,10 +803,10 @@ export class StorageService {
     const completeInfo: LaboratoryInfo = {
       ...INITIAL_LAB_INFO,
       ...info,
-      headOfQuality: info.headOfQuality || 'Siti Rahmawati, S.Tr.Kes',
-      qualityNip: info.qualityNip || '19850914 201001 2 015',
     };
     setStored(KEYS.LAB_INFO, completeInfo);
+    this.notifyDataChanged('lab_info');
+
     const sb = getSupabase();
     if (sb) {
       Promise.resolve(sb.from('laboratories').upsert(mapLabToDbFull(completeInfo)))
