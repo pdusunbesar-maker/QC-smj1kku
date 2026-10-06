@@ -57,6 +57,19 @@ function AppContent() {
   const [isNotificationDrawerOpen, setIsNotificationDrawerOpen] = useState(false);
   const [isUserProfileModalOpen, setIsUserProfileModalOpen] = useState(false);
 
+  // Desktop sidebar collapse state persisted in localStorage
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    return localStorage.getItem('lqcms_sidebar_collapsed') === 'true';
+  });
+
+  const toggleSidebarCollapse = () => {
+    setIsSidebarCollapsed(prev => {
+      const next = !prev;
+      localStorage.setItem('lqcms_sidebar_collapsed', String(next));
+      return next;
+    });
+  };
+
   // Parameter selected for Levey-Jennings chart view
   const [selectedChartParamId, setSelectedChartParamId] = useState<string>(
     parameters[0]?.id || ''
@@ -126,19 +139,6 @@ function AppContent() {
   const pendingReviewCount = qcResults.filter(r => r.reviewStatus === 'pending').length;
   const openCapaCount = capas.filter(c => c.status !== 'closed').length;
   const activeViolationsCount = qcResults.reduce((acc, r) => acc + (r.violations?.length || 0), 0);
-
-  // Desktop sidebar collapse state persisted in localStorage
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
-    return localStorage.getItem('lqcms_sidebar_collapsed') === 'true';
-  });
-
-  const toggleSidebarCollapse = () => {
-    setIsSidebarCollapsed(prev => {
-      const next = !prev;
-      localStorage.setItem('lqcms_sidebar_collapsed', String(next));
-      return next;
-    });
-  };
 
   return (
     <div className="h-screen min-h-[100dvh] w-full bg-[#F5F7FA] flex flex-col antialiased overflow-hidden print:bg-white print:h-auto print:min-h-0 print:overflow-visible print:block font-sans text-[#172033]">
