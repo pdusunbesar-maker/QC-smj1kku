@@ -15,7 +15,9 @@ import {
   Mail, 
   CheckCircle2,
   Plus,
-  ShieldAlert
+  ShieldAlert,
+  Camera,
+  Upload
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { User, RoleDefinition } from '../../types';
@@ -53,8 +55,25 @@ export const UserManagementView: React.FC = () => {
     role: 'analis',
     nip: '',
     department: 'Instalasi Patologi Klinik',
+    avatar: '',
     isActive: true,
   });
+
+  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 3 * 1024 * 1024) {
+      alert('Ukuran file foto terlalu besar. Maksimal 3MB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      if (evt.target?.result) {
+        setFormData(prev => ({ ...prev, avatar: evt.target!.result as string }));
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Custom Role Modal State
   const [showAddRoleModal, setShowAddRoleModal] = useState(false);
@@ -92,6 +111,7 @@ export const UserManagementView: React.FC = () => {
       role: roles[0]?.id || 'analis',
       nip: '',
       department: 'Instalasi Patologi Klinik',
+      avatar: '',
       isActive: true,
     });
     setModalError('');
@@ -107,6 +127,7 @@ export const UserManagementView: React.FC = () => {
       role: u.role,
       nip: u.nip || '',
       department: u.department || 'Instalasi Patologi Klinik',
+      avatar: u.avatar || '',
       isActive: u.isActive !== false,
     });
     setModalError('');
@@ -126,6 +147,7 @@ export const UserManagementView: React.FC = () => {
         role: formData.role,
         nip: formData.nip.trim() || undefined,
         department: formData.department.trim() || undefined,
+        avatar: formData.avatar || undefined,
         isActive: formData.isActive,
       });
 
@@ -141,6 +163,7 @@ export const UserManagementView: React.FC = () => {
         role: formData.role,
         nip: formData.nip.trim() || undefined,
         department: formData.department.trim() || undefined,
+        avatar: formData.avatar || undefined,
         isActive: formData.isActive,
       });
 
@@ -343,10 +366,18 @@ export const UserManagementView: React.FC = () => {
                       return (
                         <tr key={u.id} className="hover:bg-slate-50/60 transition-colors">
                           <td className="px-4 py-3">
-                            <div className="flex items-center gap-2">
-                              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-slate-900 text-white font-bold text-xs">
-                                {u.name.charAt(0)}
-                              </div>
+                            <div className="flex items-center gap-2.5">
+                              {u.avatar ? (
+                                <img
+                                  src={u.avatar}
+                                  alt={u.name}
+                                  className="h-8 w-8 rounded-lg object-cover border border-slate-200 shrink-0"
+                                />
+                              ) : (
+                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white font-bold text-xs shrink-0">
+                                  {u.name.charAt(0)}
+                                </div>
+                              )}
                               <div>
                                 <span className="font-bold text-slate-900 block">
                                   {u.name} {isCurrentUser && <span className="text-[10px] text-emerald-600 font-mono">(Anda)</span>}
@@ -553,6 +584,47 @@ export const UserManagementView: React.FC = () => {
             )}
 
             <form onSubmit={handleSaveUser} className="space-y-3 text-xs">
+              {/* Foto Profil Field */}
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center gap-3">
+                {formData.avatar ? (
+                  <img
+                    src={formData.avatar}
+                    alt="Preview Foto"
+                    className="h-12 w-12 rounded-lg object-cover border border-slate-200 shrink-0"
+                  />
+                ) : (
+                  <div className="h-12 w-12 rounded-lg bg-slate-800 text-white font-bold text-base flex items-center justify-center shrink-0">
+                    {formData.name ? formData.name.charAt(0) : '?'}
+                  </div>
+                )}
+                <div className="flex-1 space-y-1">
+                  <label className="block font-semibold text-slate-800">
+                    Foto Profil Pengguna
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <label className="flex items-center gap-1 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-900 text-white font-semibold text-[11px] cursor-pointer transition-colors">
+                      <Upload className="h-3 w-3" />
+                      <span>Unggah Foto</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleAvatarUpload}
+                        className="hidden"
+                      />
+                    </label>
+                    {formData.avatar && (
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, avatar: '' })}
+                        className="text-[11px] text-rose-600 hover:underline font-semibold"
+                      >
+                        Hapus Foto
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
                   Nama Lengkap (dengan Gelar) *

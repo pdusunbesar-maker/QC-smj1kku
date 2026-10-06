@@ -111,7 +111,15 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           {isAuthenticated && (
             <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-between text-xs">
               <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                {currentUser.avatar ? (
+                  <img
+                    src={currentUser.avatar}
+                    alt={currentUser.name}
+                    className="h-7 w-7 rounded-lg object-cover border border-emerald-300 shrink-0"
+                  />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                )}
                 <div>
                   <span className="font-semibold text-emerald-950">Sedang aktif: </span>
                   <span className="text-emerald-800">{currentUser.name} ({currentUser.role})</span>

@@ -30,6 +30,7 @@ import { AuditTrailView } from './components/audit/AuditTrailView';
 import { DatabaseSettingsModal } from './components/settings/DatabaseSettingsModal';
 import { NotificationDrawer } from './components/common/NotificationDrawer';
 import { LoginPage } from './components/auth/LoginPage';
+import { UserProfileModal } from './components/users/UserProfileModal';
 
 function AppContent() {
   const { user, role, isAuthenticated } = useAuth();
@@ -54,6 +55,7 @@ function AppContent() {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isDatabaseSettingsOpen, setIsDatabaseSettingsOpen] = useState(false);
   const [isNotificationDrawerOpen, setIsNotificationDrawerOpen] = useState(false);
+  const [isUserProfileModalOpen, setIsUserProfileModalOpen] = useState(false);
 
   // Parameter selected for Levey-Jennings chart view
   const [selectedChartParamId, setSelectedChartParamId] = useState<string>(
@@ -136,6 +138,7 @@ function AppContent() {
           notifications={notifications}
           onOpenNotifications={() => setIsNotificationDrawerOpen(true)}
           onOpenDatabaseSettings={() => setIsDatabaseSettingsOpen(true)}
+          onOpenUserProfile={() => setIsUserProfileModalOpen(true)}
           onToggleSidebarMobile={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
         />
       </div>
@@ -366,6 +369,11 @@ function AppContent() {
         notifications={notifications}
         onNotificationsUpdated={(notifs) => setNotifications(notifs)}
         onNavigateToTab={handleNavigateToTab}
+      />
+      {/* User Profile & Photo Modal */}
+      <UserProfileModal
+        isOpen={isUserProfileModalOpen}
+        onClose={() => setIsUserProfileModalOpen(false)}
       />
     </div>
   );

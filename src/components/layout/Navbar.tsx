@@ -6,7 +6,9 @@ import {
   Shield, 
   UserCheck, 
   Menu,
-  ChevronDown
+  ChevronDown,
+  User,
+  Camera
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { LaboratoryInfo, AppNotification, UserRole } from '../../types';
@@ -18,6 +20,7 @@ interface NavbarProps {
   notifications: AppNotification[];
   onOpenNotifications: () => void;
   onOpenDatabaseSettings: () => void;
+  onOpenUserProfile?: () => void;
   onToggleSidebarMobile: () => void;
 }
 
@@ -27,6 +30,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   notifications,
   onOpenNotifications,
   onOpenDatabaseSettings,
+  onOpenUserProfile,
   onToggleSidebarMobile,
 }) => {
   const { user, role, switchRole, logout } = useAuth();
@@ -125,11 +129,19 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             type="button"
             onClick={() => setShowRoleMenu(!showRoleMenu)}
-            className="flex items-center gap-2 p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg border border-slate-200 hover:border-slate-300 bg-white transition-all text-left shadow-2xs"
+            className="flex items-center gap-2 p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg border border-slate-200 hover:border-slate-300 bg-white transition-all text-left shadow-2xs cursor-pointer"
           >
-            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-slate-900 text-white font-bold text-xs">
-              {user.name.charAt(0)}
-            </div>
+            {user.avatar ? (
+              <img
+                src={user.avatar}
+                alt={user.name}
+                className="h-7 w-7 rounded-md object-cover border border-slate-200"
+              />
+            ) : (
+              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-slate-900 text-white font-bold text-xs">
+                {user.name.charAt(0)}
+              </div>
+            )}
             <div className="hidden sm:block">
               <p className="text-xs font-semibold text-slate-900 leading-tight truncate max-w-[130px]">
                 {user.name}
@@ -147,11 +159,38 @@ export const Navbar: React.FC<NavbarProps> = ({
                 className="fixed inset-0 z-40" 
                 onClick={() => setShowRoleMenu(false)} 
               />
-              <div className="absolute right-0 mt-2 w-64 rounded-xl border border-slate-200 bg-white p-2 shadow-xl z-50">
-                <div className="px-3 py-2 border-b border-slate-100">
-                  <p className="text-xs font-semibold text-slate-900">{user.name}</p>
-                  <p className="text-[11px] text-slate-500 font-mono mt-0.5">{user.email}</p>
-                  <p className="text-[10px] text-slate-400 mt-1">NIP: {user.nip || '-'}</p>
+              <div className="absolute right-0 mt-2 w-64 rounded-xl border border-slate-200 bg-white p-2 shadow-xl z-50 animate-in fade-in zoom-in-95 duration-150">
+                <div className="px-3 py-2 border-b border-slate-100 flex items-center gap-2.5">
+                  {user.avatar ? (
+                    <img
+                      src={user.avatar}
+                      alt={user.name}
+                      className="h-9 w-9 rounded-lg object-cover border border-slate-200 shrink-0"
+                    />
+                  ) : (
+                    <div className="h-9 w-9 rounded-lg bg-slate-900 text-white font-bold text-sm flex items-center justify-center shrink-0">
+                      {user.name.charAt(0)}
+                    </div>
+                  )}
+                  <div className="overflow-hidden">
+                    <p className="text-xs font-bold text-slate-900 truncate">{user.name}</p>
+                    <p className="text-[10px] text-slate-500 font-mono truncate">{user.email}</p>
+                    <p className="text-[9px] text-slate-400">NIP: {user.nip || '-'}</p>
+                  </div>
+                </div>
+
+                <div className="py-1 border-b border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onOpenUserProfile) onOpenUserProfile();
+                      setShowRoleMenu(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-emerald-800 bg-emerald-50/80 hover:bg-emerald-100 rounded-md transition-colors text-left"
+                  >
+                    <Camera className="h-3.5 w-3.5 text-emerald-700" />
+                    <span>Profil Saya & Ubah Foto</span>
+                  </button>
                 </div>
 
                 <div className="py-2">

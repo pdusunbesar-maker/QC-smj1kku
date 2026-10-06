@@ -231,26 +231,38 @@ export const Sidebar: React.FC<SidebarProps> = ({
           ))}
         </div>
 
-        {/* Footer Info & Logout Menu */}
-        <div className="border-t border-slate-100 p-3 bg-slate-50/70 space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-[11px] text-slate-500">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" />
-              <span className="truncate">RSUD S.M. Jamaludin I</span>
+        {/* Footer Info & User Card */}
+        <div className="border-t border-slate-100 p-3 bg-slate-50/70 space-y-2.5">
+          <div className="flex items-center gap-2.5">
+            {user.avatar ? (
+              <img
+                src={user.avatar}
+                alt={user.name}
+                className="h-8 w-8 rounded-lg object-cover border border-slate-200 shrink-0"
+              />
+            ) : (
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white font-bold text-xs shrink-0">
+                {user.name.charAt(0)}
+              </div>
+            )}
+            <div className="flex-1 overflow-hidden min-w-0">
+              <p className="text-xs font-bold text-slate-900 truncate leading-tight">{user.name}</p>
+              <p className="text-[10px] text-slate-500 truncate capitalize">{user.role}</p>
             </div>
             <button
               type="button"
               onClick={logout}
-              className="flex items-center gap-1 text-[11px] font-semibold text-rose-600 hover:text-rose-800 transition-colors"
+              className="text-rose-600 hover:text-rose-800 p-1 rounded-md hover:bg-rose-50 transition-colors"
               title="Keluar dari sesi ini dan kembali ke login"
             >
-              <LogOut className="h-3.5 w-3.5" />
-              <span>Keluar</span>
+              <LogOut className="h-4 w-4" />
             </button>
           </div>
-          <p className="text-[10px] text-slate-400 font-mono truncate">
-            {user.name} ({user.role})
-          </p>
+
+          <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono pt-1 border-t border-slate-200/50">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+            <span className="truncate">RSUD S.M. Jamaludin I</span>
+          </div>
         </div>
       </aside>
     </>

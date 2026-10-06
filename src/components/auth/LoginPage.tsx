@@ -175,10 +175,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ labInfo }) => {
 
               <div className="grid grid-cols-2 gap-1.5 pt-1">
                 {(availableUsers.length > 0 ? availableUsers.slice(0, 4) : [
-                  { id: 'u1', name: 'dr. Hendra Wijaya, Sp.PK', role: 'admin', nip: '19800512 200801 1 008', password: 'password123' },
-                  { id: 'u2', name: 'Siti Rahmawati, S.Tr.Kes', role: 'supervisor', nip: '19850914 201001 2 015', password: 'password123' },
-                  { id: 'u3', name: 'Budi Santoso, A.Md.AK', role: 'analis', nip: '19920315 201502 1 004', password: 'password123' },
-                  { id: 'u4', name: 'Maya Indriani, S.ST', role: 'viewer', nip: '19940720 201801 2 009', password: 'password123' },
+                  { id: 'u1', name: 'dr. Hendra Wijaya, Sp.PK', role: 'admin', nip: '19800512 200801 1 008', password: 'password123', avatar: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=150&auto=format&fit=crop&q=80' },
+                  { id: 'u2', name: 'Siti Rahmawati, S.Tr.Kes', role: 'supervisor', nip: '19850914 201001 2 015', password: 'password123', avatar: 'https://images.unsplash.com/photo-1594824813572-132d733737b3?w=150&auto=format&fit=crop&q=80' },
+                  { id: 'u3', name: 'Budi Pratama, A.Md.AK', role: 'analis', nip: '19930720 201802 1 003', password: 'password123', avatar: 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?w=150&auto=format&fit=crop&q=80' },
+                  { id: 'u4', name: 'Maya Andriani, S.Kep', role: 'viewer', nip: '19950910 202001 2 005', password: 'password123', avatar: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=150&auto=format&fit=crop&q=80' },
                 ]).map((u) => {
                   const roleLabel = u.role === 'admin' ? 'Admin' : u.role === 'supervisor' ? 'Supervisor' : u.role === 'analis' ? 'ATLM' : 'Viewer';
                   const isSelected = identifier.toLowerCase() === u.role || (u.nip && identifier.includes(u.nip.slice(0, 6)));
@@ -187,19 +187,32 @@ export const LoginPage: React.FC<LoginPageProps> = ({ labInfo }) => {
                       key={u.id}
                       type="button"
                       onClick={() => handleQuickFill(u as User)}
-                      className={`flex flex-col text-left p-2 rounded-lg border transition-all ${
+                      className={`flex items-center gap-2 p-2 rounded-lg border transition-all text-left ${
                         isSelected 
                           ? 'border-emerald-600 bg-emerald-50/80 text-emerald-950 font-semibold shadow-2xs' 
                           : 'border-slate-200 bg-white hover:bg-slate-100 text-slate-700'
                       }`}
                     >
-                      <div className="flex items-center justify-between text-[10px] w-full">
-                        <span className="font-bold text-slate-900 truncate">{u.name.split(',')[0]}</span>
-                        <span className="text-[9px] px-1 rounded bg-slate-100 font-mono text-slate-600 shrink-0">{roleLabel}</span>
+                      {u.avatar ? (
+                        <img
+                          src={u.avatar}
+                          alt={u.name}
+                          className="h-8 w-8 rounded-lg object-cover border border-slate-200 shrink-0"
+                        />
+                      ) : (
+                        <div className="h-8 w-8 rounded-lg bg-slate-900 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                          {u.name.charAt(0)}
+                        </div>
+                      )}
+                      <div className="flex-1 overflow-hidden min-w-0">
+                        <div className="flex items-center justify-between text-[10px] w-full">
+                          <span className="font-bold text-slate-900 truncate">{u.name.split(',')[0]}</span>
+                          <span className="text-[9px] px-1 rounded bg-slate-100 font-mono text-slate-600 shrink-0">{roleLabel}</span>
+                        </div>
+                        <span className="text-[9px] text-slate-500 font-mono truncate block mt-0.5">
+                          Pass: {u.password || 'password123'}
+                        </span>
                       </div>
-                      <span className="text-[9px] text-slate-500 font-mono truncate mt-0.5">
-                        Pass: {u.password || 'password123'}
-                      </span>
                     </button>
                   );
                 })}
