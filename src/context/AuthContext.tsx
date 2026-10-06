@@ -138,7 +138,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: false, message: 'Akun pengguna ini sedang dinonaktifkan oleh administrator.' };
     }
 
-    if (target.password && password && password.trim() !== '' && target.password !== password) {
+    if (!password || password.trim() === '') {
+      return { success: false, message: 'Kata sandi belum diisi. Petugas wajib mengisi kata sandi secara manual.' };
+    }
+
+    if (target.password && target.password !== password) {
       return { success: false, message: 'Kata sandi tidak sesuai. Periksa kembali kata sandi Anda.' };
     }
 
