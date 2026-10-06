@@ -78,30 +78,66 @@ body {
     print-color-adjust: exact !important;
   }
 
-  #root, main, .main-content {
+  #root, #root > div, main, .main-content {
     width: 100% !important;
     max-width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
     overflow: visible !important;
     height: auto !important;
     min-height: 0 !important;
     display: block !important;
   }
 
-  /* Hide screen-only interactive components */
+  /* Hide screen-only interactive components, navigation, buttons, and dialogs */
   .print\:hidden,
+  [data-print-hidden="true"],
   nav,
   aside,
-  button:not(.print\:block),
+  header:not(.kop-surat),
+  footer,
+  button,
   input,
   select,
+  textarea,
   .toast,
-  .notification-drawer {
+  .notification-drawer,
+  [role="dialog"],
+  .modal-backdrop {
     display: none !important;
+    visibility: hidden !important;
   }
 
-  /* Prevent page-break cutting */
+  /* Eliminate margin-top created by Tailwind space-y-* on print */
+  .space-y-6 > :not([hidden]) ~ :not([hidden]),
+  .space-y-4 > :not([hidden]) ~ :not([hidden]),
+  .space-y-5 > :not([hidden]) ~ :not([hidden]),
+  .space-y-3 > :not([hidden]) ~ :not([hidden]),
+  .space-y-2 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0 !important;
+  }
+
+  /* Printable Sheet: Pure document content with zero card borders, rounded corners, or web padding */
+  #printable-report-sheet,
+  #printable-levey-jennings-doc,
+  .printable-sheet {
+    display: block !important;
+    visibility: visible !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    overflow: visible !important;
+  }
+
+  /* Prevent page-break cutting on Kop Surat, rows, and signatures */
   .print-avoid-break,
   .break-inside-avoid,
   table,

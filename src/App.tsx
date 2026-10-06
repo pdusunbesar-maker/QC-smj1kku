@@ -159,7 +159,7 @@ function AppContent() {
 
         {/* Main Content Viewport */}
         <main className="flex-1 overflow-y-auto p-3 sm:p-5 lg:p-6 xl:p-8 w-full print:p-0 print:m-0 print:overflow-visible print:w-full">
-          <div className="w-full max-w-full space-y-6 print:max-w-none print:w-full print:m-0 print:p-0">
+          <div className="w-full max-w-full space-y-6 print:max-w-none print:w-full print:m-0 print:p-0 print:space-y-0">
             {/* 1. Dashboard View */}
             {activeTab === 'dashboard' && (
               <DashboardView

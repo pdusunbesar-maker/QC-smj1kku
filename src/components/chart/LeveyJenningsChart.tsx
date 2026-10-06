@@ -213,6 +213,25 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
         logging: false,
         backgroundColor: '#ffffff',
         windowWidth: 1280,
+        ignoreElements: (el) => 
+          el.classList.contains('print:hidden') || 
+          el.classList.contains('no-print') || 
+          el.tagName === 'BUTTON',
+        onclone: (clonedDoc) => {
+          const sheet = clonedDoc.getElementById('printable-levey-jennings-doc');
+          if (sheet) {
+            sheet.style.border = 'none';
+            sheet.style.borderRadius = '0px';
+            sheet.style.boxShadow = 'none';
+            sheet.style.padding = '0px';
+            sheet.style.margin = '0px';
+            sheet.style.width = '100%';
+            sheet.style.maxWidth = '100%';
+          }
+          clonedDoc.querySelectorAll('.print\\:hidden, button').forEach(el => {
+            (el as HTMLElement).style.display = 'none';
+          });
+        }
       });
 
       const imgData = canvas.toDataURL('image/png');
@@ -262,7 +281,7 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 print:space-y-0 print:m-0 print:p-0">
       {/* SCREEN ACTION TOOLBAR & FILTER CONTROLS (HIDDEN ON PRINT) */}
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs space-y-3 print:hidden">
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between border-b border-slate-100 pb-3">
@@ -456,7 +475,7 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
       <div 
         ref={printableDocRef}
         id="printable-levey-jennings-doc"
-        className="rounded-xl border border-slate-200 bg-white p-6 md:p-8 shadow-xs space-y-5 print:border-none print:shadow-none print:p-0 print:m-0 print:w-full print:max-w-none"
+        className="printable-sheet rounded-xl border border-slate-200 bg-white p-6 md:p-8 shadow-xs space-y-5 print:border-none print:shadow-none print:p-0 print:m-0 print:w-full print:max-w-none print:rounded-none"
       >
         {/* KOP SURAT RESMI RSUD SULTAN MUHAMMAD JAMALUDIN I */}
         <div className="w-full kop-surat print-avoid-break mb-5">

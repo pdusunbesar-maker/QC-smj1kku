@@ -371,6 +371,25 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         logging: false,
         backgroundColor: '#ffffff',
         windowWidth: 1200,
+        ignoreElements: (el) => 
+          el.classList.contains('print:hidden') || 
+          el.classList.contains('no-print') || 
+          el.tagName === 'BUTTON',
+        onclone: (clonedDoc) => {
+          const sheet = clonedDoc.getElementById('printable-report-sheet');
+          if (sheet) {
+            sheet.style.border = 'none';
+            sheet.style.borderRadius = '0px';
+            sheet.style.boxShadow = 'none';
+            sheet.style.padding = '0px';
+            sheet.style.margin = '0px';
+            sheet.style.width = '100%';
+            sheet.style.maxWidth = '100%';
+          }
+          clonedDoc.querySelectorAll('.print\\:hidden, button').forEach(el => {
+            (el as HTMLElement).style.display = 'none';
+          });
+        }
       });
 
       const imgData = canvas.toDataURL('image/png');
@@ -385,21 +404,20 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       const margin = 10;
       const contentWidth = pdfWidth - margin * 2;
       const contentHeight = (canvas.height * contentWidth) / canvas.width;
+      const pageAvailableHeight = pdfHeight - margin * 2;
 
-      if (contentHeight <= pdfHeight - margin * 2) {
+      if (contentHeight <= pageAvailableHeight) {
         pdf.addImage(imgData, 'PNG', margin, margin, contentWidth, contentHeight);
       } else {
-        let heightLeft = contentHeight;
-        let position = margin;
-
-        pdf.addImage(imgData, 'PNG', margin, position, contentWidth, contentHeight);
-        heightLeft -= pdfHeight;
-
-        while (heightLeft > 0) {
-          position = heightLeft - contentHeight + margin;
-          pdf.addPage();
-          pdf.addImage(imgData, 'PNG', margin, position, contentWidth, contentHeight);
-          heightLeft -= pdfHeight;
+        const totalPages = Math.ceil(contentHeight / pageAvailableHeight);
+        for (let i = 0; i < totalPages; i++) {
+          if (i > 0) pdf.addPage();
+          const yPosition = margin - i * pageAvailableHeight;
+          pdf.addImage(imgData, 'PNG', margin, yPosition, contentWidth, contentHeight);
+          
+          pdf.setFontSize(8);
+          pdf.setTextColor(150, 150, 150);
+          pdf.text(`Halaman ${i + 1} dari ${totalPages}`, pdfWidth / 2, pdfHeight - 5, { align: 'center' });
         }
       }
 
@@ -417,7 +435,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 print:space-y-0 print:m-0 print:p-0">
       {/* Top Header - Screen Only */}
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between border-b border-slate-200 pb-4 print:hidden">
         <div>
@@ -716,7 +734,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       <div 
         ref={printableDocRef}
         id="printable-report-sheet"
-        className="rounded-xl border border-slate-200 bg-white p-8 shadow-xs print:border-none print:shadow-none print:p-0 print:m-0 print:w-full print:max-w-none"
+        className="printable-sheet rounded-xl border border-slate-200 bg-white p-8 shadow-xs print:border-none print:shadow-none print:p-0 print:m-0 print:w-full print:max-w-none print:rounded-none"
       >
         {/* KOP SURAT RESMI RSUD SULTAN MUHAMMAD JAMALUDIN I */}
         <div className="w-full kop-surat print-avoid-break mb-6">
