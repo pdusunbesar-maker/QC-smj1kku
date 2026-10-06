@@ -141,6 +141,8 @@ export interface QCResult {
   
   // Review metadata
   reviewStatus: 'pending' | 'accepted' | 'rejected' | 'investigation_required';
+  source: 'MANUAL' | 'AI_VISION' | 'IMPORT';
+  verificationStatus: 'AI_EXTRACTED' | 'PENDING_VERIFICATION' | 'VERIFIED' | 'SAVED' | 'REJECTED';
   reviewedBy?: string;
   reviewedByName?: string;
   reviewedAt?: string;
@@ -226,9 +228,9 @@ export interface CAPAActionItem {
 }
 
 export interface CAPA {
-  id: string; // e.g., CAPA-2026-001
+  id: string; // e.g., CAPA-2026-00001
   createdAt: string;
-  source: 'QC Gagal' | 'Pelanggaran Westgard' | 'Non-Conformity' | 'Keluhan' | 'Temuan Audit' | 'Insiden Laboratorium';
+  source: 'Pelanggaran Westgard' | 'QC Gagal' | 'Non-Conformity' | 'Keluhan' | 'Temuan Audit' | 'Insiden Laboratorium';
   department: string;
   pic: string;
   problemStatement: string;
@@ -241,22 +243,40 @@ export interface CAPA {
   fiveWhy: FiveWhyData;
   identifiedRootCause: string;
   
-  // Actions
+  // Workflow tracking
+  status: 'DRAFT' | 'OPEN' | 'INVESTIGATION' | 'ACTION_REQUIRED' | 'IN_PROGRESS' | 'WAITING_REVIEW' | 'EFFECTIVENESS_CHECK' | 'CLOSED' | 'REJECTED' | 'CANCELLED';
+  priority: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  overallDueDate: string;
+  
+  // Corrective/Preventive Actions
   correctiveActions: CAPAActionItem[];
   preventiveActions: CAPAActionItem[];
   
-  // Verification
+  // Investigation/Review/Effectiveness
+  immediateContainment: {
+    actionTaken: string;
+    takenBy: string;
+    dateTime: string;
+  }[];
+  
   verificationMethod?: string;
   verificationResult?: string;
   verificationDate?: string;
   verifier?: string;
   verifierName?: string;
-  effectiveness: 'pending' | 'effective' | 'not_effective';
+  effectiveness: 'pending' | 'effective' | 'partially_effective' | 'not_effective';
   
-  status: CAPAStatus;
-  overallDueDate: string;
+  // Linking/Audit
+  auditTrail: AuditLog[];
+  evidenceList: {
+    fileName: string;
+    uploadedBy: string;
+    uploadedAt: string;
+    description: string;
+  }[];
+
   closedAt?: string;
-  linkedQcResultId?: string;
+  linkedQcResultIds: string[]; // Support multiple QC results
   linkedNonConformityId?: string;
 }
 
@@ -304,4 +324,93 @@ export interface AppNotification {
   linkTab?: string;
   linkId?: string;
   read: boolean;
+}
+
+export interface OCRScanResult {
+  scan: {
+    scan_id: string;
+    timestamp: string;
+    image_id: string;
+  };
+  document: {
+    laboratory_name: string | null;
+    analyzer: string | null;
+    date: string | null;
+    time: string | null;
+  };
+  results: Array<{
+    parameter: { value: string | null; original_text: string | null; confidence: number };
+    level: { value: string | null; original_text: string | null; confidence: number };
+    lot: { value: string | null; confidence: number };
+    result: { value: number | null; original_text: string | null; confidence: number };
+    unit: { value: string | null; confidence: number };
+    mean: { value: number | null; confidence: number };
+    sd: { value: number | null; confidence: number };
+    source_text: string | null;
+    bounding_box?: { x: number; y: number; width: number; height: number };
+    overall_confidence: number;
+    needs_verification: boolean;
+    verification_reason: string | null;
+  }>;
+}
+
+export interface QCLevel {
+  id: string;
+  name: string; // e.g., 'Level 1'
+  code: string; // e.g., 'L1'
+  materialId: string;
+  description: string;
+  status: 'active' | 'inactive';
+}
+
+export interface QCLot {
+  id: string;
+  number: string;
+  materialId: string;
+  levelId: string;
+  manufacturer: string;
+  expirationDate: string;
+  openDate?: string;
+  status: 'active' | 'expired' | 'inactive';
+  notes?: string;
+}
+
+export interface MasterUnit {
+  id: string;
+  name: string;
+  symbol: string;
+  decimalPlaces: number;
+  status: 'active' | 'inactive';
+}
+
+export interface ReferenceValue {
+  id: string;
+  analyzerId: string;
+  parameterId: string;
+  materialId: string;
+  levelId: string;
+  lotId: string;
+  unitId: string;
+  mean: number;
+  sd: number;
+  minAcceptable: number;
+  maxAcceptable: number;
+  effectiveDate: string;
+  expiryDate: string;
+  version: number;
+  status: 'active' | 'inactive' | 'pending';
+  source: string;
+  approvedBy?: string;
+  approvalDate?: string;
+  notes?: string;
+}
+
+export interface AIMapping {
+  id: string;
+  type: 'ANALYZER' | 'PARAMETER' | 'LEVEL' | 'LOT' | 'UNIT';
+  ocrText: string;
+  masterDataId: string; // ID of the referenced Master Data
+  confidenceRequirement: 'low' | 'medium' | 'high';
+  status: 'active' | 'inactive';
+  notes?: string;
 }

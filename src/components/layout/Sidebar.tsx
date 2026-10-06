@@ -15,6 +15,7 @@ import {
   Users,
   LogOut,
   X,
+  Camera,
   PanelLeftClose,
   PanelLeftOpen
 } from 'lucide-react';
@@ -63,6 +64,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           roleRestricted: role === 'viewer',
         },
         {
+          id: 'qc-scan',
+          label: 'Scan QC',
+          icon: Camera,
+          badge: null,
+          roleRestricted: role === 'viewer',
+        },
+        {
           id: 'qc-review',
           label: 'QC Review & Approval',
           icon: CheckCircle2,
@@ -96,6 +104,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
           id: 'non-conformity',
           label: 'Penyimpangan (NC)',
           icon: AlertTriangle,
+          badge: null,
+        },
+        {
+          id: 'capa-dashboard',
+          label: 'CAPA Dashboard',
+          icon: LayoutDashboard,
           badge: null,
         },
         {

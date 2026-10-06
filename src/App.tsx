@@ -17,14 +17,17 @@ import { Navbar } from './components/layout/Navbar';
 import { Sidebar } from './components/layout/Sidebar';
 import { DashboardView } from './components/dashboard/DashboardView';
 import { QCInputView } from './components/qc/QCInputView';
+import { MasterDataView } from './components/master-data/MasterDataView';
 import { QCReviewView } from './components/qc/QCReviewView';
+import { QCScanView } from './components/qc/QCScanView';
+import { QCVerificationView } from './components/qc/QCVerificationView';
 import { LeveyJenningsChart } from './components/chart/LeveyJenningsChart';
 import { WestgardRulesView } from './components/westgard/WestgardRulesView';
 import { NonConformityView } from './components/nonconformity/NonConformityView';
 import { CAPAView } from './components/capa/CAPAView';
+import { CAPADashboardView } from './components/capa/CAPADashboardView';
 import { RCAView } from './components/rca/RCAView';
 import { ReportsView } from './components/reports/ReportsView';
-import { MasterDataView } from './components/master/MasterDataView';
 import { UserManagementView } from './components/users/UserManagementView';
 import { AuditTrailView } from './components/audit/AuditTrailView';
 import { DatabaseSettingsModal } from './components/settings/DatabaseSettingsModal';
@@ -56,6 +59,8 @@ function AppContent() {
   const [isDatabaseSettingsOpen, setIsDatabaseSettingsOpen] = useState(false);
   const [isNotificationDrawerOpen, setIsNotificationDrawerOpen] = useState(false);
   const [isUserProfileModalOpen, setIsUserProfileModalOpen] = useState(false);
+  const [scannedResults, setScannedResults] = useState<any[]>([]);
+  const [scanPreviewUrl, setScanPreviewUrl] = useState<string | null>(null);
 
   // Desktop sidebar collapse state persisted in localStorage
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
@@ -206,7 +211,31 @@ function AppContent() {
               />
             )}
 
-            {/* 3. QC Review & Approval View */}
+            {/* 3. Scan QC View */}
+            {activeTab === 'qc-scan' && (
+              <QCScanView onScanComplete={(results, previewUrl) => {
+                setScannedResults(results);
+                setScanPreviewUrl(previewUrl);
+                setActiveTab('qc-verification');
+              }} />
+            )}
+
+            {/* 4. Scan QC Verification View */}
+            {activeTab === 'qc-verification' && (
+              <QCVerificationView 
+                extractedData={scannedResults}
+                previewUrl={scanPreviewUrl}
+                parameters={parameters}
+                instruments={instruments}
+                onSave={(data) => {
+                  console.log('Save verified results:', data);
+                  // Here we would map and save to qcResults
+                  setActiveTab('qc-input');
+                }}
+              />
+            )}
+
+            {/* 5. QC Review & Approval View */}
             {activeTab === 'qc-review' && (
               <QCReviewView
                 results={qcResults}
@@ -221,6 +250,11 @@ function AppContent() {
                 }}
                 onNavigateToTab={handleNavigateToTab}
               />
+            )}
+
+            {/* 6. Master Data View */}
+            {activeTab === 'master-data' && (
+              <MasterDataView />
             )}
 
             {/* 4. Levey-Jennings Chart View */}
@@ -298,7 +332,15 @@ function AppContent() {
               />
             )}
 
-            {/* 7. CAPA View */}
+            {/* 7a. CAPA Dashboard */}
+            {activeTab === 'capa-dashboard' && (
+              <CAPADashboardView
+                capas={capas}
+                onNavigateToTab={handleNavigateToTab}
+              />
+            )}
+
+            {/* 7b. CAPA View */}
             {activeTab === 'capa' && (
               <CAPAView
                 capas={capas}

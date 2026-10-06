@@ -20,11 +20,14 @@ import {
   FileText, 
   Check, 
   ExternalLink,
-  CalendarDays
+  CalendarDays,
+  Camera
 } from 'lucide-react';
 import { QCResult, CAPA, NonConformity, Instrument, Parameter, AuditLog } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { StorageService } from '../../services/storage';
+import { SummaryCardsPanel } from './panels/SummaryCardsPanel';
+import { CriticalAlertsPanel } from './panels/CriticalAlertsPanel';
 
 interface DashboardViewProps {
   qcResults: QCResult[];
@@ -305,114 +308,44 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </button>
           </div>
 
-          {/* Quick Action Button */}
-          <button
-            type="button"
-            onClick={() => onNavigateToTab('qc-input')}
-            className="flex items-center gap-1.5 h-9 px-3.5 text-xs font-bold text-white bg-[#0B5FA5] hover:bg-[#084B83] rounded-lg shadow-xs transition-all active:scale-[0.98] cursor-pointer"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Input QC</span>
-          </button>
+          {/* Quick Action Buttons */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onNavigateToTab('qc-scan')}
+              className="flex items-center gap-1.5 h-9 px-3.5 text-xs font-bold text-[#0B5FA5] bg-blue-50 border border-blue-200 hover:bg-blue-100 rounded-lg shadow-2xs transition-all active:scale-[0.98] cursor-pointer"
+            >
+              <Camera className="h-4 w-4" />
+              <span>Scan QC Baru</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigateToTab('qc-input')}
+              className="flex items-center gap-1.5 h-9 px-3.5 text-xs font-bold text-white bg-[#0B5FA5] hover:bg-[#084B83] rounded-lg shadow-xs transition-all active:scale-[0.98] cursor-pointer"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Input QC</span>
+            </button>
+          </div>
         </div>
       </div>
 
       {/* ========================================================================= */}
       {/* 2. ROW 1: 4 CORE KPI CARDS (Real Data Only)                               */}
       {/* ========================================================================= */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
-        
-        {/* KPI 1: QC STATUS */}
-        <div className="rounded-xl border border-[#E2E8F0] bg-white p-4 shadow-2xs flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono uppercase tracking-wider font-bold text-slate-500">
-              QC STATUS
-            </span>
-            <span className={`h-2.5 w-2.5 rounded-full ${passRate >= 95 ? 'bg-emerald-500' : 'bg-amber-500'} animate-pulse`} />
-          </div>
-          <div className="mt-2.5">
-            <div className="text-2xl sm:text-3xl font-extrabold font-mono text-[#172033] tracking-tight">
-              {passRate}%
-            </div>
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 mt-0.5">
-              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-              <span>{passRate >= 95 ? 'Dalam Batas (Stable)' : 'Perlu Pengawasan'}</span>
-            </div>
-            <p className="text-[11px] text-slate-400 font-mono mt-1">
-              {filteredPass} dari {filteredResults.length} run normal
-            </p>
-          </div>
-        </div>
+      <SummaryCardsPanel 
+        total={filteredResults.length} 
+        pass={filteredPass} 
+        warning={filteredWarning} 
+        reject={filteredReject} 
+        violationCount={attentionItems.length} 
+        openCapa={capaMetrics.open}
+      />
 
-        {/* KPI 2: TOTAL QC RUN */}
-        <div className="rounded-xl border border-[#E2E8F0] bg-white p-4 shadow-2xs flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono uppercase tracking-wider font-bold text-slate-500">
-              TOTAL PEMERIKSAAN
-            </span>
-            <div className="h-7 w-7 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-[#0B5FA5]">
-              <Activity className="h-4 w-4" />
-            </div>
-          </div>
-          <div className="mt-2.5">
-            <div className="text-2xl sm:text-3xl font-extrabold font-mono text-[#172033] tracking-tight">
-              {filteredResults.length}
-            </div>
-            <p className="text-xs text-slate-600 mt-0.5 font-medium">
-              Run Kontrol Analitik
-            </p>
-            <p className="text-[11px] text-slate-400 font-mono mt-1">
-              {parameters.length} Parameter Uji Aktif
-            </p>
-          </div>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-12">
+          <CriticalAlertsPanel alerts={attentionItems.filter(i => i.type === 'reject')} />
         </div>
-
-        {/* KPI 3: OUT OF CONTROL */}
-        <div className="rounded-xl border border-[#E2E8F0] bg-white p-4 shadow-2xs flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono uppercase tracking-wider font-bold text-rose-700">
-              QC OUT OF CONTROL
-            </span>
-            <div className="h-7 w-7 rounded-lg bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600">
-              <XCircle className="h-4 w-4" />
-            </div>
-          </div>
-          <div className="mt-2.5">
-            <div className={`text-2xl sm:text-3xl font-extrabold font-mono tracking-tight ${filteredReject > 0 ? 'text-rose-600' : 'text-slate-800'}`}>
-              {filteredReject}
-            </div>
-            <p className="text-xs text-rose-700 mt-0.5 font-medium">
-              {filteredReject > 0 ? 'Melanggar ±3SD / Westgard' : 'Nol Pelanggaran Kritis'}
-            </p>
-            <p className="text-[11px] text-slate-400 font-mono mt-1">
-              {filteredWarning} run dalam rentang warning
-            </p>
-          </div>
-        </div>
-
-        {/* KPI 4: ACTION REQUIRED */}
-        <div className="rounded-xl border border-[#E2E8F0] bg-white p-4 shadow-2xs flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono uppercase tracking-wider font-bold text-amber-700">
-              ACTION REQUIRED
-            </span>
-            <div className="h-7 w-7 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600">
-              <AlertTriangle className="h-4 w-4" />
-            </div>
-          </div>
-          <div className="mt-2.5">
-            <div className={`text-2xl sm:text-3xl font-extrabold font-mono tracking-tight ${attentionItems.length > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
-              {attentionItems.length}
-            </div>
-            <p className="text-xs text-slate-600 mt-0.5 font-medium">
-              {pendingReviews.length} Review · {capaMetrics.overdue} Overdue
-            </p>
-            <p className="text-[11px] text-slate-400 font-mono mt-1">
-              {attentionItems.length > 0 ? 'Membutuhkan intervensi petugas' : 'Semua tindakan tertangani'}
-            </p>
-          </div>
-        </div>
-
       </div>
 
       {/* ========================================================================= */}

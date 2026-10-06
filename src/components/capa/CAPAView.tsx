@@ -18,6 +18,7 @@ import {
   AlertTriangle,
   Save
 } from 'lucide-react';
+import { CAPADetailView } from './CAPADetailView';
 import { CAPA, QCResult, NonConformity } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { StorageService } from '../../services/storage';
@@ -670,198 +671,19 @@ export const CAPAView: React.FC<CAPAViewProps> = ({
 
       {/* 3. Detail & Management Modal */}
       {selectedCapa && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 overflow-y-auto animate-in fade-in">
-          <div className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-2xl space-y-6 my-8 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="font-bold text-slate-900 text-base">
-                    Dokumen CAPA #{selectedCapa.id}
-                  </h3>
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                    selectedCapa.status === 'closed' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                  }`}>
-                    {selectedCapa.status}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500 font-mono mt-0.5">
-                  Diterbitkan {selectedCapa.createdAt} · PIC: {selectedCapa.pic}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedCapa(null)}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            {/* Problem Overview */}
-            <div className="rounded-xl bg-slate-50 p-4 border border-slate-200 space-y-2 text-xs">
-              <h4 className="font-bold text-slate-900 text-sm">{selectedCapa.problemStatement}</h4>
-              <p className="text-slate-600 leading-relaxed">{selectedCapa.nonConformityDescription}</p>
-              <div className="pt-2 flex flex-wrap gap-4 text-[11px] text-slate-500 border-t border-slate-200/60">
-                <span>Sumber: <strong>{selectedCapa.source}</strong></span>
-                <span>Unit: <strong>{selectedCapa.department}</strong></span>
-                <span>Jatuh Tempo: <strong>{selectedCapa.overallDueDate}</strong></span>
-              </div>
-            </div>
-
-            {/* RCA Section */}
-            <div className="space-y-2 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-slate-900 uppercase tracking-wider text-[11px]">
-                  1. Analisis Akar Masalah (Root Cause Analysis)
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedCapa(null);
-                    onNavigateToTab('rca', { capaId: selectedCapa.id });
-                  }}
-                  className="text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-1 text-[11px]"
-                >
-                  <span>Buka Editor Fishbone & 5-Why</span>
-                  <ExternalLink className="h-3 w-3" />
-                </button>
-              </div>
-              <div className="p-3 rounded-lg border border-slate-200 bg-white">
-                <p className="font-semibold text-slate-700">Hasil Identifikasi Akar Masalah:</p>
-                <p className="text-slate-600 mt-1 italic">
-                  {selectedCapa.identifiedRootCause || 'Belum ada kesimpulan akar masalah. Buka tab RCA untuk melakukan analisis.'}
-                </p>
-              </div>
-            </div>
-
-            {/* Action Plans */}
-            <div className="space-y-4 text-xs">
-              <span className="font-bold text-slate-900 uppercase tracking-wider text-[11px] block">
-                2. Rencana Tindakan Korektif & Preventif
-              </span>
-
-              {/* Corrective Actions */}
-              <div className="space-y-2">
-                <span className="font-semibold text-slate-700 block">Tindakan Korektif (Corrective Action):</span>
-                {selectedCapa.correctiveActions.map((ca, idx) => (
-                  <div key={ca.id} className="p-3 rounded-lg border border-slate-200 bg-white flex items-center justify-between gap-4">
-                    <div>
-                      <p className="font-medium text-slate-900">{idx + 1}. {ca.description || (ca as any).action}</p>
-                      <p className="text-[11px] text-slate-400 font-mono mt-0.5">PIC: {ca.pic} · Batas: {ca.dueDate}</p>
-                    </div>
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase shrink-0 ${
-                      ca.status === 'completed' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'
-                    }`}>
-                      {ca.status}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Preventive Actions */}
-              <div className="space-y-2">
-                <span className="font-semibold text-slate-700 block">Tindakan Preventif (Preventive Action):</span>
-                {selectedCapa.preventiveActions.map((pa, idx) => (
-                  <div key={pa.id} className="p-3 rounded-lg border border-slate-200 bg-white flex items-center justify-between gap-4">
-                    <div>
-                      <p className="font-medium text-slate-900">{idx + 1}. {pa.description || (pa as any).action}</p>
-                      <p className="text-[11px] text-slate-400 font-mono mt-0.5">PIC: {pa.pic} · Batas: {pa.dueDate}</p>
-                    </div>
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase shrink-0 ${
-                      pa.status === 'completed' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'
-                    }`}>
-                      {pa.status}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Verification of Effectiveness Section */}
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-4 space-y-3 text-xs">
-              <h4 className="font-bold text-emerald-950 uppercase tracking-wider flex items-center gap-1.5">
-                <ShieldCheck className="h-4 w-4 text-emerald-700" />
-                <span>3. Verifikasi Efektivitas & Penutupan (Closure)</span>
-              </h4>
-
-              {selectedCapa.effectiveness === 'effective' ? (
-                <div className="space-y-1 text-emerald-900 bg-white/80 p-3 rounded-lg border border-emerald-200">
-                  <p className="font-bold flex items-center gap-1 text-emerald-800">
-                    <CheckCircle2 className="h-4 w-4" />
-                    <span>CAPA Dinyatakan EFEKTIF & RESMI DITUTUP</span>
-                  </p>
-                  <p><strong>Metode:</strong> {selectedCapa.verificationMethod}</p>
-                  <p><strong>Hasil:</strong> {selectedCapa.verificationResult}</p>
-                  <p className="font-mono text-[11px] text-slate-500">
-                    Diverifikasi oleh {selectedCapa.verifierName} pada {selectedCapa.verificationDate}
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <p className="text-slate-600">
-                    Lakukan evaluasi grafik QC pasca perbaikan minimal 7 hari untuk memverifikasi kestabilan analitik sebelum menutup CAPA ini.
-                  </p>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleVerifyEffectiveness(
-                        selectedCapa,
-                        'effective',
-                        'Monitoring grafik Levey-Jennings 7 hari berturut-turut',
-                        'Nilai kontrol normal, CV% < 3.5%, tidak ada pelanggaran Westgard.'
-                      )}
-                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg transition-colors"
-                    >
-                      Verifikasi Efektif & Tutup CAPA
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Footer Buttons with Edit & Delete */}
-            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-              <div className="flex items-center gap-1">
-                {canManage && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const target = selectedCapa;
-                        setSelectedCapa(null);
-                        handleOpenEditCapa(target);
-                      }}
-                      className="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 flex items-center gap-1"
-                    >
-                      <Edit3 className="h-3.5 w-3.5" />
-                      <span>Edit CAPA</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const target = selectedCapa;
-                        setSelectedCapa(null);
-                        setCapaToDelete(target);
-                      }}
-                      className="px-3 py-1.5 rounded-lg border border-rose-200 hover:bg-rose-50 text-xs font-semibold text-rose-700 flex items-center gap-1"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      <span>Hapus CAPA</span>
-                    </button>
-                  </>
-                )}
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setSelectedCapa(null)}
-                className="px-4 py-2 border border-slate-200 hover:bg-slate-50 rounded-lg text-xs font-semibold"
-              >
-                Selesai & Tutup
-              </button>
-            </div>
-          </div>
-        </div>
+        <CAPADetailView
+          capa={selectedCapa}
+          onClose={() => setSelectedCapa(null)}
+          onEdit={(c) => {
+            setSelectedCapa(null);
+            handleOpenEditCapa(c);
+          }}
+          onDelete={(c) => {
+            setSelectedCapa(null);
+            setCapaToDelete(c);
+          }}
+          onNavigateToTab={onNavigateToTab}
+        />
       )}
 
       {/* 4. Delete CAPA Confirmation Modal */}
