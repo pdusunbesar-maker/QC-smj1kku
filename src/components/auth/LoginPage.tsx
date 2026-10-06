@@ -9,7 +9,8 @@ import {
   KeyRound,
   ShieldCheck,
   CheckCircle2,
-  Users
+  Users,
+  Loader2
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { LaboratoryInfo, User } from '../../types';
@@ -25,6 +26,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ labInfo }) => {
   const [password, setPassword] = useState('password123');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const [availableUsers, setAvailableUsers] = useState<User[]>([]);
 
   // Hydrate fresh user credentials from Supabase when opening Login Page on any device
@@ -35,14 +37,20 @@ export const LoginPage: React.FC<LoginPageProps> = ({ labInfo }) => {
     setAvailableUsers(StorageService.getUsers());
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
+    setIsLoading(true);
 
-    // Instant synchronous authentication
-    const res = loginWithCredentials(identifier, password);
-    if (!res.success) {
-      setErrorMsg(res.message || 'Username, NIP, atau kata sandi tidak sesuai.');
+    try {
+      const res = await loginWithCredentials(identifier, password);
+      setIsLoading(false);
+      if (!res.success) {
+        setErrorMsg(res.message || 'Username, NIP, atau kata sandi tidak sesuai.');
+      }
+    } catch (err: any) {
+      setIsLoading(false);
+      setErrorMsg(err.message || 'Terjadi kesalahan saat otentikasi masuk.');
     }
   };
 
@@ -201,10 +209,20 @@ export const LoginPage: React.FC<LoginPageProps> = ({ labInfo }) => {
             {/* Submit Button */}
             <button
               type="submit"
-              className="w-full py-3 px-4 rounded-xl bg-[#008f75] hover:bg-[#007a64] active:bg-[#006e5a] text-white font-bold text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer hover:shadow-lg active:scale-[0.99] mt-2"
+              disabled={isLoading}
+              className="w-full py-3 px-4 rounded-xl bg-[#008f75] hover:bg-[#007a64] active:bg-[#006e5a] disabled:bg-[#008f75]/60 text-white font-bold text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer hover:shadow-lg active:scale-[0.99] mt-2"
             >
-              <span>Masuk ke Aplikasi QC</span>
-              <ArrowRight className="h-4 w-4" />
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Memverifikasi Akun...</span>
+                </>
+              ) : (
+                <>
+                  <span>Masuk ke Aplikasi QC</span>
+                  <ArrowRight className="h-4 w-4" />
+                </>
+              )}
             </button>
           </form>
 

@@ -719,36 +719,48 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         className="rounded-xl border border-slate-200 bg-white p-8 shadow-xs print:border-none print:shadow-none print:p-0 print:m-0 print:w-full print:max-w-none"
       >
         {/* KOP SURAT RESMI RSUD SULTAN MUHAMMAD JAMALUDIN I */}
-        <div className="flex items-center justify-between border-b-2 border-slate-900 pb-4 mb-6 kop-surat print-avoid-break">
+        <div className="flex items-center justify-between border-b-4 border-double border-slate-900 pb-3 mb-6 kop-surat print-avoid-break">
           <img
             src={labInfo.logoUrl || '/logo_kayong_utara.png'}
             alt="Lambang Daerah Kabupaten Kayong Utara"
-            className="h-24 w-auto object-contain shrink-0"
+            className="h-20 w-auto object-contain shrink-0"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = '/logo_kayong_utara.png';
+            }}
           />
-          <div className="text-center flex-1 px-4">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-              PEMERINTAH KABUPATEN KAYONG UTARA
+          <div className="text-center flex-1 px-4 space-y-0.5">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 leading-tight">
+              {labInfo.regency || 'PEMERINTAH KABUPATEN KAYONG UTARA'}
             </h3>
-            <h2 className="text-lg font-black uppercase text-slate-900 leading-tight">
-              {labInfo.hospitalName}
+            <h3 className="text-xs font-extrabold uppercase text-slate-800 leading-tight">
+              {labInfo.healthService || 'DINAS KESEHATAN DAN KELUARGA BERENCANA'}
+            </h3>
+            <h2 className="text-base sm:text-lg font-black uppercase text-slate-950 leading-tight">
+              {labInfo.hospitalName || 'RSUD SULTAN MUHAMMAD JAMALUDIN I'}
             </h2>
-            <h4 className="text-sm font-bold uppercase text-slate-800">
-              {labInfo.name}
+            <h4 className="text-xs sm:text-sm font-bold uppercase text-emerald-950 leading-tight">
+              {labInfo.name || 'INSTALASI PATOLOGI KLINIK & LABORATORIUM TERPADU'}
             </h4>
             <p className="text-[11px] text-slate-600 mt-1">
               {labInfo.address}
             </p>
-            <p className="text-[11px] text-slate-500 font-mono">
+            <p className="text-[10px] text-slate-500 font-mono">
               Telp: {labInfo.phone} · Surel: {labInfo.email} · Akreditasi: {labInfo.accreditation}
             </p>
           </div>
-          <div className="w-24 shrink-0 text-right">
-            <span className="font-mono text-[9px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-300 block mb-1">
-              KARS PARIPURNA
-            </span>
-            <span className="font-mono text-[9px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-300 block">
-              ISO 15189:2022
-            </span>
+          <div className="w-20 shrink-0 text-right hidden sm:block">
+            {labInfo.logoRightUrl ? (
+              <img src={labInfo.logoRightUrl} alt="Logo Kanan" className="h-20 w-auto object-contain ml-auto" />
+            ) : (
+              <div className="space-y-1">
+                <span className="font-mono text-[9px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-300 block text-center">
+                  KARS PARIPURNA
+                </span>
+                <span className="font-mono text-[9px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-300 block text-center">
+                  ISO 15189
+                </span>
+              </div>
+            )}
           </div>
         </div>
 

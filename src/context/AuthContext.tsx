@@ -9,7 +9,7 @@ interface AuthContextType {
   role: string;
   isAuthenticated: boolean;
   login: (user: User) => void;
-  loginWithCredentials: (email: string, password?: string) => { success: boolean; message?: string };
+  loginWithCredentials: (email: string, password?: string) => Promise<{ success: boolean; message?: string }> | { success: boolean; message?: string };
   logout: () => void;
   switchRole: (role: string) => void;
   can: (action: string) => boolean;
@@ -72,47 +72,60 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, 0);
   };
 
-  const loginWithCredentials = (identifier: string, password?: string): { success: boolean; message?: string } => {
-    // Always read latest users list from storage to guarantee fresh authentication data across devices
-    const currentUsersList = StorageService.getUsers();
-    setUsers(currentUsersList);
-
+  const loginWithCredentials = async (identifier: string, password?: string): Promise<{ success: boolean; message?: string }> => {
     const raw = identifier.trim().toLowerCase();
     if (!raw) {
       return { success: false, message: 'Silakan masukkan Username atau NIP.' };
     }
 
-    const cleanDigits = raw.replace(/\D/g, '');
+    // Try fetching fresh users list from Supabase if online
+    try {
+      await StorageService.syncFromSupabase();
+    } catch (e) {
+      // ignore transient sync errors
+    }
 
-    const target = currentUsersList.find(u => {
-      const email = u.email.toLowerCase();
-      const name = u.name.toLowerCase();
-      const nip = (u.nip || '').toLowerCase();
-      const nipDigits = (u.nip || '').replace(/\D/g, '');
-      const role = u.role.toLowerCase();
+    let currentUsersList = StorageService.getUsers();
+    setUsers(currentUsersList);
 
-      // Check common alias/username
-      if (raw === 'admin' && (role === 'admin' || email.includes('admin') || name.includes('hendra'))) return true;
-      if (raw === 'budi' && name.includes('budi')) return true;
-      if (raw === 'rudi' && (name.includes('budi') || name.includes('rudi'))) return true;
-      if (raw === 'maya' && name.includes('maya')) return true;
-      if (raw === 'hendra' && name.includes('hendra')) return true;
-      if (raw === 'siti' && name.includes('siti')) return true;
+    const findMatch = (list: User[]) => {
+      const cleanDigits = raw.replace(/\D/g, '');
 
-      // Email match
-      if (email === raw || email.split('@')[0] === raw) return true;
+      // 1. Exact Email / NIP / ID match
+      const exactMatch = list.find(u => {
+        const email = u.email.toLowerCase();
+        const nip = (u.nip || '').toLowerCase();
+        const nipDigits = (u.nip || '').replace(/\D/g, '');
+        if (email === raw || email.split('@')[0] === raw) return true;
+        if (nip === raw || (cleanDigits.length >= 6 && nipDigits === cleanDigits)) return true;
+        if (u.id.toLowerCase() === raw) return true;
+        return false;
+      });
+      if (exactMatch) return exactMatch;
 
-      // NIP match
-      if (nip === raw || (cleanDigits.length >= 6 && nipDigits.includes(cleanDigits))) return true;
+      // 2. Name, Role, or Known Alias match
+      return list.find(u => {
+        const email = u.email.toLowerCase();
+        const name = u.name.toLowerCase();
+        const role = u.role.toLowerCase();
+        const nipDigits = (u.nip || '').replace(/\D/g, '');
 
-      // Name includes
-      if (name.includes(raw)) return true;
+        if (raw === 'admin' && (role === 'admin' || email.includes('admin') || name.includes('hendra'))) return true;
+        if (raw === 'budi' && name.includes('budi')) return true;
+        if (raw === 'rudi' && (name.includes('budi') || name.includes('rudi'))) return true;
+        if (raw === 'maya' && name.includes('maya')) return true;
+        if (raw === 'hendra' && name.includes('hendra')) return true;
+        if (raw === 'siti' && name.includes('siti')) return true;
 
-      // Role match
-      if (role === raw) return true;
+        if (cleanDigits.length >= 6 && nipDigits.includes(cleanDigits)) return true;
+        if (name.includes(raw)) return true;
+        if (role === raw) return true;
 
-      return false;
-    });
+        return false;
+      });
+    };
+
+    let target = findMatch(currentUsersList);
 
     if (!target) {
       return { 
@@ -126,7 +139,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     if (target.password && password && password.trim() !== '' && target.password !== password) {
-      return { success: false, message: 'Kata sandi tidak sesuai.' };
+      return { success: false, message: 'Kata sandi tidak sesuai. Periksa kembali kata sandi Anda.' };
     }
 
     login(target);

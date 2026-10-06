@@ -109,18 +109,20 @@ function mapDbToLab(row: any): LaboratoryInfo {
     id: row.id || 'lab-rsud-smj1',
     name: row.name || current.name,
     hospitalName: row.hospital_name || row.hospitalName || current.hospitalName,
+    healthService: row.health_service || row.healthService || current.healthService || 'DINAS KESEHATAN DAN KELUARGA BERENCANA',
     regency: row.regency || current.regency,
     province: row.province || current.province,
     roomUnit: row.room_unit || row.roomUnit || current.roomUnit,
     headOfLab: row.head_of_lab || row.headOfLab || current.headOfLab,
     headNip: row.head_nip || row.headNip || current.headNip,
-    headOfQuality: row.head_of_quality || row.headOfQuality || current.headOfQuality || 'Siti Rahmawati, S.Tr.Kes',
-    qualityNip: row.quality_nip || row.qualityNip || current.qualityNip || '19850914 201001 2 015',
+    headOfQuality: row.head_of_quality || row.headOfQuality || current.headOfQuality,
+    qualityNip: row.quality_nip || row.qualityNip || current.qualityNip,
     address: row.address || current.address,
     phone: row.phone || current.phone,
     email: row.email || current.email,
     accreditation: row.accreditation || current.accreditation,
     logoUrl: row.logo_url || row.logoUrl || current.logoUrl,
+    logoRightUrl: row.logo_right_url || row.logoRightUrl || current.logoRightUrl || '',
   };
 }
 
@@ -833,6 +835,11 @@ export class StorageService {
   // --- Users & Current Auth ---
   static getUsers(): User[] {
     return getStored<User[]>(KEYS.USERS, INITIAL_USERS);
+  }
+
+  static saveAllUsersLocally(users: User[]): void {
+    setStored(KEYS.USERS, users);
+    this.notifyDataChanged('users');
   }
 
   static saveUser(user: User): void {

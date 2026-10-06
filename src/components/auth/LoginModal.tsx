@@ -8,7 +8,8 @@ import {
   ArrowRight,
   AlertCircle,
   CheckCircle2,
-  LogOut
+  LogOut,
+  Loader2
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { LaboratoryInfo } from '../../types';
@@ -31,17 +32,25 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
+    setIsLoading(true);
 
-    const res = loginWithCredentials(identifier, password);
-    if (!res.success) {
-      setErrorMsg(res.message || 'Gagal masuk. Periksa kembali username atau NIP Anda.');
-      return;
+    try {
+      const res = await loginWithCredentials(identifier, password);
+      setIsLoading(false);
+      if (!res.success) {
+        setErrorMsg(res.message || 'Gagal masuk. Periksa kembali username atau NIP Anda.');
+        return;
+      }
+      onClose();
+    } catch (err: any) {
+      setIsLoading(false);
+      setErrorMsg(err.message || 'Terjadi kesalahan saat otentikasi masuk.');
     }
-    onClose();
   };
 
   return (
@@ -172,10 +181,20 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
             <button
               type="submit"
-              className="w-full py-3 px-4 rounded-xl bg-[#008f75] hover:bg-[#007a64] active:bg-[#006e5a] text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer mt-2"
+              disabled={isLoading}
+              className="w-full py-3 px-4 rounded-xl bg-[#008f75] hover:bg-[#007a64] active:bg-[#006e5a] disabled:bg-[#008f75]/60 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer mt-2"
             >
-              <span>Masuk ke Aplikasi QC</span>
-              <ArrowRight className="h-4 w-4" />
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Memverifikasi Akun...</span>
+                </>
+              ) : (
+                <>
+                  <span>Masuk ke Aplikasi QC</span>
+                  <ArrowRight className="h-4 w-4" />
+                </>
+              )}
             </button>
           </form>
         </div>

@@ -459,21 +459,27 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
         className="rounded-xl border border-slate-200 bg-white p-6 md:p-8 shadow-xs space-y-5 print:border-none print:shadow-none print:p-0 print:m-0 print:w-full print:max-w-none"
       >
         {/* KOP SURAT RESMI RSUD SULTAN MUHAMMAD JAMALUDIN I */}
-        <div className="flex items-center justify-between border-b-2 border-slate-900 pb-4 mb-4 kop-surat print-avoid-break">
+        <div className="flex items-center justify-between border-b-4 border-double border-slate-900 pb-3 mb-4 kop-surat print-avoid-break">
           <img
             src={labInfo.logoUrl || '/logo_kayong_utara.png'}
             alt="Lambang Daerah Kabupaten Kayong Utara"
             className="h-20 w-auto object-contain shrink-0"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = '/logo_kayong_utara.png';
+            }}
           />
-          <div className="text-center flex-1 px-4">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-              PEMERINTAH KABUPATEN KAYONG UTARA
+          <div className="text-center flex-1 px-4 space-y-0.5">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 leading-tight">
+              {labInfo.regency || 'PEMERINTAH KABUPATEN KAYONG UTARA'}
             </h3>
-            <h2 className="text-base md:text-lg font-black uppercase text-slate-900 leading-tight">
-              {labInfo.hospitalName}
+            <h3 className="text-xs font-extrabold uppercase text-slate-800 leading-tight">
+              {labInfo.healthService || 'DINAS KESEHATAN DAN KELUARGA BERENCANA'}
+            </h3>
+            <h2 className="text-base md:text-lg font-black uppercase text-slate-950 leading-tight">
+              {labInfo.hospitalName || 'RSUD SULTAN MUHAMMAD JAMALUDIN I'}
             </h2>
-            <h4 className="text-xs md:text-sm font-bold uppercase text-slate-800">
-              {labInfo.name}
+            <h4 className="text-xs md:text-sm font-bold uppercase text-emerald-950 leading-tight">
+              {labInfo.name || 'INSTALASI PATOLOGI KLINIK & LABORATORIUM TERPADU'}
             </h4>
             <p className="text-[10px] md:text-[11px] text-slate-600 mt-0.5">
               {labInfo.address}
@@ -482,7 +488,11 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
               Telp: {labInfo.phone} · Surel: {labInfo.email} · Akreditasi: {labInfo.accreditation}
             </p>
           </div>
-          <div className="w-20 hidden md:block" />
+          <div className="w-20 hidden md:block shrink-0">
+            {labInfo.logoRightUrl && (
+              <img src={labInfo.logoRightUrl} alt="Logo Kanan" className="h-20 w-auto object-contain ml-auto" />
+            )}
+          </div>
         </div>
 
         {/* DOCUMENT TITLE & METADATA */}

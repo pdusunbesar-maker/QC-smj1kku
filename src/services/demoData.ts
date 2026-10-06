@@ -14,20 +14,22 @@ import { calculateZScore, formatSDPosition, evaluateWestgardRules, DEFAULT_WESTG
 
 export const INITIAL_LAB_INFO: LaboratoryInfo = {
   id: 'lab-rsud-smj1',
-  name: 'Instalasi Patologi Klinik & Laboratorium Terpadu',
-  hospitalName: 'RSUD Sultan Muhammad Jamaludin I',
-  regency: 'Kabupaten Kayong Utara',
+  name: 'INSTALASI PATOLOGI KLINIK & LABORATORIUM TERPADU',
+  hospitalName: 'RSUD SULTAN MUHAMMAD JAMALUDIN I',
+  healthService: 'DINAS KESEHATAN DAN KELUARGA BERENCANA',
+  regency: 'PEMERINTAH KABUPATEN KAYONG UTARA',
   province: 'Kalimantan Barat',
   roomUnit: 'Laboratorium Sentral Lantai 1',
   headOfLab: 'dr. Hendra Wijaya, Sp.PK',
   headNip: '19800512 200801 1 008',
   headOfQuality: 'Siti Rahmawati, S.Tr.Kes',
   qualityNip: '19850914 201001 2 015',
-  address: 'Jl. Provinsi Sukadana - Teluk Batang KM. 3, Sukadana, Kayong Utara 78852',
+  address: 'Jl. Provinsi Sukadana - Teluk Batang KM. 3, Desa Harapan Mulia, Kec. Sukadana, Kab. Kayong Utara, Kalimantan Barat 78852',
   phone: '(0534) 770123 / Ext. 108',
-  email: 'lab.patklin@rsudsultanmuhammadjamaludin1.go.id',
+  email: 'rsudsmj1.kku@gmail.com',
   accreditation: 'KARS Paripurna Bintang 5',
-  logoUrl: '/logo_kayong_utara.png',
+  logoUrl: '/Lambang_Daerah_Kab._Kayong_Utara.png',
+  logoRightUrl: '',
 };
 
 export const SYSTEM_PERMISSIONS = [

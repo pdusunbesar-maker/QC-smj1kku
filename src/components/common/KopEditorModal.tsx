@@ -121,25 +121,32 @@ export const KopEditorModal: React.FC<KopEditorModalProps> = ({
           {/* PRATINJAU KOP SURAT */}
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
-              Pratinjau Hasil KOP Surat:
+              Pratinjau Hasil KOP Surat Laporan Resmi:
             </span>
-            <div className="rounded-lg bg-white p-4 border border-slate-300 flex items-center justify-between gap-3 text-center">
+            <div className="rounded-lg bg-white p-4 border border-slate-300 border-b-4 border-double border-b-slate-900 flex items-center justify-between gap-3 text-center">
               <img
-                src={form.logoUrl || '/logo_kayong_utara.png'}
-                alt="Logo KOP"
+                src={form.logoUrl || '/Lambang_Daerah_Kab._Kayong_Utara.png'}
+                alt="Logo KOP Kiri"
                 className="h-16 w-auto object-contain shrink-0"
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = '/logo_kayong_utara.png';
+                  (e.target as HTMLImageElement).src = '/Lambang_Daerah_Kab._Kayong_Utara.png';
                 }}
               />
-              <div className="flex-1 px-2">
-                <h4 className="text-[10px] font-bold uppercase text-slate-700">{form.regency || 'PEMERINTAH KABUPATEN KAYONG UTARA'}</h4>
-                <h3 className="text-sm font-black uppercase text-slate-900">{form.hospitalName || 'RSUD SULTAN MUHAMMAD JAMALUDIN I'}</h3>
-                <h5 className="text-[11px] font-bold uppercase text-slate-800">{form.name || 'INSTALASI PATOLOGI KLINIK & LABORATORIUM TERPADU'}</h5>
+              <div className="flex-1 px-2 space-y-0.5">
+                <h4 className="text-[10px] font-bold uppercase text-slate-700 leading-tight">{form.regency || 'PEMERINTAH KABUPATEN KAYONG UTARA'}</h4>
+                <h4 className="text-[10px] font-extrabold uppercase text-slate-800 leading-tight">{form.healthService || 'DINAS KESEHATAN DAN KELUARGA BERENCANA'}</h4>
+                <h3 className="text-xs sm:text-sm font-black uppercase text-slate-950 leading-tight">{form.hospitalName || 'RSUD SULTAN MUHAMMAD JAMALUDIN I'}</h3>
+                <h5 className="text-[11px] font-bold uppercase text-emerald-950 leading-tight">{form.name || 'INSTALASI PATOLOGI KLINIK & LABORATORIUM TERPADU'}</h5>
                 <p className="text-[9px] text-slate-600 mt-0.5">{form.address}</p>
                 <p className="text-[9px] text-slate-500 font-mono">Telp: {form.phone} · Surel: {form.email} · Akreditasi: {form.accreditation}</p>
               </div>
-              <div className="w-12 hidden sm:block" />
+              <div className="w-12 hidden sm:block shrink-0">
+                {form.logoRightUrl ? (
+                  <img src={form.logoRightUrl} alt="Logo Kanan" className="h-16 w-auto object-contain" />
+                ) : (
+                  <div className="w-12" />
+                )}
+              </div>
             </div>
           </div>
 
@@ -167,7 +174,20 @@ export const KopEditorModal: React.FC<KopEditorModalProps> = ({
 
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  Nama Rumah Sakit / Faskes Utama (Baris 2):
+                  Dinas / Lembaga Kesehatan (Baris 2):
+                </label>
+                <input
+                  type="text"
+                  value={form.healthService || ''}
+                  onChange={(e) => setForm({ ...form, healthService: e.target.value })}
+                  placeholder="Contoh: DINAS KESEHATAN DAN KELUARGA BERENCANA"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Nama Rumah Sakit / Faskes Utama (Baris 3):
                 </label>
                 <input
                   type="text"
@@ -181,14 +201,14 @@ export const KopEditorModal: React.FC<KopEditorModalProps> = ({
 
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  Nama Unit / Instalasi Laboratorium (Baris 3):
+                  Nama Unit / Instalasi Laboratorium (Baris 4):
                 </label>
                 <input
                   type="text"
                   required
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder="Contoh: Instalasi Patologi Klinik & Laboratorium Terpadu"
+                  placeholder="Contoh: INSTALASI PATOLOGI KLINIK & LABORATORIUM TERPADU"
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs focus:border-emerald-500 focus:outline-none"
                 />
               </div>

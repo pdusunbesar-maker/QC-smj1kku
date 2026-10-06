@@ -32,6 +32,7 @@ export interface LaboratoryInfo {
   id: string;
   name: string;
   hospitalName: string;
+  healthService?: string;
   regency: string;
   province: string;
   roomUnit: string;
@@ -44,6 +45,7 @@ export interface LaboratoryInfo {
   email: string;
   accreditation: string;
   logoUrl: string;
+  logoRightUrl?: string;
 }
 
 export interface Instrument {
