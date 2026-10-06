@@ -1,5 +1,5 @@
 import React from 'react';
-import { Activity, XCircle, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Activity, XCircle, AlertTriangle, CheckCircle2, FolderGit2 } from 'lucide-react';
 
 export const SummaryCardsPanel: React.FC<{
   total: number;

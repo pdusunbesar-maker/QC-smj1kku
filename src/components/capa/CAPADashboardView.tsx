@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { CAPA } from '../../types';
-import { AlertCircle, FileText, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
+import { AlertCircle, FileText, CheckCircle, Clock, AlertTriangle, Search, ShieldCheck, CheckCircle2 } from 'lucide-react';
 
 interface CAPADashboardViewProps {
   capas: CAPA[];

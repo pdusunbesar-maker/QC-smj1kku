@@ -141,8 +141,8 @@ export interface QCResult {
   
   // Review metadata
   reviewStatus: 'pending' | 'accepted' | 'rejected' | 'investigation_required';
-  source: 'MANUAL' | 'AI_VISION' | 'IMPORT';
-  verificationStatus: 'AI_EXTRACTED' | 'PENDING_VERIFICATION' | 'VERIFIED' | 'SAVED' | 'REJECTED';
+  source?: 'MANUAL' | 'AI_VISION' | 'IMPORT';
+  verificationStatus?: 'AI_EXTRACTED' | 'PENDING_VERIFICATION' | 'VERIFIED' | 'SAVED' | 'REJECTED';
   reviewedBy?: string;
   reviewedByName?: string;
   reviewedAt?: string;
@@ -215,7 +215,17 @@ export type CAPAStatus =
   | 'action_in_progress' 
   | 'pending_verification' 
   | 'closed' 
-  | 'overdue';
+  | 'overdue'
+  | 'DRAFT'
+  | 'OPEN'
+  | 'INVESTIGATION'
+  | 'ACTION_REQUIRED'
+  | 'IN_PROGRESS'
+  | 'WAITING_REVIEW'
+  | 'EFFECTIVENESS_CHECK'
+  | 'CLOSED'
+  | 'REJECTED'
+  | 'CANCELLED';
 
 export interface CAPAActionItem {
   id: string;
@@ -244,8 +254,8 @@ export interface CAPA {
   identifiedRootCause: string;
   
   // Workflow tracking
-  status: 'DRAFT' | 'OPEN' | 'INVESTIGATION' | 'ACTION_REQUIRED' | 'IN_PROGRESS' | 'WAITING_REVIEW' | 'EFFECTIVENESS_CHECK' | 'CLOSED' | 'REJECTED' | 'CANCELLED';
-  priority: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  status: CAPAStatus;
+  priority?: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
   overallDueDate: string;
   
   // Corrective/Preventive Actions
@@ -253,7 +263,7 @@ export interface CAPA {
   preventiveActions: CAPAActionItem[];
   
   // Investigation/Review/Effectiveness
-  immediateContainment: {
+  immediateContainment?: {
     actionTaken: string;
     takenBy: string;
     dateTime: string;
@@ -267,8 +277,8 @@ export interface CAPA {
   effectiveness: 'pending' | 'effective' | 'partially_effective' | 'not_effective';
   
   // Linking/Audit
-  auditTrail: AuditLog[];
-  evidenceList: {
+  auditTrail?: AuditLog[];
+  evidenceList?: {
     fileName: string;
     uploadedBy: string;
     uploadedAt: string;
@@ -276,7 +286,8 @@ export interface CAPA {
   }[];
 
   closedAt?: string;
-  linkedQcResultIds: string[]; // Support multiple QC results
+  linkedQcResultId?: string;
+  linkedQcResultIds?: string[]; // Support multiple QC results
   linkedNonConformityId?: string;
 }
 

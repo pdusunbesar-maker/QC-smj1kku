@@ -17,7 +17,7 @@ import { Navbar } from './components/layout/Navbar';
 import { Sidebar } from './components/layout/Sidebar';
 import { DashboardView } from './components/dashboard/DashboardView';
 import { QCInputView } from './components/qc/QCInputView';
-import { MasterDataView } from './components/master-data/MasterDataView';
+import { MasterDataView } from './components/master/MasterDataView';
 import { QCReviewView } from './components/qc/QCReviewView';
 import { QCScanView } from './components/qc/QCScanView';
 import { QCVerificationView } from './components/qc/QCVerificationView';
@@ -250,11 +250,6 @@ function AppContent() {
                 }}
                 onNavigateToTab={handleNavigateToTab}
               />
-            )}
-
-            {/* 6. Master Data View */}
-            {activeTab === 'master-data' && (
-              <MasterDataView />
             )}
 
             {/* 4. Levey-Jennings Chart View */}
