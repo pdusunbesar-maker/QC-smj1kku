@@ -44,6 +44,173 @@ body {
   background: #94a3b8;
 }
 
+/* Medical Enterprise Login Animations */
+@keyframes medicalGlow {
+  0%, 100% {
+    opacity: 0.35;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.65;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes movingGradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes lightBeamSweep {
+  0% {
+    opacity: 0.10;
+    transform: translate(-30%, 30%) rotate(-15deg) scale(0.9);
+  }
+  50% {
+    opacity: 0.28;
+    transform: translate(15%, -15%) rotate(5deg) scale(1.15);
+  }
+  100% {
+    opacity: 0.10;
+    transform: translate(-30%, 30%) rotate(-15deg) scale(0.9);
+  }
+}
+
+@keyframes floatA {
+  0%, 100% {
+    transform: translateY(-8px);
+  }
+  50% {
+    transform: translateY(8px);
+  }
+}
+
+@keyframes floatB {
+  0%, 100% {
+    transform: translateY(5px);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes floatC {
+  0%, 100% {
+    transform: rotate(-2.5deg) translateY(-4px);
+  }
+  50% {
+    transform: rotate(2.5deg) translateY(4px);
+  }
+}
+
+@keyframes floatD {
+  0%, 100% {
+    transform: translateY(-6px) scale(0.98);
+  }
+  50% {
+    transform: translateY(6px) scale(1.02);
+  }
+}
+
+@keyframes particleDrift {
+  0% {
+    transform: translateY(0) translateX(0);
+    opacity: 0.2;
+  }
+  50% {
+    transform: translateY(-24px) translateX(8px);
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateY(0) translateX(0);
+    opacity: 0.2;
+  }
+}
+
+@keyframes molecularPulse {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.35);
+  }
+}
+
+@keyframes spinExtremelySlow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-medical-glow {
+  animation: medicalGlow 12s ease-in-out infinite;
+}
+
+.animate-moving-gradient {
+  background-size: 200% 200%;
+  animation: movingGradient 20s ease-in-out infinite;
+}
+
+.animate-light-beam {
+  animation: lightBeamSweep 18s ease-in-out infinite;
+}
+
+.animate-float-a {
+  animation: floatA 5s ease-in-out infinite;
+}
+
+.animate-float-b {
+  animation: floatB 7s ease-in-out infinite;
+}
+
+.animate-float-c {
+  animation: floatC 9s ease-in-out infinite;
+}
+
+.animate-float-d {
+  animation: floatD 6s ease-in-out infinite;
+}
+
+.animate-particle-drift {
+  animation: particleDrift 14s ease-in-out infinite;
+}
+
+.animate-molecular-node {
+  animation: molecularPulse 4s ease-in-out infinite;
+}
+
+.animate-spin-extremely-slow {
+  animation: spinExtremelySlow 60s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-medical-glow,
+  .animate-moving-gradient,
+  .animate-light-beam,
+  .animate-float-a,
+  .animate-float-b,
+  .animate-float-c,
+  .animate-float-d,
+  .animate-particle-drift,
+  .animate-molecular-node,
+  .animate-spin-extremely-slow {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
 @media print {
   @page {
     size: A4 portrait;

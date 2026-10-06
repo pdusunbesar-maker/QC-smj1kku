@@ -127,8 +127,21 @@ function AppContent() {
   const openCapaCount = capas.filter(c => c.status !== 'closed').length;
   const activeViolationsCount = qcResults.reduce((acc, r) => acc + (r.violations?.length || 0), 0);
 
+  // Desktop sidebar collapse state persisted in localStorage
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    return localStorage.getItem('lqcms_sidebar_collapsed') === 'true';
+  });
+
+  const toggleSidebarCollapse = () => {
+    setIsSidebarCollapsed(prev => {
+      const next = !prev;
+      localStorage.setItem('lqcms_sidebar_collapsed', String(next));
+      return next;
+    });
+  };
+
   return (
-    <div className="h-screen min-h-[100dvh] w-full bg-slate-50 flex flex-col antialiased overflow-hidden print:bg-white print:h-auto print:min-h-0 print:overflow-visible print:block">
+    <div className="h-screen min-h-[100dvh] w-full bg-[#F5F7FA] flex flex-col antialiased overflow-hidden print:bg-white print:h-auto print:min-h-0 print:overflow-visible print:block font-sans text-[#172033]">
       {/* Top Navbar */}
       <div className="shrink-0 w-full print:hidden">
         <Navbar
@@ -140,6 +153,8 @@ function AppContent() {
           onOpenDatabaseSettings={() => setIsDatabaseSettingsOpen(true)}
           onOpenUserProfile={() => setIsUserProfileModalOpen(true)}
           onToggleSidebarMobile={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+          isSidebarCollapsed={isSidebarCollapsed}
+          onToggleSidebarCollapse={toggleSidebarCollapse}
         />
       </div>
 
@@ -151,6 +166,8 @@ function AppContent() {
             onSelectTab={setActiveTab}
             isOpenMobile={isMobileSidebarOpen}
             onCloseMobile={() => setIsMobileSidebarOpen(false)}
+            isCollapsed={isSidebarCollapsed}
+            onToggleCollapse={toggleSidebarCollapse}
             pendingReviewCount={pendingReviewCount}
             openCapaCount={openCapaCount}
             activeViolationsCount={activeViolationsCount}
@@ -158,8 +175,8 @@ function AppContent() {
         </div>
 
         {/* Main Content Viewport */}
-        <main className="flex-1 overflow-y-auto p-3 sm:p-5 lg:p-6 xl:p-8 w-full print:p-0 print:m-0 print:overflow-visible print:w-full">
-          <div className="w-full max-w-full space-y-6 print:max-w-none print:w-full print:m-0 print:p-0 print:space-y-0">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 w-full print:p-0 print:m-0 print:overflow-visible print:w-full">
+          <div className="w-full max-w-[1440px] mx-auto space-y-6 print:max-w-none print:w-full print:m-0 print:p-0 print:space-y-0">
             {/* 1. Dashboard View */}
             {activeTab === 'dashboard' && (
               <DashboardView
@@ -168,6 +185,7 @@ function AppContent() {
                 nonConformities={nonConformities}
                 instruments={instruments}
                 parameters={parameters}
+                auditLogs={auditLogs}
                 onNavigateToTab={handleNavigateToTab}
               />
             )}
