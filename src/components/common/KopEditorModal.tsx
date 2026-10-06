@@ -123,29 +123,46 @@ export const KopEditorModal: React.FC<KopEditorModalProps> = ({
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
               Pratinjau Hasil KOP Surat Laporan Resmi:
             </span>
-            <div className="rounded-lg bg-white p-4 border border-slate-300 border-b-4 border-double border-b-slate-900 flex items-center justify-between gap-3 text-center">
-              <img
-                src={form.logoUrl || '/Lambang_Daerah_Kab._Kayong_Utara.png'}
-                alt="Logo KOP Kiri"
-                className="h-16 w-auto object-contain shrink-0"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = '/Lambang_Daerah_Kab._Kayong_Utara.png';
-                }}
-              />
-              <div className="flex-1 px-2 space-y-0.5">
-                <h4 className="text-[10px] font-bold uppercase text-slate-700 leading-tight">{form.regency || 'PEMERINTAH KABUPATEN KAYONG UTARA'}</h4>
-                <h4 className="text-[10px] font-extrabold uppercase text-slate-800 leading-tight">{form.healthService || 'DINAS KESEHATAN DAN KELUARGA BERENCANA'}</h4>
-                <h3 className="text-xs sm:text-sm font-black uppercase text-slate-950 leading-tight">{form.hospitalName || 'RSUD SULTAN MUHAMMAD JAMALUDIN I'}</h3>
-                <h5 className="text-[11px] font-bold uppercase text-emerald-950 leading-tight">{form.name || 'INSTALASI PATOLOGI KLINIK & LABORATORIUM TERPADU'}</h5>
-                <p className="text-[9px] text-slate-600 mt-0.5">{form.address}</p>
-                <p className="text-[9px] text-slate-500 font-mono">Telp: {form.phone} · Surel: {form.email} · Akreditasi: {form.accreditation}</p>
+            <div className="rounded-lg bg-white p-4 border border-slate-300">
+              <div className="flex items-center justify-between gap-3 text-center">
+                <div className="w-14 sm:w-16 shrink-0 flex items-center justify-start">
+                  <img
+                    src={form.logoUrl || '/Lambang_Daerah_Kab._Kayong_Utara.png'}
+                    alt="Logo KOP Kiri"
+                    className="h-14 sm:h-16 w-auto object-contain max-w-full"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = '/Lambang_Daerah_Kab._Kayong_Utara.png';
+                    }}
+                  />
+                </div>
+                <div className="flex-1 px-1 space-y-0.5">
+                  <h4 className="text-[10px] font-bold uppercase text-slate-700 leading-tight">{form.regency || 'PEMERINTAH KABUPATEN KAYONG UTARA'}</h4>
+                  <h4 className="text-[10px] font-extrabold uppercase text-slate-800 leading-tight">{form.healthService || 'DINAS KESEHATAN DAN KELUARGA BERENCANA'}</h4>
+                  <h3 className="text-xs sm:text-sm font-black uppercase text-slate-950 leading-tight">{form.hospitalName || 'RSUD SULTAN MUHAMMAD JAMALUDIN I'}</h3>
+                  <h5 className="text-[11px] font-bold uppercase text-emerald-950 leading-tight">{form.name || 'INSTALASI PATOLOGI KLINIK & LABORATORIUM TERPADU'}</h5>
+                  <p className="text-[9px] text-slate-600 mt-0.5">{form.address}</p>
+                  <p className="text-[9px] text-slate-500 font-mono">Telp: {form.phone} · Surel: {form.email} · Akreditasi: {form.accreditation}</p>
+                </div>
+                <div className="w-14 sm:w-16 shrink-0 flex items-center justify-end">
+                  {form.logoRightUrl ? (
+                    <img src={form.logoRightUrl} alt="Logo Kanan" className="h-14 sm:h-16 w-auto object-contain max-w-full" />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center gap-0.5 w-full">
+                      <span className="font-mono text-[8px] bg-slate-100 text-slate-700 px-1 py-0.2 rounded border border-slate-300 font-bold block w-full text-center">
+                        KARS
+                      </span>
+                      <span className="font-mono text-[8px] bg-slate-100 text-slate-700 px-1 py-0.2 rounded border border-slate-300 font-bold block w-full text-center">
+                        ISO 15189
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="w-12 hidden sm:block shrink-0">
-                {form.logoRightUrl ? (
-                  <img src={form.logoRightUrl} alt="Logo Kanan" className="h-16 w-auto object-contain" />
-                ) : (
-                  <div className="w-12" />
-                )}
+
+              {/* Garis Bawah Kop Surat Proporsional (3px & 1px double underline) */}
+              <div className="w-full mt-2">
+                <div className="border-b-[3px] border-slate-900 w-full" />
+                <div className="border-b-[1px] border-slate-900 w-full mt-[2px]" />
               </div>
             </div>
           </div>

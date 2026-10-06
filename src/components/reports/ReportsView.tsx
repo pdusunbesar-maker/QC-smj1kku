@@ -719,48 +719,67 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         className="rounded-xl border border-slate-200 bg-white p-8 shadow-xs print:border-none print:shadow-none print:p-0 print:m-0 print:w-full print:max-w-none"
       >
         {/* KOP SURAT RESMI RSUD SULTAN MUHAMMAD JAMALUDIN I */}
-        <div className="flex items-center justify-between border-b-4 border-double border-slate-900 pb-3 mb-6 kop-surat print-avoid-break">
-          <img
-            src={labInfo.logoUrl || '/logo_kayong_utara.png'}
-            alt="Lambang Daerah Kabupaten Kayong Utara"
-            className="h-20 w-auto object-contain shrink-0"
-            onError={(e) => {
-              (e.target as HTMLImageElement).src = '/logo_kayong_utara.png';
-            }}
-          />
-          <div className="text-center flex-1 px-4 space-y-0.5">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 leading-tight">
-              {labInfo.regency || 'PEMERINTAH KABUPATEN KAYONG UTARA'}
-            </h3>
-            <h3 className="text-xs font-extrabold uppercase text-slate-800 leading-tight">
-              {labInfo.healthService || 'DINAS KESEHATAN DAN KELUARGA BERENCANA'}
-            </h3>
-            <h2 className="text-base sm:text-lg font-black uppercase text-slate-950 leading-tight">
-              {labInfo.hospitalName || 'RSUD SULTAN MUHAMMAD JAMALUDIN I'}
-            </h2>
-            <h4 className="text-xs sm:text-sm font-bold uppercase text-emerald-950 leading-tight">
-              {labInfo.name || 'INSTALASI PATOLOGI KLINIK & LABORATORIUM TERPADU'}
-            </h4>
-            <p className="text-[11px] text-slate-600 mt-1">
-              {labInfo.address}
-            </p>
-            <p className="text-[10px] text-slate-500 font-mono">
-              Telp: {labInfo.phone} · Surel: {labInfo.email} · Akreditasi: {labInfo.accreditation}
-            </p>
+        <div className="w-full kop-surat print-avoid-break mb-6">
+          <div className="flex items-center justify-between gap-4">
+            {/* Logo Kiri */}
+            <div className="w-20 sm:w-24 shrink-0 flex items-center justify-start">
+              <img
+                src={labInfo.logoUrl || '/logo_kayong_utara.png'}
+                alt="Lambang Daerah Kabupaten Kayong Utara"
+                className="h-20 sm:h-24 w-auto object-contain max-w-full"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = '/logo_kayong_utara.png';
+                }}
+              />
+            </div>
+
+            {/* Kalimat & Informasi Instansi */}
+            <div className="flex-1 text-center px-2 space-y-0.5">
+              <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-800 leading-tight">
+                {labInfo.regency || 'PEMERINTAH KABUPATEN KAYONG UTARA'}
+              </h3>
+              <h3 className="text-xs sm:text-sm font-extrabold uppercase text-slate-900 leading-tight">
+                {labInfo.healthService || 'DINAS KESEHATAN DAN KELUARGA BERENCANA'}
+              </h3>
+              <h2 className="text-base sm:text-xl font-black uppercase text-slate-950 tracking-tight leading-tight mt-0.5">
+                {labInfo.hospitalName || 'RSUD SULTAN MUHAMMAD JAMALUDIN I'}
+              </h2>
+              <h4 className="text-xs sm:text-base font-bold uppercase text-emerald-950 leading-tight">
+                {labInfo.name || 'INSTALASI PATOLOGI KLINIK & LABORATORIUM TERPADU'}
+              </h4>
+              <p className="text-[11px] sm:text-xs text-slate-700 mt-1 font-normal leading-normal">
+                {labInfo.address}
+              </p>
+              <p className="text-[10px] sm:text-[11px] text-slate-600 font-mono leading-normal">
+                Telp: {labInfo.phone} · Surel: {labInfo.email} {labInfo.accreditation ? `· Akreditasi: ${labInfo.accreditation}` : ''}
+              </p>
+            </div>
+
+            {/* Logo / Badge Kanan Simetris */}
+            <div className="w-20 sm:w-24 shrink-0 flex items-center justify-end">
+              {labInfo.logoRightUrl ? (
+                <img
+                  src={labInfo.logoRightUrl}
+                  alt="Logo Kanan Instansi"
+                  className="h-20 sm:h-24 w-auto object-contain max-w-full"
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center gap-1 text-center w-full">
+                  <span className="font-mono text-[9px] bg-slate-100 text-slate-800 px-1.5 py-0.5 rounded border border-slate-300 font-bold block w-full">
+                    KARS PARIPURNA
+                  </span>
+                  <span className="font-mono text-[9px] bg-slate-100 text-slate-800 px-1.5 py-0.5 rounded border border-slate-300 font-bold block w-full">
+                    ISO 15189
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
-          <div className="w-20 shrink-0 text-right hidden sm:block">
-            {labInfo.logoRightUrl ? (
-              <img src={labInfo.logoRightUrl} alt="Logo Kanan" className="h-20 w-auto object-contain ml-auto" />
-            ) : (
-              <div className="space-y-1">
-                <span className="font-mono text-[9px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-300 block text-center">
-                  KARS PARIPURNA
-                </span>
-                <span className="font-mono text-[9px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-300 block text-center">
-                  ISO 15189
-                </span>
-              </div>
-            )}
+
+          {/* Garis Bawah Kop Surat Proporsional Bergaris Ganda Sesuai Lebar Dokumen */}
+          <div className="w-full mt-3">
+            <div className="border-b-[3px] border-slate-900 w-full" />
+            <div className="border-b-[1px] border-slate-900 w-full mt-[2px]" />
           </div>
         </div>
 
