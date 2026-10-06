@@ -277,11 +277,11 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
               <Activity className="h-4.5 w-4.5" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-slate-900">
+              <h2 className="text-sm sm:text-base lg:text-lg font-bold text-slate-900 tracking-tight">
                 Grafik Kendali Mutu Levey-Jennings: {parameter.name}
               </h2>
-              <p className="text-[11px] text-slate-500">
-                Metode: <strong className="text-slate-700">{parameter.method}</strong> · Mean: <strong className="text-slate-700">{parameter.targetMean} {parameter.unit}</strong> (SD: {parameter.targetSD}, CV: {parameter.targetCV}%)
+              <p className="text-xs text-slate-500 mt-0.5">
+                Metode: <strong className="text-slate-700 font-semibold">{parameter.method}</strong> · Mean: <strong className="text-slate-700 font-semibold">{parameter.targetMean} {parameter.unit}</strong> (SD: {parameter.targetSD}, CV: {parameter.targetCV}%)
               </p>
             </div>
           </div>

@@ -425,11 +425,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             <div className="h-8 w-8 rounded-lg bg-emerald-700 flex items-center justify-center text-white shadow-xs">
               <FileSpreadsheet className="h-4 w-4" />
             </div>
-            <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-slate-900 tracking-tight leading-tight">
               Laporan & Ekspor Kontrol Mutu Laboratorium
             </h1>
           </div>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-xs sm:text-sm text-slate-500 mt-1 font-normal">
             Pencarian data presisi dari rentang tanggal, filter parameter, pratinjau lembar resmi KOP Surat RSUD Sultan Muhammad Jamaludin I, dan ekspor data.
           </p>
         </div>

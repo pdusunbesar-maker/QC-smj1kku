@@ -181,10 +181,10 @@ export const QCReviewView: React.FC<QCReviewViewProps> = ({
       {/* Top Header */}
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between border-b border-slate-200 pb-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-slate-900 tracking-tight leading-tight">
             QC Review, Validasi & Kelola Data Kontrol
           </h1>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-xs sm:text-sm text-slate-500 mt-1 font-normal">
             Validasi kepatuhan aturan Westgard, disposisi pelepasan hasil pasien, koreksi kesalahan input, dan penghapusan data QC.
           </p>
         </div>
@@ -193,7 +193,7 @@ export const QCReviewView: React.FC<QCReviewViewProps> = ({
           <button
             type="button"
             onClick={() => onNavigateToTab('qc-input')}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition-colors shadow-2xs"
+            className="flex items-center gap-2 min-h-[42px] px-4 py-2.5 text-xs sm:text-sm font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-xl transition-all shadow-xs active:scale-[0.98]"
           >
             <span>+ Input QC Baru</span>
           </button>

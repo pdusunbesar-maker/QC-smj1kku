@@ -172,10 +172,10 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
       {/* Top Banner */}
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between border-b border-slate-200 pb-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-slate-900 tracking-tight leading-tight">
             Pencatatan Hasil Kontrol Mutu (QC Entry)
           </h1>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-xs sm:text-sm text-slate-500 mt-1 font-normal">
             Input hasil harian instrumen patologi klinik dengan verifikasi Z-Score dan deteksi otomatis Westgard Rules secara instan.
           </p>
         </div>
