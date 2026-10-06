@@ -149,6 +149,7 @@ CREATE TABLE IF NOT EXISTS app_users (
     department TEXT,
     avatar TEXT,
     is_active BOOLEAN DEFAULT true,
+    password TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );

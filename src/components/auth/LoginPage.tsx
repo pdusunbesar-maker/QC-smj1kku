@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   User, 
   Lock, 
@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { LaboratoryInfo } from '../../types';
+import { StorageService } from '../../services/storage';
 
 interface LoginPageProps {
   labInfo: LaboratoryInfo;
@@ -20,6 +21,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ labInfo }) => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  // Hydrate fresh user credentials from Supabase when opening Login Page on any device
+  useEffect(() => {
+    StorageService.syncFromSupabase();
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

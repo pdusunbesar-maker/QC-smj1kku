@@ -134,20 +134,25 @@ function mapUserToDb(u: User) {
     department: u.department,
     avatar: u.avatar,
     is_active: u.isActive ?? true,
+    password: u.password || 'password123',
   };
 }
 
 function mapDbToUser(row: any): User {
+  const currentUsers = getStored<User[]>(KEYS.USERS, INITIAL_USERS);
+  const localMatch = currentUsers.find(u => u.id === row.id || u.email === row.email);
+
   return {
     id: row.id,
-    name: row.name,
-    email: row.email,
-    role: row.role,
-    nip: row.nip,
-    department: row.department,
-    avatar: row.avatar,
-    isActive: row.is_active ?? row.isActive ?? true,
-    createdAt: row.created_at || row.createdAt,
+    name: row.name || localMatch?.name || '',
+    email: row.email || localMatch?.email || '',
+    role: row.role || localMatch?.role || 'analis',
+    nip: row.nip || localMatch?.nip || '',
+    department: row.department || localMatch?.department || 'Instalasi Patologi Klinik',
+    avatar: row.avatar || localMatch?.avatar,
+    isActive: row.is_active ?? row.isActive ?? localMatch?.isActive ?? true,
+    password: row.password || row.pass || localMatch?.password || 'password123',
+    createdAt: row.created_at || row.createdAt || localMatch?.createdAt,
   };
 }
 
@@ -839,29 +844,38 @@ export class StorageService {
       list.push(user);
     }
     setStored(KEYS.USERS, list);
+    this.notifyDataChanged('users');
 
     const sb = getSupabase();
     if (sb) {
-      sb.from('app_users')
-        .upsert(mapUserToDb(user))
-        .then(({ error }) => {
-          if (error) console.error('Supabase saveUser error:', error);
-        });
+      Promise.resolve(sb.from('app_users').upsert(mapUserToDb(user)))
+        .then(({ error }: { error: any }) => {
+          if (error) {
+            if (error.code === 'PGRST204' || error.message?.includes('password')) {
+              const baseUser = { ...mapUserToDb(user) };
+              delete (baseUser as any).password;
+              Promise.resolve(sb.from('app_users').upsert(baseUser)).catch(() => {});
+            } else {
+              console.warn('Supabase saveUser notice:', error.message);
+            }
+          }
+        })
+        .catch(() => {});
     }
   }
 
   static deleteUser(id: string): void {
     const list = this.getUsers().filter(u => u.id !== id);
     setStored(KEYS.USERS, list);
+    this.notifyDataChanged('users');
 
     const sb = getSupabase();
     if (sb) {
-      sb.from('app_users')
-        .delete()
-        .eq('id', id)
-        .then(({ error }) => {
+      Promise.resolve(sb.from('app_users').delete().eq('id', id))
+        .then(({ error }: { error: any }) => {
           if (error) console.error('Supabase deleteUser error:', error);
-        });
+        })
+        .catch(() => {});
     }
   }
 

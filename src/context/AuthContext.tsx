@@ -38,6 +38,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     StorageService.setCurrentUser(user);
   }, [user]);
 
+  // Real-time synchronization across browser tabs and Supabase sync
+  useEffect(() => {
+    const handleUpdate = () => {
+      refreshUsersAndRoles();
+    };
+
+    window.addEventListener('lqcms_data_updated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+
+    return () => {
+      window.removeEventListener('lqcms_data_updated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
+  }, []);
+
   const refreshUsersAndRoles = () => {
     const freshUsers = StorageService.getUsers();
     const freshRoles = StorageService.getRoles();
@@ -58,6 +73,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const loginWithCredentials = (identifier: string, password?: string): { success: boolean; message?: string } => {
+    // Always read latest users list from storage to guarantee fresh authentication data across devices
+    const currentUsersList = StorageService.getUsers();
+    setUsers(currentUsersList);
+
     const raw = identifier.trim().toLowerCase();
     if (!raw) {
       return { success: false, message: 'Silakan masukkan Username atau NIP.' };
@@ -65,7 +84,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const cleanDigits = raw.replace(/\D/g, '');
 
-    const target = users.find(u => {
+    const target = currentUsersList.find(u => {
       const email = u.email.toLowerCase();
       const name = u.name.toLowerCase();
       const nip = (u.nip || '').toLowerCase();
