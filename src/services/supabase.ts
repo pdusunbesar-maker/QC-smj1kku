@@ -114,20 +114,21 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 -- 2. LABORATORIES TABLE
 CREATE TABLE IF NOT EXISTS laboratories (
     id TEXT PRIMARY KEY DEFAULT 'lab-rsud-smj1',
-    name TEXT NOT NULL DEFAULT 'Instalasi Patologi Klinik & Laboratorium Terpadu',
-    hospital_name TEXT NOT NULL DEFAULT 'RSUD Sultan Muhammad Jamaludin I',
-    regency TEXT NOT NULL DEFAULT 'Kabupaten Kayong Utara',
+    name TEXT NOT NULL DEFAULT 'INSTALASI PATOLOGI KLINIK & LABORATORIUM TERPADU',
+    hospital_name TEXT NOT NULL DEFAULT 'RSUD SULTAN MUHAMMAD JAMALUDIN I',
+    health_service TEXT NOT NULL DEFAULT 'DINAS KESEHATAN DAN KELUARGA BERENCANA',
+    regency TEXT NOT NULL DEFAULT 'PEMERINTAH KABUPATEN KAYONG UTARA',
     province TEXT NOT NULL DEFAULT 'Kalimantan Barat',
     room_unit TEXT NOT NULL DEFAULT 'Laboratorium Sentral Lantai 1',
     head_of_lab TEXT NOT NULL DEFAULT 'dr. Hendra Wijaya, Sp.PK',
     head_nip TEXT NOT NULL DEFAULT '19800512 200801 1 008',
     head_of_quality TEXT NOT NULL DEFAULT 'Siti Rahmawati, S.Tr.Kes',
     quality_nip TEXT NOT NULL DEFAULT '19850914 201001 2 015',
-    address TEXT NOT NULL DEFAULT 'Jl. Provinsi Sukadana - Teluk Batang KM. 3, Sukadana, Kayong Utara 78852',
+    address TEXT NOT NULL DEFAULT 'Jl. Provinsi Sukadana - Teluk Batang KM. 3, Desa Harapan Mulia, Kec. Sukadana, Kab. Kayong Utara 78852',
     phone TEXT DEFAULT '(0534) 770123 / Ext. 108',
-    email TEXT DEFAULT 'lab.patklin@rsudsultanmuhammadjamaludin1.go.id',
+    email TEXT DEFAULT 'rsudsmj1.kku@gmail.com',
     accreditation TEXT DEFAULT 'KARS Paripurna Bintang 5',
-    logo_url TEXT DEFAULT '/logo_kayong_utara.png',
+    logo_url TEXT DEFAULT '/Lambang_Daerah_Kab._Kayong_Utara.png',
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
