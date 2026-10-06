@@ -83,7 +83,7 @@ export const DatabaseSettingsModal: React.FC<DatabaseSettingsModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 overflow-y-auto">
-      <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl space-y-5 my-8 max-h-[90vh] overflow-y-auto">
+      <div className="w-full max-w-2xl rounded-2xl bg-white p-4 sm:p-6 shadow-2xl space-y-5 my-4 sm:my-8 max-h-[90dvh] overflow-y-auto">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
             <Database className="h-5 w-5 text-emerald-600" />

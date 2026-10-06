@@ -33,9 +33,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ labInfo }) => {
   };
 
   return (
-    <div className="min-h-screen bg-[#041a18] flex flex-col justify-center py-8 px-4 sm:px-6 lg:px-8 selection:bg-emerald-500 selection:text-white">
+    <div className="min-h-[100dvh] w-full bg-[#041a18] flex flex-col justify-center items-center py-6 px-4 sm:px-6 lg:px-8 selection:bg-emerald-500 selection:text-white">
       {/* Container Card matching official design */}
-      <div className="sm:mx-auto sm:w-full sm:max-w-md rounded-2xl overflow-hidden shadow-2xl bg-white border border-emerald-950/30">
+      <div className="w-full max-w-md rounded-2xl overflow-hidden shadow-2xl bg-white border border-emerald-950/30">
         
         {/* 1. Dark Teal Hospital Header Section */}
         <div className="bg-gradient-to-b from-[#082d29] via-[#0a3833] to-[#05211e] px-6 pt-7 pb-6 text-center text-white">

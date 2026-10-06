@@ -126,9 +126,9 @@ function AppContent() {
   const activeViolationsCount = qcResults.reduce((acc, r) => acc + (r.violations?.length || 0), 0);
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col antialiased print:bg-white print:min-h-0 print:block">
+    <div className="h-screen min-h-[100dvh] w-full bg-slate-50 flex flex-col antialiased overflow-hidden print:bg-white print:h-auto print:min-h-0 print:overflow-visible print:block">
       {/* Top Navbar */}
-      <div className="print:hidden">
+      <div className="shrink-0 w-full print:hidden">
         <Navbar
           labInfo={labInfo}
           activeTab={activeTab}
@@ -140,9 +140,9 @@ function AppContent() {
         />
       </div>
 
-      <div className="flex flex-1 overflow-hidden print:block print:overflow-visible">
+      <div className="flex flex-1 w-full overflow-hidden print:block print:overflow-visible">
         {/* Left Sidebar */}
-        <div className="print:hidden">
+        <div className="shrink-0 print:hidden">
           <Sidebar
             activeTab={activeTab}
             onSelectTab={setActiveTab}
@@ -155,8 +155,8 @@ function AppContent() {
         </div>
 
         {/* Main Content Viewport */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 print:p-0 print:m-0 print:overflow-visible print:w-full">
-          <div className="mx-auto max-w-7xl print:max-w-none print:w-full print:m-0 print:p-0">
+        <main className="flex-1 overflow-y-auto p-3 sm:p-5 lg:p-6 xl:p-8 w-full print:p-0 print:m-0 print:overflow-visible print:w-full">
+          <div className="w-full max-w-full space-y-6 print:max-w-none print:w-full print:m-0 print:p-0">
             {/* 1. Dashboard View */}
             {activeTab === 'dashboard' && (
               <DashboardView

@@ -50,7 +50,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
         onClick={onClose} 
       />
 
-      <div className="fixed inset-y-0 right-0 flex max-w-full pl-10">
+      <div className="fixed inset-y-0 right-0 flex max-w-full pl-0 sm:pl-10">
         <div className="w-screen max-w-md bg-white shadow-2xl flex flex-col">
           {/* Header */}
           <div className="p-4 border-b border-slate-100 flex items-center justify-between">
