@@ -212,7 +212,7 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff',
-        windowWidth: 1200,
+        windowWidth: 1280,
       });
 
       const imgData = canvas.toDataURL('image/png');
@@ -222,49 +222,43 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
         format: 'a4',
       });
 
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      const margin = 10;
-      const contentWidth = pdfWidth - margin * 2;
-      const contentHeight = (canvas.height * contentWidth) / canvas.width;
+      const pdfWidth = pdf.internal.pageSize.getWidth(); // 297mm
+      const pdfHeight = pdf.internal.pageSize.getHeight(); // 210mm
+      const margin = 10; // 10mm margins
+      const availableWidth = pdfWidth - margin * 2; // 277mm
+      const availableHeight = pdfHeight - margin * 2; // 190mm
 
-      if (contentHeight <= pdfHeight - margin * 2) {
-        // Fits on single landscape page
-        pdf.addImage(imgData, 'PNG', margin, margin, contentWidth, contentHeight);
-      } else {
-        // Multi-page or scale to fit
-        const scaleFactor = (pdfHeight - margin * 2) / contentHeight;
-        if (scaleFactor > 0.8) {
-          pdf.addImage(imgData, 'PNG', margin, margin, contentWidth * scaleFactor, contentHeight * scaleFactor);
-        } else {
-          // Multi-page slice
-          let heightLeft = contentHeight;
-          let position = margin;
+      // Calculate initial dimensions based on full width
+      let renderWidth = availableWidth;
+      let renderHeight = (canvas.height * renderWidth) / canvas.width;
 
-          pdf.addImage(imgData, 'PNG', margin, position, contentWidth, contentHeight);
-          heightLeft -= pdfHeight;
-
-          while (heightLeft > 0) {
-            position = heightLeft - contentHeight + margin;
-            pdf.addPage();
-            pdf.addImage(imgData, 'PNG', margin, position, contentWidth, contentHeight);
-            heightLeft -= pdfHeight;
-          }
-        }
+      // Scale down proportionally to fit exactly on 1 Landscape A4 page if taller than printable area
+      if (renderHeight > availableHeight) {
+        const scaleRatio = availableHeight / renderHeight;
+        renderHeight = availableHeight;
+        renderWidth = renderWidth * scaleRatio;
       }
 
+      // Center horizontally and vertically on page
+      const xOffset = margin + (availableWidth - renderWidth) / 2;
+      const yOffset = margin + (availableHeight - renderHeight) / 2;
+
+      pdf.addImage(imgData, 'PNG', xOffset, yOffset, renderWidth, renderHeight);
       pdf.save(`Laporan_Grafik_QC_Levey_Jennings_${parameter.code}_${startDate}_sd_${endDate}.pdf`);
     } catch (err) {
       console.error('Error generating PDF:', err);
-      // Fallback to window.print() if canvas rendering has any issue
-      window.print();
+      handlePrint();
     } finally {
       setIsGeneratingPDF(false);
     }
   };
 
   const handlePrint = () => {
+    document.body.classList.add('print-landscape');
     window.print();
+    setTimeout(() => {
+      document.body.classList.remove('print-landscape');
+    }, 1000);
   };
 
   return (
