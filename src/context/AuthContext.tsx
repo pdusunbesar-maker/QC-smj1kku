@@ -139,7 +139,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     if (!password || password.trim() === '') {
-      return { success: false, message: 'Kata sandi belum diisi. Petugas wajib mengisi kata sandi secara manual.' };
+      return { success: false, message: 'Silakan masukkan kata sandi akun Anda.' };
     }
 
     if (target.password && target.password !== password) {

@@ -78,7 +78,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     }
 
     if (!password || password.trim() === '') {
-      setErrorMsg('Kata sandi belum diisi. Petugas wajib mengisi kata sandi secara manual.');
+      setErrorMsg('Silakan masukkan kata sandi.');
       passwordInputRef.current?.focus();
       return;
     }
@@ -210,14 +210,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
             {/* Field 2: Kata Sandi */}
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="font-semibold text-slate-800 text-xs">
-                  Kata Sandi
-                </label>
-                <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200/60 px-1.5 py-0.2 rounded font-medium">
-                  Diisi Manual Petugas
-                </span>
-              </div>
+              <label className="block font-semibold text-slate-800 mb-1.5 text-xs">
+                Kata Sandi
+              </label>
               <div className="relative">
                 <Lock className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
                 <input
@@ -225,7 +220,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Ketik kata sandi petugas di sini..."
+                  placeholder="Masukkan kata sandi..."
                   className="w-full rounded-xl border border-slate-200 pl-10 pr-10 py-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-none transition-all font-mono"
                   required
                 />
@@ -246,9 +241,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                 <span className="flex items-center gap-1.5">
                   <KeyRound className="h-3.5 w-3.5 text-emerald-700" />
                   <span>Petunjuk Kredensial Akun Terdaftar:</span>
-                </span>
-                <span className="text-[10px] text-emerald-800 font-semibold bg-emerald-100/90 border border-emerald-200/80 px-2 py-0.5 rounded-full">
-                  Password Diisi Manual
                 </span>
               </div>
 
@@ -313,7 +305,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               <div className="pt-1.5 border-t border-slate-200/70 flex items-start gap-1 text-[10px] text-slate-500 leading-normal">
                 <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 shrink-0 mt-0.5" />
                 <span>
-                  Password <strong>tidak ditampilkan</strong> demi keamanan dan wajib diisi manual oleh petugas.
+                  Password <strong>tidak ditampilkan</strong> demi keamanan akun.
                 </span>
               </div>
             </div>

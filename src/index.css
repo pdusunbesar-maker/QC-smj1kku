@@ -24,6 +24,11 @@ body {
 }
 
 /* Smooth custom scrollbars for high-density tables and drawers */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;

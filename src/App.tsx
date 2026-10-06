@@ -143,9 +143,9 @@ function AppContent() {
         />
       </div>
 
-      <div className="flex flex-1 w-full overflow-hidden print:block print:overflow-visible">
+      <div className="flex flex-1 w-full min-h-0 overflow-hidden print:block print:overflow-visible">
         {/* Left Sidebar */}
-        <div className="shrink-0 print:hidden">
+        <div className="shrink-0 h-full min-h-0 flex flex-col print:hidden">
           <Sidebar
             activeTab={activeTab}
             onSelectTab={setActiveTab}

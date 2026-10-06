@@ -161,12 +161,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Sidebar Container */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-50 flex w-64 flex-col border-r border-slate-200 bg-white transition-transform duration-200 ease-in-out md:static md:translate-x-0 ${
+        className={`fixed top-0 bottom-0 left-0 z-50 flex h-full max-h-[100dvh] md:max-h-full w-64 min-h-0 flex-col border-r border-slate-200 bg-white transition-transform duration-200 ease-in-out md:static md:translate-x-0 ${
           isOpenMobile ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         {/* Mobile Header */}
-        <div className="flex h-16 items-center justify-between border-b border-slate-200 px-4 md:hidden">
+        <div className="shrink-0 flex h-16 items-center justify-between border-b border-slate-200 px-4 md:hidden">
           <div className="flex items-center gap-2">
             <span className="font-bold text-slate-900 text-sm">L-QCMS Menu</span>
           </div>
@@ -180,7 +180,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Navigation Items */}
-        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-4 pb-8 space-y-6">
           {navigationItems.map((section, idx) => (
             <div key={idx}>
               <div className="px-3 pb-2 text-[10px] font-semibold tracking-wider text-slate-400 uppercase">
@@ -232,7 +232,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Footer Info & User Card */}
-        <div className="border-t border-slate-100 p-3 bg-slate-50/70 space-y-2.5">
+        <div className="shrink-0 border-t border-slate-100 p-3 bg-slate-50/70 space-y-2.5">
           <div className="flex items-center gap-2.5">
             {user.avatar ? (
               <img
