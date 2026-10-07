@@ -24,7 +24,8 @@ import {
   Layers,
   ChevronLeft,
   ChevronRight,
-  Images
+  Images,
+  Loader2
 } from 'lucide-react';
 import { Parameter, Instrument, QCResult, WestgardViolation, QCStatus } from '../../types';
 import { calculateZScore, formatSDPosition, evaluateWestgardRules, DEFAULT_WESTGARD_RULES } from '../../utils/qcCalculations';
@@ -58,6 +59,7 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
   const { user } = useAuth();
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [isSavedSuccess, setIsSavedSuccess] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
   const [savedCount, setSavedCount] = useState<number>(0);
   const [lastSavedItems, setLastSavedItems] = useState<QCResult[]>([]);
   const [activeBatchImageIndex, setActiveBatchImageIndex] = useState<number>(0);
@@ -334,19 +336,38 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
   }, [items]);
 
   const handleSaveAll = () => {
-    if (selectedItems.length === 0) return;
+    if (isSaving || selectedItems.length === 0) return;
+    setIsSaving(true);
 
     const savedResultsList: QCResult[] = [];
+    const seenBatchKeys = new Set<string>();
 
     selectedItems.forEach((item, idx) => {
+      // Guard against identical duplicates within same batch
+      const batchKey = `${item.parameterId}_${item.instrumentId}_${item.controlLevel}_${item.date}_${item.time}_${item.resultValue}`;
+      if (seenBatchKeys.has(batchKey)) return;
+      seenBatchKeys.add(batchKey);
+
       const fullDate = `${item.date}T${item.time}:00`;
-      const id = `QC-AI-${Date.now().toString().slice(-6)}-${idx + 1}`;
+      const itemTimestamp = new Date(fullDate).getTime();
+
+      // Check if identical result already exists in existingResults
+      const existingMatch = existingResults.find(r => 
+        r.parameterId === item.parameterId &&
+        r.instrumentId === item.instrumentId &&
+        r.controlLevel === item.controlLevel &&
+        r.date === item.date &&
+        (r.time === item.time || Math.abs(r.timestamp - itemTimestamp) < 60000) &&
+        Number(r.value) === Number(item.resultValue)
+      );
+
+      const id = existingMatch ? existingMatch.id : `QC-AI-${Date.now().toString().slice(-6)}-${idx + 1}`;
 
       const newQC: QCResult = {
         id,
         date: item.date,
         time: item.time,
-        timestamp: new Date(fullDate).getTime(),
+        timestamp: itemTimestamp,
         operatorId: user?.id || 'user-analis',
         operatorName: user?.name || 'Ahli Teknologi Laboratorium Medik',
         instrumentId: item.instrumentId,
@@ -385,10 +406,22 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
     setLastSavedItems(savedResultsList);
     setSavedCount(savedResultsList.length);
     setIsSavedSuccess(true);
+    setItems([]); // Clear items so form is emptied and double clicking cannot save again
 
     if (onSave) {
       onSave(savedResultsList);
     }
+
+    // Otomatis dialihkan ke Menu Awal (Dashboard)
+    setTimeout(() => {
+      onNavigateToTab?.('dashboard', {
+        qcSaved: true,
+        source: 'scan',
+        count: savedResultsList.length,
+        analyzer: documentMeta?.analyzer || instruments.find(i => i.id === detectedInstrumentId)?.name,
+        message: `${savedResultsList.length} Hasil QC berhasil diverifikasi & disimpan. Otomatis dialihkan ke Menu Awal.`
+      });
+    }, 500);
   };
 
   const getConfidenceBadge = (confidence: number) => {
@@ -1036,10 +1069,20 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
               <button
                 type="button"
                 onClick={handleSaveAll}
-                disabled={selectedItems.length === 0}
-                className="w-1/2 sm:w-auto px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg flex items-center justify-center gap-2 transition-all"
+                disabled={selectedItems.length === 0 || isSaving}
+                className="w-1/2 sm:w-auto px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg flex items-center justify-center gap-2 transition-all cursor-pointer"
               >
-                <Save className="h-4 w-4" /> Simpan Semua ke QC Harian & Validasi
+                {isSaving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Menyimpan & Mengalihkan ke Menu Awal...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4" />
+                    <span>Simpan Semua ke QC Harian & Validasi</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

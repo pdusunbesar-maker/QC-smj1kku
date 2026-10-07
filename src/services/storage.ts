@@ -1084,20 +1084,58 @@ export class StorageService {
 
   // --- QC Results ---
   static getQCResults(): QCResult[] {
-    return getStored<QCResult[]>(KEYS.QC_RESULTS, []);
+    const list = getStored<QCResult[]>(KEYS.QC_RESULTS, []);
+    if (list.length === 0) {
+      const demo = generateDemoQCResults();
+      setStored(KEYS.QC_RESULTS, demo);
+      return demo;
+    }
+    // If existing local dataset only contains legacy 45 demo records without multi-month history, backfill
+    if (list.length < 60 && list.some(r => r.id.startsWith('QC-DEMO-'))) {
+      const demo = generateDemoQCResults();
+      const existingIds = new Set(list.map(r => r.id));
+      const additions = demo.filter(d => !existingIds.has(d.id));
+      if (additions.length > 0) {
+        const merged = [...list, ...additions].sort((a, b) => b.timestamp - a.timestamp);
+        setStored(KEYS.QC_RESULTS, merged);
+        return merged;
+      }
+    }
+    return list;
   }
 
   static saveQCResult(result: QCResult): void {
     const list = this.getQCResults();
-    const idx = list.findIndex(r => r.id === result.id);
-    if (idx >= 0) list[idx] = result;
-    else list.unshift(result);
+    // 1. Direct ID match
+    let idx = list.findIndex(r => r.id === result.id);
+
+    // 2. Anti-double input & duplicate result guard:
+    // If IDs differ but same parameter, instrument, level, date, time/recent timestamp, and value exist,
+    // update the existing record instead of inserting an accidental duplicate.
+    if (idx < 0) {
+      idx = list.findIndex(r => 
+        r.parameterId === result.parameterId &&
+        r.instrumentId === result.instrumentId &&
+        r.controlLevel === result.controlLevel &&
+        r.date === result.date &&
+        (r.time === result.time || (r.timestamp && result.timestamp && Math.abs(r.timestamp - result.timestamp) < 60000)) &&
+        Number(r.value) === Number(result.value)
+      );
+    }
+
+    if (idx >= 0) {
+      // Keep existing ID or update
+      list[idx] = { ...list[idx], ...result, id: list[idx].id };
+    } else {
+      list.unshift(result);
+    }
     setStored(KEYS.QC_RESULTS, list);
 
     const sb = getSupabase();
     if (sb) {
+      const targetResult = idx >= 0 ? list[idx] : result;
       sb.from('qc_results')
-        .upsert(mapQCResultToDb(result))
+        .upsert(mapQCResultToDb(targetResult))
         .then(({ error }) => {
           if (error) {
             console.error('Supabase saveQCResult error:', error);

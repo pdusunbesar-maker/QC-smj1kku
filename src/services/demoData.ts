@@ -940,6 +940,127 @@ export function generateDemoQCResults(): QCResult[] {
     });
   }
 
+  // --- Multi-Month Historical QC Records Generator for Laboratory Workload Evaluation ---
+  // Covers past 11 calendar months (Nov 2025 - Oct 2026) across CST-240, DIMIH 3980, Cobas c311, and Sysmex XN-550
+  const sampleParams = [
+    INITIAL_PARAMETERS.find(p => p.id === 'param-cst-alb'),
+    INITIAL_PARAMETERS.find(p => p.id === 'param-cst-alt'),
+    INITIAL_PARAMETERS.find(p => p.id === 'param-cst-glu-hk'),
+    INITIAL_PARAMETERS.find(p => p.id === 'param-dimih-wbc'),
+    INITIAL_PARAMETERS.find(p => p.id === 'param-dimih-hgb'),
+    INITIAL_PARAMETERS.find(p => p.id === 'param-hema-wbc'),
+    INITIAL_PARAMETERS.find(p => p.id === 'param-creat')
+  ].filter(Boolean) as typeof INITIAL_PARAMETERS;
+
+  // Month offsets: -11 (Nov 2025) to 0 (Oct 2026)
+  // For months before September 2026 (or earlier), add baseline runs
+  const refYear = 2026;
+  const refMonth = 9; // 0-indexed: October is 9
+
+  for (let mOffset = -11; mOffset <= 0; mOffset++) {
+    const dTarget = new Date(refYear, refMonth + mOffset, 1);
+    const y = dTarget.getFullYear();
+    const m = dTarget.getMonth();
+    const mStr = String(m + 1).padStart(2, '0');
+
+    // Run days in each month: ~10 to 14 active days
+    const testDays = [2, 5, 8, 11, 14, 16, 19, 22, 25, 27];
+    // In current month (October 2026), only generate up to day 7
+    const daysToUse = (y === 2026 && m === 9) 
+      ? [1, 2, 3, 4, 5, 6, 7] 
+      : testDays;
+
+    daysToUse.forEach((day, dayIdx) => {
+      const dayStr = String(day).padStart(2, '0');
+      const dateStr = `${y}-${mStr}-${dayStr}`;
+
+      sampleParams.forEach((param, pIdx) => {
+        // Pick 2-3 parameters per day for natural distribution
+        if ((dayIdx + pIdx) % 2 !== 0 && sampleParams.length > 3) return;
+
+        // Skip if exact duplicate already exists in results for this param and date
+        if (results.some(r => r.date === dateStr && r.parameterId === param.id)) {
+          return;
+        }
+
+        // Pseudo-random pseudo-z for realistic QC curve
+        const seed = (y * 1000 + m * 50 + day * 7 + pIdx * 13) % 100;
+        let z = 0;
+        let status: 'pass' | 'warning' | 'reject' = 'pass';
+        let violations: any[] = [];
+
+        if (seed === 97 || seed === 98) {
+          // Reject (~2%)
+          z = seed === 97 ? 3.15 : -3.20;
+          status = 'reject';
+          violations = [{
+            rule: '1_3s',
+            ruleName: '1:3s Rule Violation',
+            type: 'reject',
+            description: `Nilai kontrol melebihi 3SD (${z > 0 ? '+' : ''}${z.toFixed(2)}SD)`,
+            pointsInvolved: [],
+            detectedAt: dateStr
+          }];
+        } else if (seed >= 92 && seed < 97) {
+          // Warning (~5%)
+          z = seed % 2 === 0 ? 2.18 : -2.12;
+          status = 'warning';
+          violations = [{
+            rule: '1_2s',
+            ruleName: '1:2s Warning Rule',
+            type: 'warning',
+            description: `Peringatan 1:2s terdeteksi (${z > 0 ? '+' : ''}${z.toFixed(2)}SD)`,
+            pointsInvolved: [],
+            detectedAt: dateStr
+          }];
+        } else {
+          // Normal Pass (~93%)
+          // Range between -1.4 and +1.4
+          z = ((seed % 29) - 14) / 10;
+          status = 'pass';
+        }
+
+        const rawVal = param.targetMean + (z * param.targetSD);
+        const val = Number(rawVal.toFixed(param.decimalPlaces));
+        const pos = formatSDPosition(z);
+        const id = `QC-HIST-${y}${mStr}-${dayStr}-${param.code}-${pIdx}`;
+
+        const inst = INITIAL_INSTRUMENTS.find(i => i.id === param.instrumentId);
+        const instName = inst ? inst.name : 'Automated Chemistry Analyzer';
+
+        results.push({
+          id,
+          date: dateStr,
+          time: `07:${String(30 + ((pIdx * 5) % 25)).padStart(2, '0')}`,
+          timestamp: new Date(`${dateStr}T08:00:00`).getTime(),
+          operatorId: pIdx % 2 === 0 ? 'user-analis' : 'user-supervisor',
+          operatorName: pIdx % 2 === 0 ? 'Budi Pratama, A.Md.AK' : 'Siti Rahmawati, S.Tr.Kes',
+          instrumentId: param.instrumentId,
+          instrumentName: instName,
+          parameterId: param.id,
+          parameterName: param.name,
+          parameterCode: param.code,
+          controlLevel: 'Level 1',
+          lotNumber: 'LOT-QC-HIST-2026',
+          value: val,
+          unit: param.unit,
+          mean: param.targetMean,
+          sd: param.targetSD,
+          zScore: z,
+          sdPosition: pos,
+          status,
+          violations,
+          notes: `Pemeriksaan Kontrol Mutu Berkala (${param.code})`,
+          isDemo: false,
+          reviewStatus: status === 'reject' ? 'rejected' : status === 'warning' ? 'pending' : 'accepted',
+          reviewedBy: status === 'pass' ? 'user-supervisor' : undefined,
+          reviewedByName: status === 'pass' ? 'Siti Rahmawati, S.Tr.Kes' : undefined,
+          reviewedAt: status === 'pass' ? `${dateStr} 09:00:00` : undefined,
+        });
+      });
+    });
+  }
+
   return results;
 }
 

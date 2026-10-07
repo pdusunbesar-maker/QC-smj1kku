@@ -10,7 +10,8 @@ import {
   ArrowRight,
   Calculator,
   History,
-  Info
+  Info,
+  Loader2
 } from 'lucide-react';
 import { Parameter, Instrument, ControlMaterial, QCResult, WestgardViolation } from '../../types';
 import { useAuth } from '../../context/AuthContext';
@@ -53,6 +54,8 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
   const [inputValue, setInputValue] = useState<string>('');
   const [notes, setNotes] = useState('');
   const [isSaved, setIsSaved] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
   const [lastSavedResult, setLastSavedResult] = useState<QCResult | null>(null);
 
   // Filter parameters by chosen instrument
@@ -106,17 +109,37 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!liveAnalysis || !currentParam) return;
+    if (isSubmitting || !liveAnalysis || !currentParam) return;
 
     const val = liveAnalysis.value;
-    const id = `QC-${Date.now().toString().slice(-6)}`;
     const fullDate = `${date}T${time}:00`;
+    const fullTimestamp = new Date(fullDate).getTime();
+
+    // Anti-double input check: prevent duplicate input of the same parameter, instrument, level, date, time & value
+    const isDuplicate = existingResults.some(r => 
+      r.parameterId === currentParam.id &&
+      r.instrumentId === currentInstrument.id &&
+      r.controlLevel === selectedLevel &&
+      r.date === date &&
+      (r.time === time || Math.abs(r.timestamp - fullTimestamp) < 60000) &&
+      Number(r.value) === Number(val)
+    );
+
+    if (isDuplicate) {
+      setDuplicateWarning(`Peringatan: Hasil QC ${currentParam.code} (${val} ${currentParam.unit}) pada tanggal ${date} (${time}) sudah tersimpan di database. Sistem mencegah input ganda hasil yang sama.`);
+      return;
+    }
+
+    setIsSubmitting(true);
+    setDuplicateWarning(null);
+
+    const id = `QC-${Date.now().toString().slice(-6)}`;
 
     const newResult: QCResult = {
       id,
       date,
       time,
-      timestamp: new Date(fullDate).getTime(),
+      timestamp: fullTimestamp,
       operatorId: user.id,
       operatorName: user.name,
       instrumentId: currentInstrument.id,
@@ -158,12 +181,36 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
     onResultAdded(newResult);
     setLastSavedResult(newResult);
     setIsSaved(true);
+
+    // Reset input fields immediately to prevent double submissions
+    setInputValue('');
+    setNotes('');
+
+    // Otomatis diarahkan kembali ke Menu Awal (Dashboard)
+    setTimeout(() => {
+      onNavigateToTab('dashboard', {
+        qcSaved: true,
+        source: 'manual',
+        parameterId: currentParam.id,
+        parameterName: currentParam.name,
+        parameterCode: currentParam.code,
+        value: newResult.value,
+        unit: newResult.unit,
+        status: newResult.status,
+        sdPosition: newResult.sdPosition,
+        date: newResult.date,
+        time: newResult.time,
+        message: `Hasil QC ${newResult.parameterCode} (${newResult.value} ${newResult.unit}) berhasil disimpan ke database. Otomatis kembali ke Menu Awal.`
+      });
+    }, 400);
   };
 
   const handleResetForm = () => {
     setInputValue('');
     setNotes('');
     setIsSaved(false);
+    setIsSubmitting(false);
+    setDuplicateWarning(null);
     setLastSavedResult(null);
   };
 
@@ -342,12 +389,21 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
               />
             </div>
 
+            {/* Duplicate Warning Alert */}
+            {duplicateWarning && (
+              <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-xs flex items-center gap-2.5 shadow-xs">
+                <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                <span className="font-medium leading-relaxed">{duplicateWarning}</span>
+              </div>
+            )}
+
             {/* Action Buttons */}
             <div className="flex items-center justify-end gap-3 pt-2">
               <button
                 type="button"
                 onClick={handleResetForm}
-                className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors"
+                disabled={isSubmitting}
+                className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors disabled:opacity-50"
               >
                 <RotateCcw className="h-3.5 w-3.5" />
                 <span>Reset</span>
@@ -355,15 +411,24 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
 
               <button
                 type="submit"
-                disabled={!inputValue}
-                className={`flex items-center gap-1.5 px-5 py-2 text-xs font-semibold text-white rounded-lg shadow-xs transition-colors ${
-                  !inputValue
-                    ? 'bg-slate-300 cursor-not-allowed'
-                    : 'bg-emerald-600 hover:bg-emerald-700'
+                disabled={!inputValue || isSubmitting}
+                className={`flex items-center gap-1.5 px-5 py-2.5 text-xs font-bold text-white rounded-lg shadow-sm transition-all ${
+                  !inputValue || isSubmitting
+                    ? 'bg-slate-300 cursor-not-allowed text-slate-500'
+                    : 'bg-emerald-600 hover:bg-emerald-700 active:scale-95 shadow-emerald-600/20'
                 }`}
               >
-                <Save className="h-4 w-4" />
-                <span>Simpan Hasil QC</span>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span>Menyimpan & Mengalihkan ke Menu Awal...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-3.5 w-3.5" />
+                    <span>Simpan Hasil QC</span>
+                  </>
+                )}
               </button>
             </div>
           </form>

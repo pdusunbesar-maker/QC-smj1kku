@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   CheckCircle2, 
   AlertTriangle, 
@@ -21,13 +21,16 @@ import {
   Check, 
   ExternalLink,
   CalendarDays,
-  Camera
+  Camera,
+  X,
+  Sparkles
 } from 'lucide-react';
 import { QCResult, CAPA, NonConformity, Instrument, Parameter, AuditLog } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { StorageService } from '../../services/storage';
 import { SummaryCardsPanel } from './panels/SummaryCardsPanel';
 import { CriticalAlertsPanel } from './panels/CriticalAlertsPanel';
+import { MonthlyQCVolumeChartPanel } from './panels/MonthlyQCVolumeChartPanel';
 
 interface DashboardViewProps {
   qcResults: QCResult[];
@@ -36,6 +39,7 @@ interface DashboardViewProps {
   instruments: Instrument[];
   parameters: Parameter[];
   auditLogs?: AuditLog[];
+  initialData?: any;
   onNavigateToTab: (tab: string, itemData?: any) => void;
 }
 
@@ -46,11 +50,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   instruments,
   parameters,
   auditLogs: propAuditLogs,
+  initialData,
   onNavigateToTab,
 }) => {
   const { user } = useAuth();
   const [selectedPeriod, setSelectedPeriod] = useState<'today' | '7d' | '30d' | 'all'>('today');
   const [selectedPreviewParamId, setSelectedPreviewParamId] = useState<string>(parameters[0]?.id || '');
+  const [savedNotification, setSavedNotification] = useState<any>(() => initialData?.qcSaved ? initialData : null);
+
+  useEffect(() => {
+    if (initialData?.qcSaved) {
+      setSavedNotification(initialData);
+      const timer = setTimeout(() => {
+        setSavedNotification(null);
+      }, 9000);
+      return () => clearTimeout(timer);
+    }
+  }, [initialData]);
   const [hoveredPoint, setHoveredPoint] = useState<{
     date: string;
     value: number;
@@ -261,6 +277,64 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   return (
     <div className="space-y-6 antialiased">
+      {/* Auto-Redirect / Anti-Double Input Success Banner */}
+      {savedNotification && (
+        <div className="rounded-2xl border-2 border-emerald-500 bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 p-4 sm:p-5 shadow-sm text-emerald-950 flex flex-col md:flex-row md:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="flex items-start sm:items-center gap-3.5">
+            <div className="h-11 w-11 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <CheckCircle2 className="h-6 w-6" />
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[11px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                  <Sparkles className="h-3 w-3" /> Input Berhasil & Tersimpan
+                </span>
+                <span className="text-xs text-emerald-800 font-medium bg-white/70 px-2 py-0.5 rounded-md border border-emerald-200/60">
+                  Dialihkan Otomatis ke Menu Awal (Anti Double-Input)
+                </span>
+              </div>
+              <p className="text-sm font-bold text-emerald-950">
+                {savedNotification.message || 'Hasil QC berhasil disimpan ke database.'}
+              </p>
+              {savedNotification.parameterCode && (
+                <div className="flex items-center gap-3 text-xs text-emerald-900 pt-0.5 font-mono">
+                  <span>Parameter: <strong>{savedNotification.parameterCode}</strong></span>
+                  <span>Nilai: <strong>{savedNotification.value} {savedNotification.unit}</strong></span>
+                  {savedNotification.sdPosition && <span>SDI: <strong>{savedNotification.sdPosition}</strong></span>}
+                  <span className={`px-2 py-0.2 rounded font-bold uppercase text-[10px] ${
+                    savedNotification.status === 'reject' ? 'bg-rose-100 text-rose-800' :
+                    savedNotification.status === 'warning' ? 'bg-amber-100 text-amber-800' :
+                    'bg-emerald-100 text-emerald-800'
+                  }`}>
+                    {savedNotification.status}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-end md:self-center shrink-0">
+            {savedNotification.parameterId && (
+              <button
+                type="button"
+                onClick={() => onNavigateToTab('levey-jennings', { parameterId: savedNotification.parameterId })}
+                className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <span>Lihat di Levey-Jennings</span>
+                <ExternalLink className="h-3.5 w-3.5" />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setSavedNotification(null)}
+              className="p-2 text-slate-400 hover:text-slate-700 hover:bg-white/80 rounded-xl transition-colors cursor-pointer"
+              title="Tutup Notifikasi"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
       
       {/* ========================================================================= */}
       {/* 1. COMMAND CENTER HEADER & WELCOME AREA                                   */}
@@ -543,6 +617,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
       </div>
+
+      {/* ========================================================================= */}
+      {/* 3.5. ROW 2.5: VISUALISASI TREN PEMERIKSAAN QC BULANAN (GRAFIK BATANG)     */}
+      {/* ========================================================================= */}
+      <MonthlyQCVolumeChartPanel
+        qcResults={qcResults}
+        instruments={instruments}
+        onNavigateToTab={onNavigateToTab}
+      />
 
       {/* ========================================================================= */}
       {/* 4. ROW 3: INTERACTIVE CONTROL CHART PREVIEW + RECENT ACTIVITY             */}

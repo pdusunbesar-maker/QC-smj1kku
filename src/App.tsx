@@ -192,6 +192,7 @@ function AppContent() {
                 instruments={instruments}
                 parameters={parameters}
                 auditLogs={auditLogs}
+                initialData={navigationPayload}
                 onNavigateToTab={handleNavigateToTab}
               />
             )}
@@ -235,6 +236,9 @@ function AppContent() {
                   setQcResults(StorageService.getQCResults());
                   setNotifications(StorageService.getNotifications());
                   setAuditLogs(StorageService.getAuditLogs());
+                  setScannedResults([]);
+                  setScanPreviewUrl(null);
+                  setScannedDocumentMeta(null);
                 }}
                 onRetakeScan={() => setActiveTab('qc-scan')}
                 onNavigateToTab={handleNavigateToTab}

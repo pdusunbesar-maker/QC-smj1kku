@@ -16,7 +16,9 @@ import {
   Trash2,
   AlertTriangle,
   Save,
-  RotateCcw
+  RotateCcw,
+  Download,
+  FileSpreadsheet
 } from 'lucide-react';
 import { QCResult } from '../../types';
 import { useAuth } from '../../context/AuthContext';
@@ -57,6 +59,7 @@ export const QCReviewView: React.FC<QCReviewViewProps> = ({
   // Delete QC Result State
   const [resultToDelete, setResultToDelete] = useState<QCResult | null>(null);
   const [deleteReason, setDeleteReason] = useState('Kesalahan pencatatan nilai / duplikasi');
+  const [exportFeedback, setExportFeedback] = useState<string | null>(null);
 
   const isSupervisorOrAdmin = can('review_qc') || user.role === 'admin' || user.role === 'supervisor';
   const canEditOrDelete = can('input_qc') || user.role === 'admin' || user.role === 'supervisor';
@@ -176,8 +179,122 @@ export const QCReviewView: React.FC<QCReviewViewProps> = ({
     setResultToDelete(null);
   };
 
+  // Export Filtered QC Results to CSV (Audit & External Archiving)
+  const handleExportCSV = () => {
+    if (filteredResults.length === 0) {
+      alert('Tidak ada data QC yang dapat diekspor dengan filter saat ini.');
+      return;
+    }
+
+    const todayDate = new Date().toISOString().split('T')[0];
+    const filename = `Data_Hasil_QC_Review_${filterStatus.toUpperCase()}_${todayDate}.csv`;
+
+    const headers = [
+      'No',
+      'ID_QC',
+      'Tanggal',
+      'Waktu',
+      'Nama_Instrumen',
+      'ID_Instrumen',
+      'Kode_Parameter',
+      'Nama_Parameter',
+      'Level_Kontrol',
+      'Nomor_Lot',
+      'Nilai_Hasil_QC',
+      'Satuan',
+      'Target_Mean',
+      'Target_SD',
+      'Z_Score_SDI',
+      'Posisi_SD',
+      'Status_QC',
+      'Pelanggaran_Westgard',
+      'Status_Review',
+      'Direview_Oleh',
+      'Waktu_Review',
+      'Catatan_Review',
+      'Operator_ATLM',
+      'Metode_Input',
+      'Keterangan'
+    ];
+
+    let csvContent = '\uFEFF' + headers.join(',') + '\n';
+
+    filteredResults.forEach((r, idx) => {
+      const escapeCsv = (str: string | number | undefined | null) => {
+        if (str === undefined || str === null) return '""';
+        const stringified = String(str).replace(/"/g, '""');
+        return `"${stringified}"`;
+      };
+
+      const violationsStr = (r.violations || []).map(v => `${v.rule} (${v.description})`).join('; ') || '-';
+      const sourceStr = r.source === 'AI_VISION' ? 'AI Vision Scan' : 'Manual Entry';
+
+      const row = [
+        idx + 1,
+        escapeCsv(r.id),
+        escapeCsv(r.date),
+        escapeCsv(r.time),
+        escapeCsv(r.instrumentName),
+        escapeCsv(r.instrumentId),
+        escapeCsv(r.parameterCode),
+        escapeCsv(r.parameterName),
+        escapeCsv(r.controlLevel),
+        escapeCsv(r.lotNumber),
+        r.value,
+        escapeCsv(r.unit),
+        r.mean,
+        r.sd,
+        r.zScore,
+        escapeCsv(r.sdPosition),
+        escapeCsv(r.status.toUpperCase()),
+        escapeCsv(violationsStr),
+        escapeCsv(r.reviewStatus.toUpperCase()),
+        escapeCsv(r.reviewedByName || '-'),
+        escapeCsv(r.reviewedAt || '-'),
+        escapeCsv(r.reviewComment || '-'),
+        escapeCsv(r.operatorName || '-'),
+        escapeCsv(sourceStr),
+        escapeCsv(r.notes || '-')
+      ];
+
+      csvContent += row.join(',') + '\n';
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    setExportFeedback(`File CSV berhasil diunduh (${filteredResults.length} data QC terarsip).`);
+    setTimeout(() => {
+      setExportFeedback(null);
+    }, 5000);
+  };
+
   return (
     <div className="space-y-6">
+      {/* Export Success Notification Banner */}
+      {exportFeedback && (
+        <div className="p-3.5 bg-emerald-50 border-2 border-emerald-500 rounded-xl text-emerald-900 text-xs font-semibold flex items-center justify-between gap-2 shadow-xs animate-in fade-in duration-200">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+            <span>{exportFeedback}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setExportFeedback(null)}
+            className="p-1 text-slate-400 hover:text-slate-700 rounded-md"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Top Header */}
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between border-b border-slate-200 pb-4">
         <div>
@@ -189,11 +306,23 @@ export const QCReviewView: React.FC<QCReviewViewProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {/* Export to CSV Button */}
+          <button
+            type="button"
+            onClick={handleExportCSV}
+            disabled={filteredResults.length === 0}
+            className="flex items-center gap-1.5 min-h-[42px] px-4 py-2 text-xs sm:text-sm font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed border border-emerald-300 rounded-xl transition-all shadow-2xs active:scale-[0.98] cursor-pointer"
+            title="Unduh data tabel QC saat ini ke file CSV terstruktur untuk pengarsipan eksternal"
+          >
+            <Download className="h-4 w-4 text-emerald-700" />
+            <span>Ekspor CSV ({filteredResults.length})</span>
+          </button>
+
           <button
             type="button"
             onClick={() => onNavigateToTab('qc-input')}
-            className="flex items-center gap-2 min-h-[42px] px-4 py-2.5 text-xs sm:text-sm font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-xl transition-all shadow-xs active:scale-[0.98]"
+            className="flex items-center gap-2 min-h-[42px] px-4 py-2.5 text-xs sm:text-sm font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-xl transition-all shadow-xs active:scale-[0.98] cursor-pointer"
           >
             <span>+ Input QC Baru</span>
           </button>
@@ -226,16 +355,28 @@ export const QCReviewView: React.FC<QCReviewViewProps> = ({
           ))}
         </div>
 
-        {/* Search Field */}
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cari parameter, ATLM, ID..."
-            className="w-full rounded-lg border border-slate-200 pl-9 pr-3 py-1.5 text-xs focus:border-emerald-500 focus:outline-none"
-          />
+        {/* Search Field & Inline Export */}
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="relative flex-1 sm:w-72">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Cari parameter, ATLM, ID..."
+              className="w-full rounded-lg border border-slate-200 pl-9 pr-3 py-1.5 text-xs focus:border-emerald-500 focus:outline-none"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={handleExportCSV}
+            disabled={filteredResults.length === 0}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-40 disabled:cursor-not-allowed border border-emerald-300 rounded-lg transition-colors cursor-pointer shrink-0 shadow-2xs"
+            title="Unduh data tabel yang difilter ke format CSV"
+          >
+            <Download className="h-3.5 w-3.5 text-emerald-700" />
+            <span>CSV</span>
+          </button>
         </div>
       </div>
 
