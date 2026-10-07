@@ -232,18 +232,46 @@ Format respon HARUS JSON valid:
 
       let ocrResult: any = null;
 
-      // Check if GEMINI_API_KEY is present
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (apiKey && apiKey.trim() !== '') {
-        try {
-          const ai = new GoogleGenAI({
-            apiKey: apiKey,
-            httpOptions: {
-              headers: { 'User-Agent': 'aistudio-build' }
-            }
-          });
+      // Initialize GoogleGenAI with available API key from environment
+      const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || process.env.GOOGLE_API_KEY;
+      try {
+        const ai = new GoogleGenAI(apiKey ? { apiKey } : {});
 
-          // Multimodal call using gemini-3.8-flash with proper parts object
+        // Multimodal call using gemini-3.8-flash with proper parts object
+        const imagePart = {
+          inlineData: {
+            data: cleanBase64,
+            mimeType: cleanMime
+          }
+        };
+        const textPart = {
+          text: prompt
+        };
+
+        const response = await ai.models.generateContent({
+          model: "gemini-3.8-flash",
+          contents: {
+            parts: [imagePart, textPart]
+          },
+          config: {
+            responseMimeType: "application/json"
+          }
+        });
+
+        let rawText = response.text || '';
+        rawText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+        const firstBrace = rawText.indexOf('{');
+        const lastBrace = rawText.lastIndexOf('}');
+        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+          rawText = rawText.substring(firstBrace, lastBrace + 1);
+        }
+        if (rawText) {
+          ocrResult = JSON.parse(rawText);
+        }
+      } catch (geminiErr: any) {
+        console.warn('Gemini vision API error with gemini-3.8-flash, trying gemini-flash-latest:', geminiErr?.message || geminiErr);
+        try {
+          const ai = new GoogleGenAI(apiKey ? { apiKey } : {});
           const imagePart = {
             inlineData: {
               data: cleanBase64,
@@ -253,9 +281,8 @@ Format respon HARUS JSON valid:
           const textPart = {
             text: prompt
           };
-
-          const response = await ai.models.generateContent({
-            model: "gemini-3.8-flash",
+          const response2 = await ai.models.generateContent({
+            model: "gemini-flash-latest",
             contents: {
               parts: [imagePart, textPart]
             },
@@ -263,57 +290,18 @@ Format respon HARUS JSON valid:
               responseMimeType: "application/json"
             }
           });
-
-          let rawText = response.text || '';
-          rawText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
-          const firstBrace = rawText.indexOf('{');
-          const lastBrace = rawText.lastIndexOf('}');
-          if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-            rawText = rawText.substring(firstBrace, lastBrace + 1);
+          let rawText2 = response2.text || '';
+          rawText2 = rawText2.replace(/```json/gi, '').replace(/```/g, '').trim();
+          const firstBrace2 = rawText2.indexOf('{');
+          const lastBrace2 = rawText2.lastIndexOf('}');
+          if (firstBrace2 !== -1 && lastBrace2 !== -1 && lastBrace2 > firstBrace2) {
+            rawText2 = rawText2.substring(firstBrace2, lastBrace2 + 1);
           }
-          if (rawText) {
-            ocrResult = JSON.parse(rawText);
+          if (rawText2) {
+            ocrResult = JSON.parse(rawText2);
           }
-        } catch (geminiErr: any) {
-          console.warn('Gemini vision API error with gemini-3.8-flash, trying gemini-flash-latest:', geminiErr?.message || geminiErr);
-          try {
-            const ai = new GoogleGenAI({
-              apiKey: apiKey,
-              httpOptions: {
-                headers: { 'User-Agent': 'aistudio-build' }
-              }
-            });
-            const imagePart = {
-              inlineData: {
-                data: cleanBase64,
-                mimeType: cleanMime
-              }
-            };
-            const textPart = {
-              text: prompt
-            };
-            const response2 = await ai.models.generateContent({
-              model: "gemini-flash-latest",
-              contents: {
-                parts: [imagePart, textPart]
-              },
-              config: {
-                responseMimeType: "application/json"
-              }
-            });
-            let rawText2 = response2.text || '';
-            rawText2 = rawText2.replace(/```json/gi, '').replace(/```/g, '').trim();
-            const firstBrace2 = rawText2.indexOf('{');
-            const lastBrace2 = rawText2.lastIndexOf('}');
-            if (firstBrace2 !== -1 && lastBrace2 !== -1 && lastBrace2 > firstBrace2) {
-              rawText2 = rawText2.substring(firstBrace2, lastBrace2 + 1);
-            }
-            if (rawText2) {
-              ocrResult = JSON.parse(rawText2);
-            }
-          } catch (retryErr: any) {
-            console.warn('Retry model also encountered issue, proceeding with smart laboratory fallback:', retryErr?.message || retryErr);
-          }
+        } catch (retryErr: any) {
+          console.warn('Retry model also encountered issue, proceeding with smart laboratory fallback:', retryErr?.message || retryErr);
         }
       }
 

@@ -94,9 +94,7 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
       documentMeta?.instrument_id
     );
     setItems(newItems);
-    if (documentMeta?.instrument_id && documentMeta.instrument_id !== 'auto') {
-      setInstrumentFilter(documentMeta.instrument_id);
-    }
+    setInstrumentFilter('ALL');
   }, [extractedData, documentMeta, parameters, instruments]);
 
   // Re-calculate row when any field changes
@@ -295,7 +293,8 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
   // Filter items by active instrument filter
   const displayedItems = useMemo(() => {
     if (instrumentFilter === 'ALL') return items;
-    return items.filter(i => i.instrumentId === instrumentFilter);
+    const filtered = items.filter(i => i.instrumentId === instrumentFilter);
+    return filtered.length > 0 ? filtered : items;
   }, [items, instrumentFilter]);
 
   const selectedItems = useMemo(() => displayedItems.filter(i => i.isSelected), [displayedItems]);
