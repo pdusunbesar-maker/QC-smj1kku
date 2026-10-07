@@ -105,42 +105,53 @@ async function startServer() {
         : 'image/jpeg';
 
       const prompt = `Anda adalah Laboratory Quality Control (QC) & Medical Laboratory Vision OCR Specialist tingkat enterprise.
-Tugas Anda adalah membaca dan mengekstrak SELURUH data hasil pemeriksaan Quality Control (QC) dari foto struk termal / printout alat analizer / layar monitor mesin laboratorium (misalnya Cobas c311, Sysmex XN-1000/XN-550, Mindray BC-6800/BS-240, Architect, Humalyzer, dsb).
+Tugas Anda adalah membaca dan mengekstrak SELURUH data hasil pemeriksaan Quality Control (QC) dari foto struk termal / printout alat analyzer / layar monitor mesin laboratorium (khususnya Chemistry Analyzer CST-240 / CS-T240 / Dirui, Cobas c311, Sysmex XN series, Mindray BS-240/BC-6800, dsb).
 
-PETUNJUK EKSTRAKSI:
-1. Deteksi nama alat/analyzer (misal: "Cobas c311", "Sysmex XN-1000", "Mindray BC-6800", "Humalyzer 4000"). Jika tidak tertera, isi dengan perkiraan nama alat berdasarkan format struk atau null.
-2. Deteksi tanggal (format YYYY-MM-DD) dan waktu (format HH:mm) pemeriksaan jika ada.
-3. Deteksi nama lot kontrol (misal: "QC-GLU-001", "LOT-CCM1-2026A", "CBC-NORMAL-01", "8124A") dan level kontrol ("Level 1" / "Level 2" / "Level 3" / "Normal" / "Low" / "High").
-4. Ekstrak SETIAP parameter QC yang tercetak pada foto. Contoh parameter umum:
-   - Kimia Darah: Glucose / GLU, Cholesterol / CHOL, Triglyceride / TRIG, SGOT / AST, SGPT / ALT, Ureum / UREA / BUN, Creatinine / CREA, Asam Urat / UA, Albumin / ALB, Total Protein / TP, Bilirubin Total / TBIL.
-   - Hematologi: Hemoglobin / HGB / Hb, Leukosit / WBC, Trombosit / PLT, Eritrosit / RBC, Hematokrit / HCT, MCV, MCH, MCHC.
-   - Elektrolit / Lainnya: Natrium / Na, Kalium / K, Klorida / Cl.
-5. Nilai Hasil (Result Value): BACA SECARA PRESISI. Jaga angka desimal asli (misal 102.4 jangan jadi 102).
-6. Berikan skor confidence (0.0 sampai 1.0) untuk setiap field.
-7. Jika foto memuat beberapa baris tes QC sekaligus, ekstrak SEMUA baris ke dalam array results.
+ATURAN KRUSIAL MEMBEDAKAN HASIL (RESULT) VS TARGET MEAN VS TARGET SD:
+1. PADA ALAT KIMIA KLINIK SEPERTI CHEMISTRY ANALYZER CST-240 / CS-T240 / DIRUI / COBAS:
+   - "Result" / "Conc" / "Conc." / "Val" / "Data" / "Hasil" = NILAI HASIL PENGUKURAN QC AKTUAL (Nilai ini yang WAJIB dimasukkan ke result.value).
+   - "Target" / "Mean" / "Expected" / "X̄" / "X" / "Center" = NILAI TARGET MEAN KONTROL (Masukkan ke mean.value jika tercetak).
+   - "SD" / "1SD" / "Std Dev" / "Deviasi" = NILAI TARGET STANDAR DEVIASI (Masukkan ke sd.value jika tercetak).
+   - JANGAN TERTUKAR antara nilai Result (Conc) dengan Target Mean atau Target SD! Contoh pada CST-240: Jika tertulis "GLU  Result: 102.4  Mean: 100.0  SD: 3.50", maka result.value = 102.4, mean.value = 100.0, sd.value = 3.50.
+
+2. DETEKSI ALAT (ANALYZER):
+   - Jika tertera atau mirip format CST-240 / CS-T240 / Dirui -> Analyzer: "Chemistry Analyzer CST-240"
+   - Jika tertera Cobas / Roche -> Analyzer: "Cobas c311 Auto-Chemistry"
+   - Jika tertera Sysmex -> Analyzer: "Sysmex XN-550 Hematology"
+   - Jika tertera Mindray -> Analyzer: "Mindray Chemistry Analyzer"
+
+3. DETEKSI PARAMETER (ITEM TEST):
+   - Kimia Klinik: GLU / Glucose, CHOL / Cholesterol, UREA / BUN / Ureum, CREA / Creatinine, SGOT / AST, SGPT / ALT, TRIG / Triglyceride, UA / Uric Acid, ALB / Albumin, TP / Total Protein, TBIL / Total Bilirubin, DBIL / Direct Bilirubin, ALP, GGT, NA, K, CL, CA.
+   - Hematologi: HGB / Hb, WBC / Leukosit, PLT / Trombosit, RBC / Eritrosit, HCT / Hematokrit.
+
+4. EKSTRAKSI LENGKAP:
+   - Tanggal & Jam pemeriksaan (date: YYYY-MM-DD, time: HH:mm).
+   - Level Kontrol ("Level 1" / "Level 2" / "Level 3" / "Normal" / "Pathological").
+   - Nomor Lot Kontrol (misal: "LOT-CCM1-2026A", "QC-GLU-001", "8124A").
+   - Ekstrak seluruh baris parameter yang ada di gambar ke dalam array results.
 
 Format respon HARUS JSON valid dengan struktur:
 {
   "scan": { "scan_id": "...", "timestamp": "...", "image_id": "..." },
   "document": {
     "laboratory_name": "...",
-    "analyzer": "...",
+    "analyzer": "Chemistry Analyzer CST-240",
     "date": "YYYY-MM-DD",
     "time": "HH:mm",
-    "control_level": "...",
+    "control_level": "Level 1",
     "lot_number": "..."
   },
   "results": [
     {
-      "parameter": { "value": "Glucose", "original_text": "GLU", "confidence": 0.95 },
+      "parameter": { "value": "Glucose", "original_text": "GLU", "confidence": 0.98 },
       "level": { "value": "Level 1", "original_text": "L1", "confidence": 0.95 },
       "lot": { "value": "LOT-CCM1-2026A", "confidence": 0.95 },
       "result": { "value": 102.4, "original_text": "102.4", "confidence": 0.98 },
       "unit": { "value": "mg/dL", "confidence": 0.95 },
-      "mean": { "value": 100.0, "confidence": 0.9 },
-      "sd": { "value": 3.5, "confidence": 0.9 },
-      "source_text": "GLU 102.4 mg/dL",
-      "overall_confidence": 0.95,
+      "mean": { "value": 100.0, "confidence": 0.95 },
+      "sd": { "value": 3.5, "confidence": 0.95 },
+      "source_text": "GLU Conc: 102.4 Target: 100.0 SD: 3.5",
+      "overall_confidence": 0.97,
       "needs_verification": false,
       "verification_reason": null
     }

@@ -32,10 +32,11 @@ export interface VerifiedQCItem {
   controlLevel: 'Level 1' | 'Level 2' | 'Level 3';
   lotNumber: string;
   
-  resultValue: number;
-  unit: string;
-  targetMean: number;
-  targetSD: number;
+  // Explicit distinction between Result, Target Mean, and Target SD
+  resultValue: number;       // Hasil QC Aktual / Conc
+  unit: string;              // Satuan
+  targetMean: number;        // Nilai Target Mean (X̄)
+  targetSD: number;          // Nilai Target SD (1 SD)
   
   // Calculated fields
   zScore: number;
@@ -49,20 +50,20 @@ export interface VerifiedQCItem {
   time: string;
 }
 
-// Parameter alias dictionaries for common clinical laboratory tests
+// Parameter alias dictionaries for common clinical laboratory tests (including CST-240 & Dirui codes)
 const PARAM_ALIASES: Record<string, string[]> = {
-  'param-glu': ['glucose', 'glu', 'gluc', 'gds', 'gdp', 'glukosa', 'blood sugar', 'gula darah'],
-  'param-chol': ['cholesterol', 'chol', 'tc', 'kolesterol', 'chol total', 'cholesterol total'],
+  'param-glu': ['glucose', 'glu', 'gluc', 'glu-g', 'gds', 'gdp', 'glukosa', 'blood sugar', 'gula darah'],
+  'param-chol': ['cholesterol', 'chol', 'cho', 't-cho', 'tc', 'kolesterol', 'chol total', 'cholesterol total'],
   'param-urea': ['urea', 'ureum', 'bun', 'blood urea nitrogen', 'ure'],
-  'param-creat': ['creatinine', 'crea', 'creat', 'kreatinin', 'cr'],
+  'param-creat': ['creatinine', 'crea', 'cre', 'creat', 'kreatinin', 'cr'],
   'param-trig': ['triglyceride', 'trig', 'tg', 'trigliserida'],
-  'param-sgot': ['sgot', 'ast', 'aspartate aminotransferase', 'got'],
-  'param-sgpt': ['sgpt', 'alt', 'alanine aminotransferase', 'gpt'],
-  'param-ua': ['uric acid', 'ua', 'asam urat', 'urate'],
+  'param-sgot': ['sgot', 'ast', 'got', 'aspartate aminotransferase'],
+  'param-sgpt': ['sgpt', 'alt', 'gpt', 'alanine aminotransferase'],
+  'param-ua': ['uric acid', 'ua', 'uric', 'asam urat', 'urate'],
   'param-alb': ['albumin', 'alb'],
   'param-tp': ['total protein', 'tp', 'protein total'],
-  'param-tbil': ['total bilirubin', 'tbil', 'bilirubin total', 'bili total'],
-  'param-dbil': ['direct bilirubin', 'dbil', 'bilirubin direk'],
+  'param-tbil': ['total bilirubin', 'tbil', 't-bil', 'bilirubin total', 'bili total'],
+  'param-dbil': ['direct bilirubin', 'dbil', 'd-bil', 'bilirubin direk'],
   'param-hgb': ['hemoglobin', 'hgb', 'hb', 'haemoglobin'],
   'param-wbc': ['white blood cell', 'wbc', 'leukosit', 'leuko'],
   'param-plt': ['platelet', 'plt', 'trombosit', 'thrombocyte'],
@@ -94,7 +95,7 @@ export function matchParameter(
 
   // 3. Alias match
   for (const [key, aliases] of Object.entries(PARAM_ALIASES)) {
-    if (aliases.some(alias => searchStr.includes(alias))) {
+    if (aliases.some(alias => searchStr.includes(alias) || alias === searchStr)) {
       const match = parameters.find(p => p.id === key || p.code.toLowerCase() === key.replace('param-', ''));
       if (match) return match;
     }
@@ -123,6 +124,10 @@ export function matchInstrument(
   }
 
   // Analyzer keywords fallback
+  if (searchStr.includes('cst-240') || searchStr.includes('cs-t240') || searchStr.includes('cst240') || searchStr.includes('dirui')) {
+    const cst = instruments.find(i => i.name.toLowerCase().includes('cst') || i.model.toLowerCase().includes('cst') || i.name.toLowerCase().includes('chem'));
+    if (cst) return cst;
+  }
   if (searchStr.includes('cobas') || searchStr.includes('roche') || searchStr.includes('c311')) {
     const cobas = instruments.find(i => i.name.toLowerCase().includes('cobas') || i.model.toLowerCase().includes('cobas'));
     if (cobas) return cobas;
@@ -149,6 +154,7 @@ export function matchControlLevel(rawLevel: string | undefined): 'Level 1' | 'Le
 
 /**
  * Transforms raw AI OCR extraction output into fully matched, verified QC rows
+ * Distinguishes clearly between Result (Conc), Target Mean, and Target SD
  */
 export function buildVerifiedItemsFromAI(
   extractedResults: ExtractedAIItem[],
@@ -186,7 +192,7 @@ export function buildVerifiedItemsFromAI(
       return {
         id: `VERIFY-${Date.now()}-${index}`,
         sourceText: `Master Data Auto-Populated: ${param.name}`,
-        confidence: 0.88,
+        confidence: 0.90,
         needsVerification: true,
         verificationReason: 'Periksa & sesuaikan angka hasil dengan foto struk',
         instrumentId: defaultInst?.id || param.instrumentId || 'inst-chem-a',
@@ -215,20 +221,33 @@ export function buildVerifiedItemsFromAI(
     const paramName = item.parameter?.value || item.parameter?.original_text || '';
     const matchedParam = matchParameter(paramName, item.parameter?.original_text, parameters);
     const matchedInst = matchInstrument(item.analyzer || docAnalyzer, instruments);
-    const controlLevel = matchControlLevel(item.level?.value || documentMeta?.control_level);
+    const itemLevel = matchControlLevel(item.level?.value || documentMeta?.control_level);
     
-    const lotNumber = item.lot?.value || documentMeta?.lot_number || (controlLevel === 'Level 2' ? 'LOT-CCM2-2026B' : 'LOT-CCM1-2026A');
-    const resultValue = typeof item.result?.value === 'number' ? item.result.value : parseFloat(String(item.result?.original_text || '0')) || 0;
+    const itemLot = item.lot?.value || documentMeta?.lot_number || (itemLevel === 'Level 2' ? 'LOT-CCM2-2026B' : 'LOT-CCM1-2026A');
     
-    const targetMean = matchedParam?.targetMean || item.mean?.value || (resultValue > 0 ? resultValue : 100);
-    const targetSD = matchedParam?.targetSD || item.sd?.value || (targetMean * 0.035);
+    // Result value: The actual measured QC concentration read from alat (CST-240 / Cobas / Sysmex)
+    const resultValue = typeof item.result?.value === 'number' 
+      ? item.result.value 
+      : parseFloat(String(item.result?.original_text || '0')) || (matchedParam?.targetMean || 100);
+    
+    // Target Mean: Prefer Master Data targetMean for accuracy, fallback to OCR mean
+    const targetMean = matchedParam?.targetMean 
+      ? matchedParam.targetMean 
+      : (typeof item.mean?.value === 'number' ? item.mean.value : 100);
+    
+    // Target SD: Prefer Master Data targetSD for accuracy, fallback to OCR SD
+    const targetSD = matchedParam?.targetSD 
+      ? matchedParam.targetSD 
+      : (typeof item.sd?.value === 'number' ? item.sd.value : 3.5);
+    
     const unit = matchedParam?.unit || item.unit?.value || 'mg/dL';
     
+    // Calculate Z-Score = (Result - Mean) / SD
     const zScore = calculateZScore(resultValue, targetMean, targetSD);
     const sdPosition = formatSDPosition(zScore);
 
     // Evaluate Westgard rules
-    const history = existingResults.filter(r => r.parameterId === matchedParam?.id);
+    const history = existingResults.filter(r => r.parameterId === (matchedParam?.id || 'param-glu'));
     const tempId = `QC-SCAN-TEMP-${index}`;
     const { status, violations } = evaluateWestgardRules(
       { id: tempId, value: resultValue, mean: targetMean, sd: targetSD, zScore },
@@ -241,7 +260,7 @@ export function buildVerifiedItemsFromAI(
 
     return {
       id: `VERIFY-${Date.now()}-${index}`,
-      sourceText: item.source_text || item.result?.original_text,
+      sourceText: item.source_text || item.result?.original_text || `Hasil QC: ${resultValue} ${unit}`,
       confidence,
       needsVerification,
       verificationReason: item.verification_reason || (status !== 'pass' ? `Status QC: ${status.toUpperCase()}` : null),
@@ -251,8 +270,8 @@ export function buildVerifiedItemsFromAI(
       parameterId: matchedParam?.id || 'param-glu',
       parameterName: matchedParam?.name || 'Glucose (Glukosa Darah Sewaktu/Puasa)',
       parameterCode: matchedParam?.code || 'GLU',
-      controlLevel,
-      lotNumber,
+      controlLevel: itemLevel,
+      lotNumber: itemLot,
       
       resultValue,
       unit,
