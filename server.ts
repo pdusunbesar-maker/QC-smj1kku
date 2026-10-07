@@ -16,8 +16,8 @@ async function startServer() {
     const time = timestamp.split('T')[1].substring(0, 5);
     const hint = (instrumentHint || '').toLowerCase();
 
-    // 1. If Dimih 3980 is requested / hinted
-    if (hint.includes('dimih') || hint.includes('3980') || hint.includes('hema') || hint.includes('cbc')) {
+    // 1. If Dimih 3980 is explicitly requested / hinted (hematology ONLY)
+    if ((hint.includes('dimih') || hint.includes('3980') || hint.includes('hema') || hint.includes('cbc') || hint.includes('bcc')) && !hint.includes('cst') && !hint.includes('chem')) {
       return {
         scan: {
           scan_id: `SCAN-${Date.now().toString().slice(-6)}`,
@@ -97,7 +97,7 @@ async function startServer() {
       };
     }
 
-    // 2. Default: Chemistry Analyzer CST-240 / CS-T240
+    // 2. Default: Chemistry Analyzer CST-240 / CS-T240 (with ALB, ALT, AST, GLU-HK, AU, BUN, CRE-E, TG, TC, TBIL, DBIL)
     return {
       scan: {
         scan_id: `SCAN-${Date.now().toString().slice(-6)}`,
@@ -114,54 +114,145 @@ async function startServer() {
       },
       results: [
         {
-          parameter: { value: 'Glucose (Glukosa Darah CST-240)', original_text: 'GLU', confidence: 0.98 },
-          level: { value: 'Level 1', original_text: 'L1', confidence: 0.95 },
+          parameter: { value: 'Albumin (CST-240)', original_text: 'ALB', confidence: 0.99 },
+          level: { value: 'Level 1', original_text: 'L1', confidence: 0.96 },
           lot: { value: 'LOT-CST1-2026A', confidence: 0.95 },
-          result: { value: 104.2, original_text: 'Conc: 104.2', confidence: 0.99 },
-          unit: { value: 'mg/dL', confidence: 0.98 },
-          mean: { value: 100.0, confidence: 0.96 },
-          sd: { value: 3.5, confidence: 0.96 },
-          source_text: 'GLU Conc: 104.2 Mean: 100.0 SD: 3.50',
+          result: { value: 3.82, original_text: '3.82', confidence: 0.99 },
+          unit: { value: 'g/dL', confidence: 0.98 },
+          mean: { value: 3.85, confidence: 0.96 },
+          sd: { value: 0.12, confidence: 0.96 },
+          source_text: 'ALB Conc: 3.82 Mean: 3.85 SD: 0.12',
           overall_confidence: 0.98,
           needs_verification: false,
           verification_reason: null
         },
         {
-          parameter: { value: 'Cholesterol Total (CST-240)', original_text: 'CHOL', confidence: 0.97 },
+          parameter: { value: 'SGPT / ALT (CST-240)', original_text: 'ALT', confidence: 0.98 },
           level: { value: 'Level 1', original_text: 'L1', confidence: 0.95 },
           lot: { value: 'LOT-CST1-2026A', confidence: 0.95 },
-          result: { value: 161.5, original_text: 'Conc: 161.5', confidence: 0.98 },
-          unit: { value: 'mg/dL', confidence: 0.98 },
-          mean: { value: 160.0, confidence: 0.96 },
-          sd: { value: 5.2, confidence: 0.96 },
-          source_text: 'CHOL Conc: 161.5 Mean: 160.0 SD: 5.20',
+          result: { value: 31.8, original_text: '31.8', confidence: 0.98 },
+          unit: { value: 'U/L', confidence: 0.98 },
+          mean: { value: 32.0, confidence: 0.95 },
+          sd: { value: 1.7, confidence: 0.95 },
+          source_text: 'ALT Conc: 31.8 Mean: 32.0 SD: 1.7',
           overall_confidence: 0.97,
           needs_verification: false,
           verification_reason: null
         },
         {
-          parameter: { value: 'Urea / Ureum (CST-240)', original_text: 'UREA', confidence: 0.96 },
-          level: { value: 'Level 1', original_text: 'L1', confidence: 0.94 },
+          parameter: { value: 'SGOT / AST (CST-240)', original_text: 'AST', confidence: 0.98 },
+          level: { value: 'Level 1', original_text: 'L1', confidence: 0.95 },
           lot: { value: 'LOT-CST1-2026A', confidence: 0.95 },
-          result: { value: 37.6, original_text: 'Conc: 37.6', confidence: 0.98 },
-          unit: { value: 'mg/dL', confidence: 0.98 },
-          mean: { value: 38.0, confidence: 0.95 },
-          sd: { value: 1.6, confidence: 0.95 },
-          source_text: 'UREA Conc: 37.6 Mean: 38.0 SD: 1.60',
-          overall_confidence: 0.96,
+          result: { value: 35.4, original_text: '35.4', confidence: 0.98 },
+          unit: { value: 'U/L', confidence: 0.98 },
+          mean: { value: 35.0, confidence: 0.95 },
+          sd: { value: 1.8, confidence: 0.95 },
+          source_text: 'AST Conc: 35.4 Mean: 35.0 SD: 1.8',
+          overall_confidence: 0.97,
           needs_verification: false,
           verification_reason: null
         },
         {
-          parameter: { value: 'Creatinine (CST-240)', original_text: 'CREA', confidence: 0.96 },
-          level: { value: 'Level 1', original_text: 'L1', confidence: 0.94 },
+          parameter: { value: 'Glucose Hexokinase / GLU-HK (CST-240)', original_text: 'GLU-HK', confidence: 0.99 },
+          level: { value: 'Level 1', original_text: 'L1', confidence: 0.95 },
           lot: { value: 'LOT-CST1-2026A', confidence: 0.95 },
-          result: { value: 1.23, original_text: 'Conc: 1.23', confidence: 0.98 },
+          result: { value: 104.2, original_text: '104.2', confidence: 0.99 },
+          unit: { value: 'mg/dL', confidence: 0.98 },
+          mean: { value: 104.0, confidence: 0.96 },
+          sd: { value: 3.5, confidence: 0.96 },
+          source_text: 'GLU-HK Conc: 104.2 Mean: 104.0 SD: 3.50',
+          overall_confidence: 0.98,
+          needs_verification: false,
+          verification_reason: null
+        },
+        {
+          parameter: { value: 'Asam Urat / AU (CST-240)', original_text: 'AU', confidence: 0.97 },
+          level: { value: 'Level 1', original_text: 'L1', confidence: 0.95 },
+          lot: { value: 'LOT-CST1-2026A', confidence: 0.95 },
+          result: { value: 5.18, original_text: '5.18', confidence: 0.98 },
+          unit: { value: 'mg/dL', confidence: 0.98 },
+          mean: { value: 5.20, confidence: 0.95 },
+          sd: { value: 0.25, confidence: 0.95 },
+          source_text: 'AU Conc: 5.18 Mean: 5.20 SD: 0.25',
+          overall_confidence: 0.97,
+          needs_verification: false,
+          verification_reason: null
+        },
+        {
+          parameter: { value: 'Blood Urea Nitrogen / BUN (CST-240)', original_text: 'BUN', confidence: 0.97 },
+          level: { value: 'Level 1', original_text: 'L1', confidence: 0.95 },
+          lot: { value: 'LOT-CST1-2026A', confidence: 0.95 },
+          result: { value: 18.6, original_text: '18.6', confidence: 0.98 },
+          unit: { value: 'mg/dL', confidence: 0.98 },
+          mean: { value: 18.5, confidence: 0.95 },
+          sd: { value: 0.9, confidence: 0.95 },
+          source_text: 'BUN Conc: 18.6 Mean: 18.5 SD: 0.9',
+          overall_confidence: 0.97,
+          needs_verification: false,
+          verification_reason: null
+        },
+        {
+          parameter: { value: 'Creatinine Enzymatic / CRE-E (CST-240)', original_text: 'CRE-E', confidence: 0.98 },
+          level: { value: 'Level 1', original_text: 'L1', confidence: 0.95 },
+          lot: { value: 'LOT-CST1-2026A', confidence: 0.95 },
+          result: { value: 1.23, original_text: '1.23', confidence: 0.99 },
           unit: { value: 'mg/dL', confidence: 0.98 },
           mean: { value: 1.25, confidence: 0.95 },
           sd: { value: 0.06, confidence: 0.95 },
-          source_text: 'CREA Conc: 1.23 Mean: 1.25 SD: 0.06',
-          overall_confidence: 0.96,
+          source_text: 'CRE-E Conc: 1.23 Mean: 1.25 SD: 0.06',
+          overall_confidence: 0.98,
+          needs_verification: false,
+          verification_reason: null
+        },
+        {
+          parameter: { value: 'Trigliserida / TG (CST-240)', original_text: 'TG', confidence: 0.97 },
+          level: { value: 'Level 1', original_text: 'L1', confidence: 0.95 },
+          lot: { value: 'LOT-CST1-2026A', confidence: 0.95 },
+          result: { value: 124.5, original_text: '124.5', confidence: 0.98 },
+          unit: { value: 'mg/dL', confidence: 0.98 },
+          mean: { value: 125.0, confidence: 0.95 },
+          sd: { value: 5.0, confidence: 0.95 },
+          source_text: 'TG Conc: 124.5 Mean: 125.0 SD: 5.0',
+          overall_confidence: 0.97,
+          needs_verification: false,
+          verification_reason: null
+        },
+        {
+          parameter: { value: 'Total Cholesterol / TC (CST-240)', original_text: 'TC', confidence: 0.97 },
+          level: { value: 'Level 1', original_text: 'L1', confidence: 0.95 },
+          lot: { value: 'LOT-CST1-2026A', confidence: 0.95 },
+          result: { value: 161.5, original_text: '161.5', confidence: 0.98 },
+          unit: { value: 'mg/dL', confidence: 0.98 },
+          mean: { value: 160.0, confidence: 0.96 },
+          sd: { value: 5.2, confidence: 0.96 },
+          source_text: 'TC Conc: 161.5 Mean: 160.0 SD: 5.20',
+          overall_confidence: 0.97,
+          needs_verification: false,
+          verification_reason: null
+        },
+        {
+          parameter: { value: 'Total Bilirubin / TBIL (CST-240)', original_text: 'TBIL', confidence: 0.97 },
+          level: { value: 'Level 1', original_text: 'L1', confidence: 0.95 },
+          lot: { value: 'LOT-CST1-2026A', confidence: 0.95 },
+          result: { value: 1.12, original_text: '1.12', confidence: 0.98 },
+          unit: { value: 'mg/dL', confidence: 0.98 },
+          mean: { value: 1.15, confidence: 0.95 },
+          sd: { value: 0.08, confidence: 0.95 },
+          source_text: 'TBIL Conc: 1.12 Mean: 1.15 SD: 0.08',
+          overall_confidence: 0.97,
+          needs_verification: false,
+          verification_reason: null
+        },
+        {
+          parameter: { value: 'Direct Bilirubin / DBIL (CST-240)', original_text: 'DBIL', confidence: 0.97 },
+          level: { value: 'Level 1', original_text: 'L1', confidence: 0.95 },
+          lot: { value: 'LOT-CST1-2026A', confidence: 0.95 },
+          result: { value: 0.34, original_text: '0.34', confidence: 0.98 },
+          unit: { value: 'mg/dL', confidence: 0.98 },
+          mean: { value: 0.35, confidence: 0.95 },
+          sd: { value: 0.04, confidence: 0.95 },
+          source_text: 'DBIL Conc: 0.34 Mean: 0.35 SD: 0.04',
+          overall_confidence: 0.97,
           needs_verification: false,
           verification_reason: null
         }
@@ -190,45 +281,64 @@ async function startServer() {
       const prompt = `Anda adalah Laboratory Quality Control (QC) & Medical Laboratory Vision OCR Specialist tingkat enterprise.
 Tugas Anda adalah membaca dan mengekstrak SELURUH data hasil pemeriksaan Quality Control (QC) dari foto struk termal / printout / layar monitor mesin laboratorium yang diunggah secara akurat.
 
-ATURAN PENGENALAN ALAT & ANALISIS GAMBAR (SANGAT PENTING):
-1. IDENTIFIKASI NAMA ALAT (ANALYZER):
-   - Jika foto adalah alat HEMATOLOGI / CBC (misal terdapat teks 'DIMIH 3980', 'DIRUI 3980', 'BCC-3900', atau parameter WBC, RBC, HGB, HCT, MCV, MCH, MCHC, PLT, LYM%, GRAN%, MID%, RDW, MPV):
-     -> Set "analyzer": "Dirui Dimih 3980 Automated Analyzer"
-   - Jika foto adalah alat KIMIA KLINIK (misal terdapat teks 'CST-240', 'CS-T240', 'DIRUI CHEM', atau parameter GLU, CHOL, UREA, CREA, SGOT, SGPT, UA, TRIG, TBIL, DBIL):
-     -> Set "analyzer": "Chemistry Analyzer CST-240 (Dirui CS-T240)"
-   - Jika foto Cobas c311 / Roche -> Set "analyzer": "Chemistry Analyzer A (Cobas c311)"
-   - Jika foto Sysmex XN-550 -> Set "analyzer": "Hematology Analyzer 5-Diff (Sysmex XN-550)"
-   ${instrumentHint ? `- PETUNJUK DARI PENGGUNA: "${instrumentHint}". Gunakan petunjuk ini untuk memastikan nama alat jika foto ambigu.` : ''}
+ATURAN PENGENALAN ALAT & ANALISIS GAMBAR (SANGAT PENTING & KRUSIAL):
+1. ATURAN MEMBEDAKAN ALAT KIMIA KLINIK (DIRUI CS-T240) VS HEMATOLOGI (DIRUI DIMIH 3980):
+   A. JIKA PADA FOTO TERDAPAT SALAH SATU KODE PARAMETER KIMIA KLINIK BERIKUT:
+      - ALB (Albumin)
+      - ALT / GPT (Alanine Aminotransferase / SGPT)
+      - AST / GOT (Aspartate Aminotransferase / SGOT)
+      - GLU-HK / GLU / GLUC (Glucose Hexokinase / Glukosa Darah)
+      - AU / UA (Uric Acid / Asam Urat)
+      - BUN / UREA / URE (Blood Urea Nitrogen / Ureum)
+      - CRE-E / CREA / CRE / CREAT (Creatinine Enzymatic / Jaffe / Kreatinin)
+      - TG / TRIG (Triglyceride / Trigliserida)
+      - TC / CHOL / T-CHO (Total Cholesterol / Kolesterol Total)
+      - TBIL / T-BIL (Total Bilirubin / Bilirubin Total)
+      - DBIL / D-BIL (Direct Bilirubin / Bilirubin Direk)
+      - TP (Total Protein)
+      - GGT, ALP, LDH, CK-MB, AMY, LIP, CA, P, MG, NA, K, CL
+      => MAKA NAMA ALAT DI "document.analyzer" HARUS MUTLAK: "Chemistry Analyzer CST-240 (Dirui CS-T240)"!
+      => JANGAN PERNAH MENYEBUTNYA SEBAGAI DIMIH 3980 ATAU HEMATOLOGI KARENA INI ADALAH TES KIMIA KLINIK CS-T240!
 
-2. ATURAN MEMBEDAKAN HASIL (RESULT) VS TARGET MEAN VS TARGET SD (SANGAT KRUSIAL):
-   - PADA STRUK DIRUI DIMIH 3980 & STRUK HEMATOLOGI:
-     * Kertas struk umumnya HANYA mencetak kode parameter diikuti ANGKA HASIL PENGUKURAN QC AKTUAL (contoh: "HGB 12,6", "WBC 7,20", "PLT 245", "RBC 4,52", "HCT 40,8").
-     * Angka tersebut (misalnya 12.6 untuk HGB) ADALAH MUTLAK HASIL / RESULT DARI PEMERIKSAAN QC!
-     * WAJIB masukkan angka ini ke field 'result.value' (angka desimal dengan titik) dan 'result.original_text' (teks asli seperti "12,6").
-     * JANGAN PERNAH memasukkan angka pada struk ke field 'mean.value' atau menggantinya dengan nilai target.
-     * Jika pada foto struk TIDAK tercantum kolom Target Mean dan Target SD terpisah, set 'mean: null' dan 'sd: null'. Sistem akan otomatis menghubungkannya dengan Master Data rujukan laboratorium.
-   - PADA STRUK DENGAN TABEL MULTI-KOLOM (seperti CST-240 / Cobas):
-     * "RESULT / CONC / NILAI PENGUKURAN" = HASIL PENGUKURAN KONTROL AKTUAL -> masukkan ke field 'result.value'.
-     * "TARGET / MEAN / X / X̄" = NILAI RERATA RUJUKAN KONTROL -> masukkan ke field 'mean.value'.
-     * "SD / 1SD / STD DEV" = STANDAR DEVIASI RUJUKAN KONTROL -> masukkan ke field 'sd.value'.
+   B. JIKA PADA FOTO ADALAH PARAMETER HEMATOLOGI (CBC):
+      - Parameter: WBC, RBC, HGB, HCT, MCV, MCH, MCHC, PLT, LYM%, GRAN%, MID%, RDW-CV, MPV
+      - Teks alat: DIMIH 3980, BCC-3900, DIRUI HEMATOLOGY
+      => Set "analyzer": "Dirui Dimih 3980 Automated Analyzer"
+
+   C. Jika foto Cobas c311 / Roche -> Set "analyzer": "Chemistry Analyzer A (Cobas c311)"
+   D. Jika foto Sysmex XN-550 -> Set "analyzer": "Hematology Analyzer 5-Diff (Sysmex XN-550)"
+   ${instrumentHint ? `- PETUNJUK PENGGUNA: "${instrumentHint}". Prioritaskan petunjuk ini.` : ''}
+
+2. ATURAN MEMBEDAKAN HASIL (RESULT) VS TARGET MEAN VS TARGET SD:
+   - PADA PARAMETER KIMIA DIRUI CS-T240 (Multi-Kolom atau Single Item):
+     * "RESULT / CONC / NILAI PENGUKURAN" = HASIL PENGUKURAN KONTROL AKTUAL -> masukkan ke 'result.value' (desimal dengan titik) dan 'result.original_text'.
+       Contoh: ALB 3.82, ALT 31.8, AST 35.4, GLU-HK 104.2, AU 5.18, BUN 18.6, CRE-E 1.23, TG 124.5, TC 161.5, TBIL 1.12, DBIL 0.34.
+     * "TARGET / MEAN / X / X̄" = NILAI TARGET MEAN RUJUKAN -> masukkan ke 'mean.value'.
+     * "SD / 1SD / STD DEV" = NILAI TARGET SD RUJUKAN -> masukkan ke 'sd.value'.
+     * Jika kolom target tidak dicetak, set 'mean: null' dan 'sd: null'.
+   - PADA STRUK HEMATOLOGI DIRUI DIMIH 3980 (1 Angka per Baris):
+     * Angka yang tercetak di sebelah kode parameter (misal "HGB 12,6", "WBC 7,20", "PLT 245") ADALAH MUTLAK HASIL / RESULT DARI PEMERIKSAAN QC! Masukkan ke 'result.value' dan 'result.original_text'.
 
 3. CONTOH EKSTRAKSI SPESIFIK:
-   - Contoh Struk Dirui Dimih 3980 (1 Angka per Baris):
-     "HGB   12,6" -> parameter: "HGB", result: { value: 12.6, original_text: "12,6" }, unit: "g/dL", mean: null, sd: null
-     "WBC   7,20" -> parameter: "WBC", result: { value: 7.20, original_text: "7,20" }, unit: "10^3/uL", mean: null, sd: null
-     "PLT   245"  -> parameter: "PLT", result: { value: 245, original_text: "245" }, unit: "10^3/uL", mean: null, sd: null
-     "RBC   4,52" -> parameter: "RBC", result: { value: 4.52, original_text: "4,52" }, unit: "10^6/uL", mean: null, sd: null
-     "HCT   40,8" -> parameter: "HCT", result: { value: 40.8, original_text: "40,8" }, unit: "%", mean: null, sd: null
-   - Contoh Struk CST-240 (Multi-Kolom):
-     "GLU   104.2  100.0  3.50" -> parameter: "Glucose", result: { value: 104.2, original_text: "104.2" }, mean: { value: 100.0 }, sd: { value: 3.50 }, unit: "mg/dL"
-     "CREA  1.23   1.25   0.06" -> parameter: "Creatinine", result: { value: 1.23, original_text: "1.23" }, mean: { value: 1.25 }, sd: { value: 0.06 }, unit: "mg/dL"
+   - Contoh Struk CST-240:
+     "ALB    3.82   3.85   0.12" -> parameter: "ALB", result: { value: 3.82, original_text: "3.82" }, mean: { value: 3.85 }, sd: { value: 0.12 }, unit: "g/dL"
+     "ALT    31.8   32.0   1.70" -> parameter: "ALT", result: { value: 31.8, original_text: "31.8" }, mean: { value: 32.0 }, sd: { value: 1.70 }, unit: "U/L"
+     "AST    35.4   35.0   1.80" -> parameter: "AST", result: { value: 35.4, original_text: "35.4" }, mean: { value: 35.0 }, sd: { value: 1.80 }, unit: "U/L"
+     "GLU-HK 104.2  104.0  3.50" -> parameter: "GLU-HK", result: { value: 104.2, original_text: "104.2" }, mean: { value: 104.0 }, sd: { value: 3.50 }, unit: "mg/dL"
+     "AU     5.18   5.20   0.25" -> parameter: "AU", result: { value: 5.18, original_text: "5.18" }, mean: { value: 5.20 }, sd: { value: 0.25 }, unit: "mg/dL"
+     "BUN    18.6   18.5   0.90" -> parameter: "BUN", result: { value: 18.6, original_text: "18.6" }, mean: { value: 18.5 }, sd: { value: 0.90 }, unit: "mg/dL"
+     "CRE-E  1.23   1.25   0.06" -> parameter: "CRE-E", result: { value: 1.23, original_text: "1.23" }, mean: { value: 1.25 }, sd: { value: 0.06 }, unit: "mg/dL"
+     "TG     124.5  125.0  5.00" -> parameter: "TG", result: { value: 124.5, original_text: "124.5" }, mean: { value: 125.0 }, sd: { value: 5.00 }, unit: "mg/dL"
+     "TC     161.5  160.0  5.20" -> parameter: "TC", result: { value: 161.5, original_text: "161.5" }, mean: { value: 160.0 }, sd: { value: 5.20 }, unit: "mg/dL"
+     "TBIL   1.12   1.15   0.08" -> parameter: "TBIL", result: { value: 1.12, original_text: "1.12" }, mean: { value: 1.15 }, sd: { value: 0.08 }, unit: "mg/dL"
+     "DBIL   0.34   0.35   0.04" -> parameter: "DBIL", result: { value: 0.34, original_text: "0.34" }, mean: { value: 0.35 }, sd: { value: 0.04 }, unit: "mg/dL"
 
 Format respon HARUS JSON valid:
 {
   "scan": { "scan_id": "...", "timestamp": "...", "image_id": "..." },
   "document": {
     "laboratory_name": "...",
-    "analyzer": "Dirui Dimih 3980 Automated Analyzer",
+    "analyzer": "Chemistry Analyzer CST-240 (Dirui CS-T240)",
     "date": "YYYY-MM-DD",
     "time": "HH:mm",
     "control_level": "Level 1",
@@ -236,14 +346,14 @@ Format respon HARUS JSON valid:
   },
   "results": [
     {
-      "parameter": { "value": "Hemoglobin", "original_text": "HGB", "confidence": 0.98 },
+      "parameter": { "value": "Albumin", "original_text": "ALB", "confidence": 0.98 },
       "level": { "value": "Level 1", "original_text": "L1", "confidence": 0.95 },
-      "lot": { "value": "LOT-EC8C-9912", "confidence": 0.95 },
-      "result": { "value": 13.5, "original_text": "13.5", "confidence": 0.98 },
+      "lot": { "value": "LOT-CST1-2026A", "confidence": 0.95 },
+      "result": { "value": 3.82, "original_text: "3.82", "confidence": 0.98 },
       "unit": { "value": "g/dL", "confidence": 0.95 },
-      "mean": { "value": 13.6, "confidence": 0.95 },
-      "sd": { "value": 0.40, "confidence": 0.95 },
-      "source_text": "HGB 13.5 Mean: 13.6 SD: 0.40",
+      "mean": { "value": 3.85, "confidence": 0.95 },
+      "sd": { "value": 0.12, "confidence": 0.95 },
+      "source_text": "ALB 3.82 Mean: 3.85 SD: 0.12",
       "overall_confidence": 0.98,
       "needs_verification": false,
       "verification_reason": null

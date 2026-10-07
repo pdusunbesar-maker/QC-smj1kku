@@ -58,18 +58,25 @@ export interface VerifiedQCItem {
 
 // Parameter alias dictionaries for common clinical laboratory tests (including CST-240 & Dirui Dimih 3980 codes)
 const PARAM_ALIASES: Record<string, string[]> = {
-  'glu': ['glucose', 'glu', 'gluc', 'glu-g', 'gds', 'gdp', 'glukosa', 'blood sugar', 'gula darah'],
-  'chol': ['cholesterol', 'chol', 'cho', 't-cho', 'tc', 'kolesterol', 'chol total', 'cholesterol total'],
+  'alb': ['alb', 'albumin', 'alb-bcp', 'alb-bcg', 'albumin cst-240'],
+  'alt': ['alt', 'sgpt', 'gpt', 'alt/sgpt', 'alanine aminotransferase', 'sgpt / alt'],
+  'ast': ['ast', 'sgot', 'got', 'ast/sgot', 'aspartate aminotransferase', 'sgot / ast'],
+  'glu-hk': ['glu-hk', 'gluhk', 'glu', 'gluc', 'glucose', 'hexokinase', 'glukosa', 'gds', 'gdp', 'gula darah'],
+  'glu': ['glucose', 'glu', 'gluc', 'glu-hk', 'glu-g', 'gds', 'gdp', 'glukosa', 'blood sugar', 'gula darah'],
+  'au': ['au', 'ua', 'uric acid', 'uric', 'asam urat', 'urate', 'asam urat / au'],
+  'ua': ['uric acid', 'ua', 'au', 'uric', 'asam urat', 'urate'],
+  'bun': ['bun', 'urea', 'ureum', 'blood urea nitrogen', 'ure', 'bun / urea'],
   'urea': ['urea', 'ureum', 'bun', 'blood urea nitrogen', 'ure'],
-  'creat': ['creatinine', 'crea', 'cre', 'creat', 'kreatinin', 'cr'],
-  'trig': ['triglyceride', 'trig', 'tg', 'trigliserida'],
-  'sgot': ['sgot', 'ast', 'got', 'aspartate aminotransferase'],
-  'sgpt': ['sgpt', 'alt', 'gpt', 'alanine aminotransferase'],
-  'ua': ['uric acid', 'ua', 'uric', 'asam urat', 'urate'],
-  'alb': ['albumin', 'alb'],
-  'tp': ['total protein', 'tp', 'protein total'],
-  'tbil': ['total bilirubin', 'tbil', 't-bil', 'bilirubin total', 'bili total'],
-  'dbil': ['direct bilirubin', 'dbil', 'd-bil', 'bilirubin direk'],
+  'cre-e': ['cre-e', 'cree', 'cre', 'crea', 'creatinine', 'creat', 'kreatinin', 'cr', 'creatinine enzymatic'],
+  'creat': ['creatinine', 'crea', 'cre-e', 'cre', 'creat', 'kreatinin', 'cr'],
+  'tg': ['tg', 'trig', 'triglyceride', 'trigliserida', 'trigliserida / tg'],
+  'tc': ['tc', 'chol', 't-cho', 'cholesterol', 'kolesterol', 'chol total', 'cholesterol total', 'total cholesterol / tc'],
+  'chol': ['cholesterol', 'chol', 'tc', 'cho', 't-cho', 'kolesterol', 'chol total', 'cholesterol total'],
+  'tbil': ['tbil', 't-bil', 'total bilirubin', 'bilirubin total', 'bili total', 't-bilirubin'],
+  'dbil': ['dbil', 'd-bil', 'direct bilirubin', 'bilirubin direk', 'bili direk', 'd-bilirubin'],
+  'tp': ['total protein', 'tp', 'protein total', 'prot total'],
+  'sgot': ['sgot', 'ast', 'got', 'aspartate aminotransferase', 'sgot / ast'],
+  'sgpt': ['sgpt', 'alt', 'gpt', 'alanine aminotransferase', 'sgpt / alt'],
   'hgb': ['hemoglobin', 'hgb', 'hb', 'haemoglobin'],
   'wbc': ['white blood cell', 'wbc', 'leukosit', 'leuko'],
   'rbc': ['red blood cell', 'rbc', 'eritrosit', 'erythrocyte'],
@@ -94,12 +101,10 @@ export function matchParameter(
   targetInstrumentId?: string
 ): Parameter | null {
   if (parameters.length === 0) return null;
-  if (!rawName && !rawCode) {
-    const instParams = targetInstrumentId ? parameters.filter(p => p.instrumentId === targetInstrumentId) : parameters;
-    return instParams[0] || parameters[0] || null;
-  }
   
-  const searchStr = `${rawName || ''} ${rawCode || ''}`.toLowerCase().trim();
+  const rawCodeClean = (rawCode || '').toUpperCase().trim();
+  const rawNameClean = (rawName || '').trim();
+  const searchStr = `${rawNameClean} ${rawCodeClean}`.toLowerCase().trim();
 
   // If instrument is specified, prioritize parameters attached to this instrument
   const primaryPool = targetInstrumentId 
@@ -110,6 +115,17 @@ export function matchParameter(
 
   // Search in prioritized pool first, then fallback pool
   for (const pool of [primaryPool, fallbackPool]) {
+    // 0. Exact Parameter Code match (High Sensitivity for ALB, ALT, AST, GLU-HK, AU, BUN, CRE-E, TG, TC, TBIL, DBIL)
+    if (rawCodeClean) {
+      const exactCodeMatch = pool.find(p => p.code.toUpperCase() === rawCodeClean);
+      if (exactCodeMatch) return exactCodeMatch;
+      
+      // Try stripping hyphens / suffixes (e.g. GLU-HK -> GLU, CRE-E -> CREAT)
+      const rootCode = rawCodeClean.split(/[-_]/)[0];
+      const rootMatch = pool.find(p => p.code.toUpperCase() === rootCode);
+      if (rootMatch) return rootMatch;
+    }
+
     // 1. Direct code or name match
     for (const p of pool) {
       if (p.code.toLowerCase() === searchStr || p.name.toLowerCase() === searchStr) {
@@ -117,10 +133,11 @@ export function matchParameter(
       }
     }
 
-    // 2. Exact word / code match in string
+    // 2. Exact word / code match in string tokens
+    const tokens = searchStr.split(/[\s,/_.-]+/).filter(Boolean);
     for (const p of pool) {
       const pCode = p.code.toLowerCase();
-      if (searchStr.split(/[\s,/_.-]+/).includes(pCode)) {
+      if (tokens.includes(pCode)) {
         return p;
       }
     }
@@ -134,7 +151,7 @@ export function matchParameter(
 
     // 4. Alias match
     for (const [key, aliases] of Object.entries(PARAM_ALIASES)) {
-      if (aliases.some(alias => searchStr.includes(alias) || searchStr.split(/[\s,/_.-]+/).includes(alias))) {
+      if (aliases.some(alias => searchStr === alias || tokens.includes(alias) || searchStr.includes(alias))) {
         const match = pool.find(p => p.code.toLowerCase() === key || p.id.toLowerCase().includes(key));
         if (match) return match;
       }
@@ -152,29 +169,46 @@ export function matchInstrument(
   if (!rawName) return instruments[0] || null;
   const searchStr = rawName.toLowerCase().trim();
 
-  // Dirui Dimih 3980 keywords
+  // CST-240 / CS-T240 / Chemistry Analyzer keywords & parameter codes (High Priority)
+  if (
+    searchStr.includes('cst-240') || 
+    searchStr.includes('cs-t240') || 
+    searchStr.includes('cst240') || 
+    searchStr.includes('cst 240') ||
+    searchStr.includes('cst') ||
+    searchStr.includes('glu-hk') ||
+    searchStr.includes('cre-e') ||
+    searchStr.includes('tbil') ||
+    searchStr.includes('dbil') ||
+    searchStr.includes('alb') ||
+    searchStr.includes('alt') ||
+    searchStr.includes('ast') ||
+    searchStr.includes('au') ||
+    searchStr.includes('bun') ||
+    searchStr.includes('tg') ||
+    searchStr.includes('tc') ||
+    searchStr.includes('sgot') ||
+    searchStr.includes('sgpt') ||
+    searchStr.includes('kimia') ||
+    searchStr.includes('chemistry') ||
+    (searchStr.includes('dirui') && !searchStr.includes('3980') && !searchStr.includes('dimih') && !searchStr.includes('bcc') && !searchStr.includes('cbc'))
+  ) {
+    const cst = instruments.find(i => i.id === 'inst-cst240' || i.name.toLowerCase().includes('cst') || i.model.toLowerCase().includes('cst') || i.name.toLowerCase().includes('chemistry'));
+    if (cst) return cst;
+  }
+
+  // Dirui Dimih 3980 keywords (ONLY for hematology)
   if (
     searchStr.includes('dimih') || 
     searchStr.includes('3980') || 
     searchStr.includes('dimih 3980') ||
     searchStr.includes('bcc-3900') ||
     searchStr.includes('cbc') ||
-    searchStr.includes('hematology')
+    searchStr.includes('hematology') ||
+    searchStr.includes('hematologi')
   ) {
     const dimih = instruments.find(i => i.id === 'inst-dirui-3980' || i.name.toLowerCase().includes('3980') || i.model.toLowerCase().includes('3980'));
     if (dimih) return dimih;
-  }
-
-  // CST-240 / CS-T240 Analyzer keywords
-  if (
-    searchStr.includes('cst-240') || 
-    searchStr.includes('cs-t240') || 
-    searchStr.includes('cst240') || 
-    searchStr.includes('cst 240') ||
-    (searchStr.includes('dirui') && (searchStr.includes('chem') || searchStr.includes('cst')))
-  ) {
-    const cst = instruments.find(i => i.id === 'inst-cst240' || i.name.toLowerCase().includes('cst') || i.model.toLowerCase().includes('cst'));
-    if (cst) return cst;
   }
 
   // General check across all instruments
@@ -237,9 +271,27 @@ export function buildVerifiedItemsFromAI(
   const lotNumber = documentMeta?.lot_number || (controlLevel === 'Level 2' ? 'LOT-CCM2-2026B' : 'LOT-CST1-2026A');
 
   // Determine the target instrument for this document
-  const defaultInst = (filterInstrumentId ? instruments.find(i => i.id === filterInstrumentId) : null) 
+  let defaultInst = (filterInstrumentId ? instruments.find(i => i.id === filterInstrumentId) : null) 
     || matchInstrument(docAnalyzer, instruments) 
     || instruments[0];
+
+  // High-Sensitivity Safeguard: Check if extracted items contain Clinical Chemistry codes
+  const rawTextCombined = (extractedResults || []).map(r => 
+    `${r.parameter?.value || ''} ${r.parameter?.original_text || ''} ${r.source_text || ''}`
+  ).join(' ').toUpperCase();
+
+  const hasChemistryCodes = ['ALB', 'ALT', 'AST', 'GLU-HK', 'GLU', 'AU', 'BUN', 'CRE-E', 'CREA', 'CREAT', 'TG', 'TC', 'TBIL', 'DBIL', 'TP', 'SGOT', 'SGPT', 'UREA', 'CHOL', 'UA'].some(code => {
+    const regex = new RegExp(`\\b${code.replace('-', '[-_]?')}\\b`, 'i');
+    return regex.test(rawTextCombined);
+  });
+
+  // If chemistry codes are detected in extracted text, FORCE target instrument to CST-240
+  if (hasChemistryCodes && (defaultInst?.id === 'inst-dirui-3980' || defaultInst?.id?.includes('hema'))) {
+    const cst = instruments.find(i => i.id === 'inst-cst240' || i.name.toLowerCase().includes('cst') || i.name.toLowerCase().includes('chem'));
+    if (cst) {
+      defaultInst = cst;
+    }
+  }
 
   // Fallback: If AI returned 0 items, generate rows ONLY from the detected instrument's parameters
   if (!extractedResults || !Array.isArray(extractedResults) || extractedResults.length === 0) {

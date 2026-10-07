@@ -16,6 +16,54 @@ export interface ParameterNumericSchema {
 // Enterprise clinical chemistry and hematology numeric validation schemas
 export const PARAMETER_SCHEMAS: Record<string, ParameterNumericSchema> = {
   // Clinical Chemistry (Dirui CS-T240 / Cobas c311)
+  'ALB': {
+    code: 'ALB',
+    name: 'Albumin',
+    unit: 'g/dL',
+    expectedType: 'float',
+    decimalPlaces: 2,
+    minPhysiological: 0.5,
+    maxPhysiological: 10.0,
+    typicalMeanRange: [2.0, 6.0],
+    typicalSDRange: [0.05, 0.30],
+    description: 'Albumin serum (rentang kontrol 2.0 - 6.0 g/dL)'
+  },
+  'ALT': {
+    code: 'ALT',
+    name: 'SGPT / ALT',
+    unit: 'U/L',
+    expectedType: 'float',
+    decimalPlaces: 1,
+    minPhysiological: 1,
+    maxPhysiological: 1500,
+    typicalMeanRange: [15, 250],
+    typicalSDRange: [1.0, 10.0],
+    description: 'Alanine Aminotransferase / SGPT (rentang kontrol 15 - 250 U/L)'
+  },
+  'AST': {
+    code: 'AST',
+    name: 'SGOT / AST',
+    unit: 'U/L',
+    expectedType: 'float',
+    decimalPlaces: 1,
+    minPhysiological: 1,
+    maxPhysiological: 1500,
+    typicalMeanRange: [15, 250],
+    typicalSDRange: [1.0, 10.0],
+    description: 'Aspartate Aminotransferase / SGOT (rentang kontrol 15 - 250 U/L)'
+  },
+  'GLU-HK': {
+    code: 'GLU-HK',
+    name: 'Glucose Hexokinase',
+    unit: 'mg/dL',
+    expectedType: 'float',
+    decimalPlaces: 1,
+    minPhysiological: 10,
+    maxPhysiological: 700,
+    typicalMeanRange: [70, 300],
+    typicalSDRange: [1.5, 12.0],
+    description: 'Glukosa Hexokinase CST-240 (rentang normal kontrol 70 - 300 mg/dL)'
+  },
   'GLU': {
     code: 'GLU',
     name: 'Glucose (Glukosa Darah)',
@@ -28,65 +76,17 @@ export const PARAMETER_SCHEMAS: Record<string, ParameterNumericSchema> = {
     typicalSDRange: [1.5, 12.0],
     description: 'Glukosa darah sewaktu/puasa (rentang normal kontrol 70 - 300 mg/dL)'
   },
-  'CHOL': {
-    code: 'CHOL',
-    name: 'Cholesterol Total',
-    unit: 'mg/dL',
-    expectedType: 'float',
-    decimalPlaces: 1,
-    minPhysiological: 20,
-    maxPhysiological: 800,
-    typicalMeanRange: [100, 350],
-    typicalSDRange: [2.0, 15.0],
-    description: 'Kolesterol total (rentang kontrol 100 - 350 mg/dL)'
-  },
-  'UREA': {
-    code: 'UREA',
-    name: 'Urea / Ureum Darah',
-    unit: 'mg/dL',
-    expectedType: 'float',
-    decimalPlaces: 1,
-    minPhysiological: 5,
-    maxPhysiological: 350,
-    typicalMeanRange: [15, 180],
-    typicalSDRange: [0.8, 8.0],
-    description: 'Ureum darah (rentang kontrol 15 - 180 mg/dL)'
-  },
-  'CREAT': {
-    code: 'CREAT',
-    name: 'Creatinine / Kreatinin',
+  'AU': {
+    code: 'AU',
+    name: 'Asam Urat / AU',
     unit: 'mg/dL',
     expectedType: 'float',
     decimalPlaces: 2,
-    minPhysiological: 0.1,
+    minPhysiological: 0.5,
     maxPhysiological: 30.0,
-    typicalMeanRange: [0.5, 8.0],
-    typicalSDRange: [0.02, 0.40],
-    description: 'Kreatinin serum (rentang kontrol 0.5 - 8.0 mg/dL, 2 desimal)'
-  },
-  'SGOT': {
-    code: 'SGOT',
-    name: 'SGOT / AST',
-    unit: 'U/L',
-    expectedType: 'float',
-    decimalPlaces: 1,
-    minPhysiological: 1,
-    maxPhysiological: 1500,
-    typicalMeanRange: [15, 250],
-    typicalSDRange: [1.0, 10.0],
-    description: 'Aspartate Aminotransferase (rentang kontrol 15 - 250 U/L)'
-  },
-  'SGPT': {
-    code: 'SGPT',
-    name: 'SGPT / ALT',
-    unit: 'U/L',
-    expectedType: 'float',
-    decimalPlaces: 1,
-    minPhysiological: 1,
-    maxPhysiological: 1500,
-    typicalMeanRange: [15, 250],
-    typicalSDRange: [1.0, 10.0],
-    description: 'Alanine Aminotransferase (rentang kontrol 15 - 250 U/L)'
+    typicalMeanRange: [2.0, 15.0],
+    typicalSDRange: [0.1, 0.8],
+    description: 'Asam urat / AU CST-240 (rentang kontrol 2.0 - 15.0 mg/dL, 2 desimal)'
   },
   'UA': {
     code: 'UA',
@@ -100,6 +100,66 @@ export const PARAMETER_SCHEMAS: Record<string, ParameterNumericSchema> = {
     typicalSDRange: [0.1, 0.8],
     description: 'Asam urat (rentang kontrol 2.0 - 15.0 mg/dL, 2 desimal)'
   },
+  'BUN': {
+    code: 'BUN',
+    name: 'Blood Urea Nitrogen / BUN',
+    unit: 'mg/dL',
+    expectedType: 'float',
+    decimalPlaces: 1,
+    minPhysiological: 3,
+    maxPhysiological: 250,
+    typicalMeanRange: [8, 120],
+    typicalSDRange: [0.5, 6.0],
+    description: 'Blood Urea Nitrogen CST-240 (rentang kontrol 8 - 120 mg/dL)'
+  },
+  'UREA': {
+    code: 'UREA',
+    name: 'Urea / Ureum Darah',
+    unit: 'mg/dL',
+    expectedType: 'float',
+    decimalPlaces: 1,
+    minPhysiological: 5,
+    maxPhysiological: 350,
+    typicalMeanRange: [15, 180],
+    typicalSDRange: [0.8, 8.0],
+    description: 'Ureum darah (rentang kontrol 15 - 180 mg/dL)'
+  },
+  'CRE-E': {
+    code: 'CRE-E',
+    name: 'Creatinine Enzymatic / CRE-E',
+    unit: 'mg/dL',
+    expectedType: 'float',
+    decimalPlaces: 2,
+    minPhysiological: 0.1,
+    maxPhysiological: 30.0,
+    typicalMeanRange: [0.5, 8.0],
+    typicalSDRange: [0.02, 0.40],
+    description: 'Kreatinin enzimatik CST-240 (rentang kontrol 0.5 - 8.0 mg/dL, 2 desimal)'
+  },
+  'CREAT': {
+    code: 'CREAT',
+    name: 'Creatinine / Kreatinin',
+    unit: 'mg/dL',
+    expectedType: 'float',
+    decimalPlaces: 2,
+    minPhysiological: 0.1,
+    maxPhysiological: 30.0,
+    typicalMeanRange: [0.5, 8.0],
+    typicalSDRange: [0.02, 0.40],
+    description: 'Kreatinin serum (rentang kontrol 0.5 - 8.0 mg/dL, 2 desimal)'
+  },
+  'TG': {
+    code: 'TG',
+    name: 'Triglyceride / TG',
+    unit: 'mg/dL',
+    expectedType: 'float',
+    decimalPlaces: 1,
+    minPhysiological: 10,
+    maxPhysiological: 1000,
+    typicalMeanRange: [50, 400],
+    typicalSDRange: [2.0, 18.0],
+    description: 'Trigliserida CST-240 (rentang kontrol 50 - 400 mg/dL)'
+  },
   'TRIG': {
     code: 'TRIG',
     name: 'Triglyceride / Trigliserida',
@@ -111,6 +171,30 @@ export const PARAMETER_SCHEMAS: Record<string, ParameterNumericSchema> = {
     typicalMeanRange: [50, 400],
     typicalSDRange: [2.0, 18.0],
     description: 'Trigliserida serum (rentang kontrol 50 - 400 mg/dL)'
+  },
+  'TC': {
+    code: 'TC',
+    name: 'Total Cholesterol / TC',
+    unit: 'mg/dL',
+    expectedType: 'float',
+    decimalPlaces: 1,
+    minPhysiological: 20,
+    maxPhysiological: 800,
+    typicalMeanRange: [100, 350],
+    typicalSDRange: [2.0, 15.0],
+    description: 'Kolesterol total TC CST-240 (rentang kontrol 100 - 350 mg/dL)'
+  },
+  'CHOL': {
+    code: 'CHOL',
+    name: 'Cholesterol Total',
+    unit: 'mg/dL',
+    expectedType: 'float',
+    decimalPlaces: 1,
+    minPhysiological: 20,
+    maxPhysiological: 800,
+    typicalMeanRange: [100, 350],
+    typicalSDRange: [2.0, 15.0],
+    description: 'Kolesterol total (rentang kontrol 100 - 350 mg/dL)'
   },
   'TBIL': {
     code: 'TBIL',
@@ -136,17 +220,29 @@ export const PARAMETER_SCHEMAS: Record<string, ParameterNumericSchema> = {
     typicalSDRange: [0.02, 0.30],
     description: 'Bilirubin direk (rentang kontrol 0.1 - 5.0 mg/dL)'
   },
-  'ALB': {
-    code: 'ALB',
-    name: 'Albumin',
-    unit: 'g/dL',
+  'SGOT': {
+    code: 'SGOT',
+    name: 'SGOT / AST',
+    unit: 'U/L',
     expectedType: 'float',
-    decimalPlaces: 2,
-    minPhysiological: 0.5,
-    maxPhysiological: 10.0,
-    typicalMeanRange: [2.0, 6.0],
-    typicalSDRange: [0.05, 0.30],
-    description: 'Albumin serum (rentang kontrol 2.0 - 6.0 g/dL)'
+    decimalPlaces: 1,
+    minPhysiological: 1,
+    maxPhysiological: 1500,
+    typicalMeanRange: [15, 250],
+    typicalSDRange: [1.0, 10.0],
+    description: 'Aspartate Aminotransferase (rentang kontrol 15 - 250 U/L)'
+  },
+  'SGPT': {
+    code: 'SGPT',
+    name: 'SGPT / ALT',
+    unit: 'U/L',
+    expectedType: 'float',
+    decimalPlaces: 1,
+    minPhysiological: 1,
+    maxPhysiological: 1500,
+    typicalMeanRange: [15, 250],
+    typicalSDRange: [1.0, 10.0],
+    description: 'Alanine Aminotransferase (rentang kontrol 15 - 250 U/L)'
   },
   'TP': {
     code: 'TP',
@@ -400,13 +496,20 @@ export function validateQCItemSchema(
   // Fallback match by name
   if (!schema && paramCodeOrName) {
     const lower = paramCodeOrName.toLowerCase();
-    if (lower.includes('gluc') || lower.includes('gula')) schema = PARAMETER_SCHEMAS['GLU'];
-    else if (lower.includes('chol') || lower.includes('koles')) schema = PARAMETER_SCHEMAS['CHOL'];
+    if (lower.includes('alb')) schema = PARAMETER_SCHEMAS['ALB'];
+    else if (lower.includes('alt') || lower.includes('sgpt') || lower.includes('gpt')) schema = PARAMETER_SCHEMAS['ALT'];
+    else if (lower.includes('ast') || lower.includes('sgot') || lower.includes('got')) schema = PARAMETER_SCHEMAS['AST'];
+    else if (lower.includes('glu-hk') || lower.includes('gluhk')) schema = PARAMETER_SCHEMAS['GLU-HK'];
+    else if (lower.includes('gluc') || lower.includes('gula') || lower.includes('glu')) schema = PARAMETER_SCHEMAS['GLU'];
+    else if (lower.includes('au') || lower.includes('asam urat') || lower.includes('uric') || lower.includes('ua')) schema = PARAMETER_SCHEMAS['AU'];
+    else if (lower.includes('bun') || lower.includes('blood urea')) schema = PARAMETER_SCHEMAS['BUN'];
     else if (lower.includes('urea') || lower.includes('ureum')) schema = PARAMETER_SCHEMAS['UREA'];
+    else if (lower.includes('cre-e') || lower.includes('cree')) schema = PARAMETER_SCHEMAS['CRE-E'];
     else if (lower.includes('crea') || lower.includes('kreat')) schema = PARAMETER_SCHEMAS['CREAT'];
-    else if (lower.includes('sgot') || lower.includes('ast')) schema = PARAMETER_SCHEMAS['SGOT'];
-    else if (lower.includes('sgpt') || lower.includes('alt')) schema = PARAMETER_SCHEMAS['SGPT'];
-    else if (lower.includes('asam urat') || lower.includes('uric')) schema = PARAMETER_SCHEMAS['UA'];
+    else if (lower.includes('tg') || lower.includes('trig')) schema = PARAMETER_SCHEMAS['TG'];
+    else if (lower.includes('tc') || lower.includes('chol') || lower.includes('koles')) schema = PARAMETER_SCHEMAS['TC'];
+    else if (lower.includes('tbil') || lower.includes('t-bil') || lower.includes('bilirubin total')) schema = PARAMETER_SCHEMAS['TBIL'];
+    else if (lower.includes('dbil') || lower.includes('d-bil') || lower.includes('bilirubin direk')) schema = PARAMETER_SCHEMAS['DBIL'];
     else if (lower.includes('hemo') || lower.includes('hgb') || lower.includes('hb')) schema = PARAMETER_SCHEMAS['HGB'];
     else if (lower.includes('leuko') || lower.includes('wbc')) schema = PARAMETER_SCHEMAS['WBC'];
     else if (lower.includes('trombo') || lower.includes('plt')) schema = PARAMETER_SCHEMAS['PLT'];
