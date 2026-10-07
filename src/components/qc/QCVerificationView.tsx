@@ -183,6 +183,36 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
     }));
   };
 
+  // Quick swap between Result and Target SD if columns were inverted on thermal receipt
+  const swapResultAndSD = (id: string) => {
+    setItems(prev => prev.map(item => {
+      if (item.id !== id) return item;
+      const newResult = item.targetSD;
+      const newSD = item.resultValue;
+      const mean = item.targetMean;
+
+      const zScore = calculateZScore(newResult, mean, newSD);
+      const sdPosition = formatSDPosition(zScore);
+
+      const history = existingResults.filter(r => r.parameterId === item.parameterId);
+      const { status, violations } = evaluateWestgardRules(
+        { id: item.id, value: newResult, mean, sd: newSD, zScore },
+        history,
+        DEFAULT_WESTGARD_RULES
+      );
+
+      return {
+        ...item,
+        resultValue: newResult,
+        targetSD: newSD,
+        zScore,
+        sdPosition,
+        status,
+        violations
+      };
+    }));
+  };
+
   const toggleSelectAll = (selected: boolean) => {
     setItems(prev => prev.map(i => ({ ...i, isSelected: selected })));
   };
@@ -648,7 +678,30 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
                     </div>
 
                     {/* Distinct 3-Column Box: RESULT vs TARGET MEAN vs TARGET SD vs Z-SCORE (Row 2) */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-slate-50/80 p-3 rounded-xl border border-slate-200">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px] text-slate-500 px-1">
+                        <span className="font-semibold text-slate-700">Penetapan Nilai QC:</span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => swapResultAndSD(item.id)}
+                            className="px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-[#0B5FA5] rounded-md font-bold text-[10px] border border-blue-200 flex items-center gap-1 transition-colors"
+                            title="Tukar posisi nilai Result dan SD jika terbalik pada struk"
+                          >
+                            <Sliders className="h-3 w-3" /> Tukar Result ⇄ SD
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => syncWithMasterData(item.id)}
+                            className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md font-bold text-[10px] border border-slate-300 flex items-center gap-1 transition-colors"
+                            title="Reset Mean dan SD ke konfigurasi Master Data"
+                          >
+                            <RefreshCw className="h-3 w-3" /> Reset ke Master Data
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-slate-50/80 p-3 rounded-xl border border-slate-200">
                       {/* Box 1: RESULT (Nilai Hasil Pengukuran Aktual dari Alat CST-240) */}
                       <div className="space-y-1 bg-white p-2.5 rounded-xl border-2 border-blue-500 shadow-sm">
                         <div className="flex justify-between items-center">
@@ -743,6 +796,7 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
                         </span>
                       </div>
                     </div>
+                  </div>
 
                     {/* Source Text / OCR Notice */}
                     {item.sourceText && (

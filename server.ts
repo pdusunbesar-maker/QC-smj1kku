@@ -107,37 +107,41 @@ async function startServer() {
       const prompt = `Anda adalah Laboratory Quality Control (QC) & Medical Laboratory Vision OCR Specialist tingkat enterprise.
 Tugas Anda adalah membaca dan mengekstrak SELURUH data hasil pemeriksaan Quality Control (QC) dari foto struk termal / printout alat analyzer / layar monitor mesin laboratorium (khususnya Chemistry Analyzer CST-240 / CS-T240 / Dirui, Cobas c311, Sysmex XN series, Mindray BS-240/BC-6800, dsb).
 
-PANDUAN EKSTRAKSI KOLOM & FIELD KRUSIAL:
-1. BACA SETIAP KOLOM SECARA TELITI:
-   - "Result" / "Conc" / "Conc." / "Val" / "Data" / "Hasil" = HASIL PENGUKURAN QC AKTUAL -> masukkan ke field 'result.value'.
-   - "Target" / "Mean" / "Expected" / "X̄" / "X" / "Center" = NILAI TARGET MEAN -> masukkan ke field 'mean.value'.
-   - "SD" / "1SD" / "Std Dev" / "Deviasi" = NILAI TARGET STANDAR DEVIASI -> masukkan ke field 'sd.value'.
-   - "Unit" / "Satuan" (mg/dL, g/dL, U/L, mmol/L, 10^3/uL) -> masukkan ke field 'unit.value'.
+ATURAN UTAMA MEMBEDAKAN HASIL (RESULT) VS TARGET MEAN VS TARGET SD:
+1. PADA SETIAP BARIS HASIL QC:
+   - "RESULT / CONC / NILAI PENGUKURAN" = HASIL PENGUKURAN KONTROL AKTUAL -> masukkan ke field 'result.value'.
+     * Angka ini adalah konsentrasi hasil tes (misal: Glucose 104.2, Cholesterol 165.4, Ureum 37.8, Creatinine 1.24).
+   - "TARGET / MEAN / X / X̄ / CENTER" = NILAI RERATA RUJUKAN KONTROL -> masukkan ke field 'mean.value'.
+     * Angka ini adalah target nilai tengah dari bahan kontrol (misal: Glucose 100.0, Cholesterol 160.0, Ureum 38.0, Creatinine 1.25).
+   - "SD / 1SD / STD DEV / DEVIASI" = STANDAR DEVIASI RUJUKAN KONTROL -> masukkan ke field 'sd.value'.
+     * Angka ini adalah nilai 1 Standar Deviasi, biasanya bernilai KECIL (misal: Glucose SD 3.5 - 5.0, Cholesterol SD 4.0 - 8.0, Ureum SD 1.2 - 2.5, Creatinine SD 0.04 - 0.15).
+   - "SDI / Z-SCORE / DEV" = Deviasi Standar Indeks (misal: +0.84, -0.50). JANGAN masukkan nilai SDI ke result.value atau sd.value!
 
-2. CONTOH FORMAT STRUK / PRINT-OUT ALAT CST-240 & CHEMISTRY ANALYZER:
-   - Jika format tabel: [ITEM]  [RESULT/CONC]  [TARGET/MEAN]  [SD/1SD]  [SDI]
-     Contoh: "GLU   104.2   100.0   4.20   +1.00"
-     -> parameter: "Glucose" (GLU)
-     -> result.value: 104.2 (HASIL PENGUKURAN)
-     -> mean.value: 100.0 (TARGET MEAN)
-     -> sd.value: 4.20 (TARGET SD)
-   - Jika format baris: "CHOL Result: 165.4 mg/dL  Target: 160.0  SD: 5.10"
-     -> parameter: "Cholesterol Total"
-     -> result.value: 165.4
-     -> mean.value: 160.0
-     -> sd.value: 5.10
+2. CONTOH URUTAN KOLOM TABEL CST-240 & ALAT KIMIA KLINIK:
+   Format: [ITEM]   [RESULT / CONC]   [TARGET / MEAN]   [SD / 1SD]   [SDI / Z]
+   Contoh: "GLU     104.20            100.00            4.20         +1.00"
+   -> parameter: "Glucose" (GLU)
+   -> result.value: 104.20 (KONSENTRASI HASIL PENGUKURAN)
+   -> mean.value: 100.00 (TARGET MEAN)
+   -> sd.value: 4.20 (TARGET SD)
 
-3. DETEKSI NAMA ALAT (ANALYZER):
+   Contoh: "CREA    1.23              1.25              0.06         -0.33"
+   -> parameter: "Creatinine" (CREA)
+   -> result.value: 1.23 (HASIL PENGUKURAN)
+   -> mean.value: 1.25 (TARGET MEAN)
+   -> sd.value: 0.06 (TARGET SD)
+
+3. JANGAN TERTUKAR:
+   - JANGAN pernah menukar nilai Result dengan nilai Target SD!
+   - Result selalu merepresentasikan konsentrasi analit, sedangkan SD selalu merepresentasikan margin standar deviasi.
+
+4. DETEKSI NAMA ALAT (ANALYZER):
    - CST-240 / CS-T240 / Dirui -> "Chemistry Analyzer CST-240"
    - Cobas / Roche -> "Cobas c311 Auto-Chemistry"
    - Sysmex -> "Sysmex XN-550 Hematology"
    - Mindray -> "Mindray Chemistry Analyzer"
 
-4. FORMAT NILAI ANGKA:
-   - Pertahankan angka desimal asli (misal 104.20 atau 3.50 atau 0.06). Jika terdapat koma desimal (misal 104,2 atau 3,5), konversikan ke titik (104.2 atau 3.5).
-   - JANGAN TERTUKAR antara nilai Result dengan nilai Target SD!
-
-Format respon JSON:
+Format respon HARUS JSON valid:
 {
   "scan": { "scan_id": "...", "timestamp": "...", "image_id": "..." },
   "document": {
@@ -153,11 +157,11 @@ Format respon JSON:
       "parameter": { "value": "Glucose", "original_text": "GLU", "confidence": 0.98 },
       "level": { "value": "Level 1", "original_text": "L1", "confidence": 0.95 },
       "lot": { "value": "LOT-CCM1-2026A", "confidence": 0.95 },
-      "result": { "value": 104.2, "original_text": "104.2", "confidence": 0.98 },
+      "result": { "value": 104.20, "original_text": "104.20", "confidence": 0.98 },
       "unit": { "value": "mg/dL", "confidence": 0.95 },
-      "mean": { "value": 100.0, "confidence": 0.95 },
+      "mean": { "value": 100.00, "confidence": 0.95 },
       "sd": { "value": 4.20, "confidence": 0.95 },
-      "source_text": "GLU Conc: 104.2 Target: 100.0 SD: 4.20",
+      "source_text": "GLU Conc: 104.20 Target: 100.00 SD: 4.20",
       "overall_confidence": 0.98,
       "needs_verification": false,
       "verification_reason": null

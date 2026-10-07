@@ -252,6 +252,32 @@ export function buildVerifiedItemsFromAI(
       targetMean = !isNaN(parsedMean) && parsedMean > 0 ? parsedMean : (matchedParam?.targetMean || 100);
     }
 
+    // Intelligent Auto-Detection & Fix for Inverted Result vs Target SD:
+    // (e.g., if OCR or printer placed SD in result column and result in SD column)
+    const code = (matchedParam?.code || paramName).toUpperCase();
+    if (
+      (code.includes('GLU') || code.includes('CHOL') || code.includes('TRIG')) &&
+      resultValue <= 15 && targetSD >= 40
+    ) {
+      const temp = resultValue;
+      resultValue = targetSD;
+      targetSD = temp;
+    } else if (
+      (code.includes('UREA') || code.includes('BUN') || code.includes('AST') || code.includes('ALT') || code.includes('SGOT') || code.includes('SGPT')) &&
+      resultValue <= 8 && targetSD >= 20
+    ) {
+      const temp = resultValue;
+      resultValue = targetSD;
+      targetSD = temp;
+    } else if (
+      (code.includes('CREA') || code.includes('TBIL') || code.includes('DBIL')) &&
+      resultValue < 0.25 && targetSD >= 0.5
+    ) {
+      const temp = resultValue;
+      resultValue = targetSD;
+      targetSD = temp;
+    }
+
     const unit = item.unit?.value || matchedParam?.unit || 'mg/dL';
     
     // Calculate Z-Score = (Result - Mean) / SD
