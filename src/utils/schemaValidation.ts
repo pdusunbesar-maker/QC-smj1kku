@@ -380,6 +380,12 @@ export function validateQCItemSchema(
   let mean = sanitizeNumericString(rawMean);
   let sd = sanitizeNumericString(rawSD);
 
+  // If result was 0 but mean had a number and SD was empty (e.g. single-value receipt like HGB 12,6)
+  if (val === 0 && mean > 0 && sd === 0) {
+    val = mean;
+    mean = masterParam?.targetMean || 0;
+  }
+
   // Find matching schema by code
   const searchKey = (masterParam?.code || paramCodeOrName || '').toUpperCase().trim();
   let schema: ParameterNumericSchema | undefined = undefined;
@@ -507,9 +513,14 @@ export function validateExtractedResultsBatch(
 
   const validatedResults = items.map((item) => {
     const rawParamName = item.parameter?.value || item.parameter?.original_text || '';
-    const rawVal = item.result?.value ?? item.result?.original_text ?? 0;
+    let rawVal = item.result?.value ?? item.result?.original_text ?? 0;
     const rawMean = item.mean?.value ?? item.mean?.original_text ?? 0;
     const rawSD = item.sd?.value ?? item.sd?.original_text ?? 0;
+
+    // If result was 0 but mean had the single number from receipt and SD was 0/null
+    if ((rawVal === 0 || rawVal === '0') && (rawSD === 0 || rawSD === '0' || rawSD == null) && rawMean) {
+      rawVal = rawMean;
+    }
 
     const matchedParam = parameters.find(p => 
       p.code.toLowerCase() === rawParamName.toLowerCase() ||

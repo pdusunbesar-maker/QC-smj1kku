@@ -329,31 +329,63 @@ export function buildVerifiedItemsFromAI(
       
       const itemLot = item.lot?.value || documentMeta?.lot_number || (itemLevel === 'Level 2' ? 'LOT-CCM2-2026B' : 'LOT-CST1-2026A');
       
-      // Result value: The actual measured QC concentration read from photo/struk
-      let rawResultValue: number;
-      if (typeof item.result?.value === 'number' && !isNaN(item.result.value)) {
+      // 1. Result value: The actual measured QC concentration read from photo/struk
+      let rawResultValue: number = 0;
+      if (typeof item.result?.value === 'number' && !isNaN(item.result.value) && item.result.value > 0) {
         rawResultValue = item.result.value;
-      } else {
-        const parsed = parseFloat(String(item.result?.original_text || '0').replace(/,/g, '.').replace(/[^0-9.-]/g, ''));
-        rawResultValue = !isNaN(parsed) && parsed > 0 ? parsed : (matchedParam?.targetMean || 100);
+      } else if (item.result?.original_text) {
+        const parsed = parseFloat(String(item.result.original_text).replace(/,/g, '.').replace(/[^0-9.-]/g, ''));
+        if (!isNaN(parsed) && parsed > 0) {
+          rawResultValue = parsed;
+        }
       }
 
-      // Target SD: Prioritize the OCR extracted SD value from the photo, fallback to Master Data
+      // If item.result was empty or not populated, check if item.mean held the single measurement from receipt
+      if (rawResultValue === 0 && typeof item.mean?.value === 'number' && !isNaN(item.mean.value) && item.mean.value > 0) {
+        if (!item.sd?.value || item.sd.value === 0) {
+          // Single number on receipt -> this is the measured QC result
+          rawResultValue = item.mean.value;
+        }
+      }
+
+      // If still 0, search for number in source_text or parameter text (e.g. "HGB 12,6")
+      if (rawResultValue === 0) {
+        const textToSearch = `${item.source_text || ''} ${item.parameter?.original_text || ''} ${item.parameter?.value || ''}`;
+        const matchNum = textToSearch.match(/(?:[0-9]+[.,][0-9]+|\b[0-9]+\b)/);
+        if (matchNum) {
+          const parsed = parseFloat(matchNum[0].replace(/,/g, '.'));
+          if (!isNaN(parsed) && parsed > 0) {
+            rawResultValue = parsed;
+          }
+        }
+      }
+
+      // Fallback only if no number could be found
+      if (rawResultValue === 0) {
+        rawResultValue = matchedParam?.targetMean || 100;
+      }
+
+      // 2. Target Mean: If explicitly printed in separate column distinct from result, use it; otherwise, use Master Data
+      let rawTargetMean: number;
+      if (
+        typeof item.mean?.value === 'number' && 
+        !isNaN(item.mean.value) && 
+        item.mean.value > 0 &&
+        item.mean.value !== rawResultValue &&
+        typeof item.sd?.value === 'number' &&
+        item.sd.value > 0
+      ) {
+        rawTargetMean = item.mean.value;
+      } else {
+        rawTargetMean = matchedParam?.targetMean || 100;
+      }
+
+      // 3. Target SD: If explicitly printed on receipt and > 0, use it; otherwise, use Master Data
       let rawTargetSD: number;
       if (typeof item.sd?.value === 'number' && !isNaN(item.sd.value) && item.sd.value > 0) {
         rawTargetSD = item.sd.value;
       } else {
-        const parsedSD = parseFloat(String(item.sd?.original_text || '0').replace(/,/g, '.').replace(/[^0-9.-]/g, ''));
-        rawTargetSD = !isNaN(parsedSD) && parsedSD > 0 ? parsedSD : (matchedParam?.targetSD || 3.5);
-      }
-
-      // Target Mean: Prioritize the OCR extracted Mean value from the photo if available, fallback to Master Data
-      let rawTargetMean: number;
-      if (typeof item.mean?.value === 'number' && !isNaN(item.mean.value) && item.mean.value > 0) {
-        rawTargetMean = item.mean.value;
-      } else {
-        const parsedMean = parseFloat(String(item.mean?.original_text || '0').replace(/,/g, '.').replace(/[^0-9.-]/g, ''));
-        rawTargetMean = !isNaN(parsedMean) && parsedMean > 0 ? parsedMean : (matchedParam?.targetMean || 100);
+        rawTargetSD = matchedParam?.targetSD || 3.5;
       }
 
       // Intelligent Auto-Detection & Fix for Inverted Result vs Target SD:

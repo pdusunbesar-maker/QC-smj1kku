@@ -36,6 +36,7 @@ import {
   NonConformity 
 } from '../../types';
 import { calculateQCStatistics } from '../../utils/qcCalculations';
+import { exportAuditReadyExcel } from '../../utils/excelExport';
 import { StorageService } from '../../services/storage';
 import { KopEditorModal } from '../common/KopEditorModal';
 
@@ -355,6 +356,25 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
     document.body.removeChild(link);
   };
 
+  // Enterprise Audit-Ready Excel (.XLSX) Export Handler with multi-sheets and auto-calculations
+  const handleExportAuditExcel = () => {
+    const selectedParamObj = parameters.find(p => p.id === selectedParameterId);
+    const selectedInstObj = instruments.find(i => i.id === selectedInstrumentId);
+
+    exportAuditReadyExcel({
+      labInfo,
+      qcResults: filteredQC,
+      parameters,
+      instruments,
+      capas: filteredCAPA,
+      nonConformities: filteredNC,
+      startDate,
+      endDate,
+      selectedParamName: selectedParamObj ? `${selectedParamObj.name} (${selectedParamObj.code})` : undefined,
+      selectedInstrumentName: selectedInstObj ? selectedInstObj.name : undefined
+    });
+  };
+
   const printableDocRef = useRef<HTMLDivElement>(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
@@ -465,13 +485,25 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             <span>Edit KOP Surat & Pimpinan</span>
           </button>
 
+          {/* Excel XLSX Multi-sheet Export */}
+          <button
+            type="button"
+            onClick={handleExportAuditExcel}
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-emerald-900 bg-emerald-100 hover:bg-emerald-200 border border-emerald-400 rounded-lg shadow-2xs transition-colors"
+            title="Ekspor Workbook Excel (.xlsx) Multi-Sheet Lengkap dengan Auto-Perhitungan Statistik QC, Log Westgard, CAPA, & NC"
+          >
+            <FileSpreadsheet className="h-4 w-4 text-emerald-800" />
+            <span>Ekspor Excel (.XLSX)</span>
+          </button>
+
           <button
             type="button"
             onClick={handleExportCSV}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-lg shadow-2xs transition-colors"
+            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded-lg shadow-2xs transition-colors"
+            title="Ekspor data tabel aktif ke format teks .CSV"
           >
-            <Download className="h-4 w-4 text-emerald-700" />
-            <span>Ekspor Excel (.CSV)</span>
+            <Download className="h-4 w-4 text-slate-600" />
+            <span>CSV</span>
           </button>
 
           <button

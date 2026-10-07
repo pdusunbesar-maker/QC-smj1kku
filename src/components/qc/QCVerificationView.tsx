@@ -20,7 +20,11 @@ import {
   Sliders,
   RefreshCw,
   Filter,
-  ShieldCheck
+  ShieldCheck,
+  Layers,
+  ChevronLeft,
+  ChevronRight,
+  Images
 } from 'lucide-react';
 import { Parameter, Instrument, QCResult, WestgardViolation, QCStatus } from '../../types';
 import { calculateZScore, formatSDPosition, evaluateWestgardRules, DEFAULT_WESTGARD_RULES } from '../../utils/qcCalculations';
@@ -56,6 +60,17 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
   const [isSavedSuccess, setIsSavedSuccess] = useState<boolean>(false);
   const [savedCount, setSavedCount] = useState<number>(0);
   const [lastSavedItems, setLastSavedItems] = useState<QCResult[]>([]);
+  const [activeBatchImageIndex, setActiveBatchImageIndex] = useState<number>(0);
+
+  // Batch images array
+  const batchImages: string[] = useMemo(() => {
+    if (documentMeta?.isBatch && Array.isArray(documentMeta.batchImages) && documentMeta.batchImages.length > 0) {
+      return documentMeta.batchImages;
+    }
+    return previewUrl ? [previewUrl] : [];
+  }, [documentMeta, previewUrl]);
+
+  const currentPreviewUrl = batchImages[activeBatchImageIndex] || previewUrl;
 
   // Detected instrument from scan
   const detectedInstrumentId = useMemo(() => {
@@ -467,7 +482,15 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
             >
               <ArrowLeft className="h-5 w-5" />
             </button>
-            <h1 className="text-xl font-bold text-slate-900">Verifikasi & Sinkronisasi Hasil QC dari Foto</h1>
+            <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+              <span>Verifikasi & Sinkronisasi Hasil QC dari Foto</span>
+              {documentMeta?.isBatch && (
+                <span className="text-xs bg-blue-600 text-white font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-xs">
+                  <Layers className="h-3.5 w-3.5" />
+                  <span>Batch {documentMeta.totalImages || batchImages.length} Struk</span>
+                </span>
+              )}
+            </h1>
           </div>
           <p className="text-xs text-slate-500 pl-8">
             Nilai <strong>Hasil (Result/Conc)</strong> dibaca dari alat, sementara <strong>Target Mean</strong> & <strong>Target SD</strong> otomatis disinkronkan dengan Master Data alat terkait.
@@ -559,7 +582,11 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-[#0B5FA5]" />
-                <span>Foto Struk Alat Asli</span>
+                <span>
+                  {batchImages.length > 1 
+                    ? `Foto Struk #${activeBatchImageIndex + 1} dari ${batchImages.length}` 
+                    : 'Foto Struk Alat Asli'}
+                </span>
               </h3>
               <div className="flex items-center gap-1">
                 <button
@@ -592,15 +619,57 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
               </div>
             </div>
 
+            {/* Batch Photo Pager Bar */}
+            {batchImages.length > 1 && (
+              <div className="bg-blue-50/80 border border-blue-200 rounded-xl p-2 flex items-center justify-between gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setActiveBatchImageIndex(prev => Math.max(0, prev - 1))}
+                  disabled={activeBatchImageIndex === 0}
+                  className="p-1 rounded-lg bg-white border border-blue-200 text-blue-700 disabled:opacity-40 hover:bg-blue-100 transition-colors"
+                  title="Foto Sebelumnya"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+
+                <div className="flex items-center gap-1.5 overflow-x-auto py-0.5">
+                  {batchImages.map((_, imgIdx) => (
+                    <button
+                      key={imgIdx}
+                      type="button"
+                      onClick={() => setActiveBatchImageIndex(imgIdx)}
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${
+                        activeBatchImageIndex === imgIdx
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : 'bg-white text-blue-800 border border-blue-200 hover:bg-blue-100'
+                      }`}
+                    >
+                      Struk #{imgIdx + 1}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveBatchImageIndex(prev => Math.min(batchImages.length - 1, prev + 1))}
+                  disabled={activeBatchImageIndex === batchImages.length - 1}
+                  className="p-1 rounded-lg bg-white border border-blue-200 text-blue-700 disabled:opacity-40 hover:bg-blue-100 transition-colors"
+                  title="Foto Selanjutnya"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+
             <div className="bg-slate-900 rounded-xl overflow-hidden min-h-[380px] max-h-[560px] flex items-center justify-center p-2 relative">
-              {previewUrl ? (
+              {currentPreviewUrl ? (
                 <div 
                   className="transition-transform duration-150 ease-out origin-center"
                   style={{ transform: `scale(${zoomLevel})` }}
                 >
                   <img 
-                    src={previewUrl} 
-                    alt="QC Result Printout" 
+                    src={currentPreviewUrl} 
+                    alt={`QC Printout ${activeBatchImageIndex + 1}`} 
                     className="max-h-[520px] w-auto object-contain rounded" 
                   />
                 </div>

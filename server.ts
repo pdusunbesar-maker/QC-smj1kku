@@ -200,23 +200,28 @@ ATURAN PENGENALAN ALAT & ANALISIS GAMBAR (SANGAT PENTING):
    - Jika foto Sysmex XN-550 -> Set "analyzer": "Hematology Analyzer 5-Diff (Sysmex XN-550)"
    ${instrumentHint ? `- PETUNJUK DARI PENGGUNA: "${instrumentHint}". Gunakan petunjuk ini untuk memastikan nama alat jika foto ambigu.` : ''}
 
-2. ATURAN MEMBEDAKAN HASIL (RESULT) VS TARGET MEAN VS TARGET SD:
-   - "RESULT / CONC / NILAI PENGUKURAN" = HASIL PENGUKURAN KONTROL AKTUAL -> masukkan ke field 'result.value'.
-     * Contoh: HGB 13.5, WBC 7.2, PLT 245, Glucose 104.2, Creatinine 1.23.
-   - "TARGET / MEAN / X / X̄ / CENTER" = NILAI RERATA RUJUKAN KONTROL -> masukkan ke field 'mean.value'.
-     * Contoh: HGB 13.6, WBC 7.0, PLT 250, Glucose 100.0, Creatinine 1.25.
-   - "SD / 1SD / STD DEV / DEVIASI" = STANDAR DEVIASI RUJUKAN KONTROL -> masukkan ke field 'sd.value'.
-     * Contoh: HGB 0.4, WBC 0.5, PLT 15, Glucose 3.5, Creatinine 0.06.
-   - "SDI / Z-SCORE / DEV" = Deviasi Standar Indeks (misal: +0.84, -0.50). JANGAN masukkan nilai SDI ke result.value atau sd.value!
+2. ATURAN MEMBEDAKAN HASIL (RESULT) VS TARGET MEAN VS TARGET SD (SANGAT KRUSIAL):
+   - PADA STRUK DIRUI DIMIH 3980 & STRUK HEMATOLOGI:
+     * Kertas struk umumnya HANYA mencetak kode parameter diikuti ANGKA HASIL PENGUKURAN QC AKTUAL (contoh: "HGB 12,6", "WBC 7,20", "PLT 245", "RBC 4,52", "HCT 40,8").
+     * Angka tersebut (misalnya 12.6 untuk HGB) ADALAH MUTLAK HASIL / RESULT DARI PEMERIKSAAN QC!
+     * WAJIB masukkan angka ini ke field 'result.value' (angka desimal dengan titik) dan 'result.original_text' (teks asli seperti "12,6").
+     * JANGAN PERNAH memasukkan angka pada struk ke field 'mean.value' atau menggantinya dengan nilai target.
+     * Jika pada foto struk TIDAK tercantum kolom Target Mean dan Target SD terpisah, set 'mean: null' dan 'sd: null'. Sistem akan otomatis menghubungkannya dengan Master Data rujukan laboratorium.
+   - PADA STRUK DENGAN TABEL MULTI-KOLOM (seperti CST-240 / Cobas):
+     * "RESULT / CONC / NILAI PENGUKURAN" = HASIL PENGUKURAN KONTROL AKTUAL -> masukkan ke field 'result.value'.
+     * "TARGET / MEAN / X / X̄" = NILAI RERATA RUJUKAN KONTROL -> masukkan ke field 'mean.value'.
+     * "SD / 1SD / STD DEV" = STANDAR DEVIASI RUJUKAN KONTROL -> masukkan ke field 'sd.value'.
 
-3. CONTOH EKSTRAKSI HASIL:
-   - Jika foto Dimih 3980:
-     "WBC   7.20   7.00   0.50" -> parameter: "WBC", result.value: 7.20, mean.value: 7.00, sd.value: 0.50, unit: "10^3/uL"
-     "HGB   13.5   13.6   0.40" -> parameter: "HGB", result.value: 13.5, mean.value: 13.6, sd.value: 0.40, unit: "g/dL"
-     "PLT   245    250    15.0" -> parameter: "PLT", result.value: 245, mean.value: 250, sd.value: 15.0, unit: "10^3/uL"
-   - Jika foto CST-240:
-     "GLU   104.2  100.0  3.50" -> parameter: "Glucose", result.value: 104.2, mean.value: 100.0, sd.value: 3.50, unit: "mg/dL"
-     "CREA  1.23   1.25   0.06" -> parameter: "Creatinine", result.value: 1.23, mean.value: 1.25, sd.value: 0.06, unit: "mg/dL"
+3. CONTOH EKSTRAKSI SPESIFIK:
+   - Contoh Struk Dirui Dimih 3980 (1 Angka per Baris):
+     "HGB   12,6" -> parameter: "HGB", result: { value: 12.6, original_text: "12,6" }, unit: "g/dL", mean: null, sd: null
+     "WBC   7,20" -> parameter: "WBC", result: { value: 7.20, original_text: "7,20" }, unit: "10^3/uL", mean: null, sd: null
+     "PLT   245"  -> parameter: "PLT", result: { value: 245, original_text: "245" }, unit: "10^3/uL", mean: null, sd: null
+     "RBC   4,52" -> parameter: "RBC", result: { value: 4.52, original_text: "4,52" }, unit: "10^6/uL", mean: null, sd: null
+     "HCT   40,8" -> parameter: "HCT", result: { value: 40.8, original_text: "40,8" }, unit: "%", mean: null, sd: null
+   - Contoh Struk CST-240 (Multi-Kolom):
+     "GLU   104.2  100.0  3.50" -> parameter: "Glucose", result: { value: 104.2, original_text: "104.2" }, mean: { value: 100.0 }, sd: { value: 3.50 }, unit: "mg/dL"
+     "CREA  1.23   1.25   0.06" -> parameter: "Creatinine", result: { value: 1.23, original_text: "1.23" }, mean: { value: 1.25 }, sd: { value: 0.06 }, unit: "mg/dL"
 
 Format respon HARUS JSON valid:
 {
