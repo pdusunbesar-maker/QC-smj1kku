@@ -61,6 +61,7 @@ function AppContent() {
   const [isUserProfileModalOpen, setIsUserProfileModalOpen] = useState(false);
   const [scannedResults, setScannedResults] = useState<any[]>([]);
   const [scanPreviewUrl, setScanPreviewUrl] = useState<string | null>(null);
+  const [scannedDocumentMeta, setScannedDocumentMeta] = useState<any>(null);
 
   // Desktop sidebar collapse state persisted in localStorage
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
@@ -213,9 +214,10 @@ function AppContent() {
 
             {/* 3. Scan QC View */}
             {activeTab === 'qc-scan' && (
-              <QCScanView onScanComplete={(results, previewUrl) => {
+              <QCScanView onScanComplete={(results, previewUrl, docMeta) => {
                 setScannedResults(results);
                 setScanPreviewUrl(previewUrl);
+                setScannedDocumentMeta(docMeta);
                 setActiveTab('qc-verification');
               }} />
             )}
@@ -225,13 +227,17 @@ function AppContent() {
               <QCVerificationView 
                 extractedData={scannedResults}
                 previewUrl={scanPreviewUrl}
+                documentMeta={scannedDocumentMeta}
                 parameters={parameters}
                 instruments={instruments}
-                onSave={(data) => {
-                  console.log('Save verified results:', data);
-                  // Here we would map and save to qcResults
-                  setActiveTab('qc-input');
+                existingResults={qcResults}
+                onSave={(savedData) => {
+                  setQcResults(StorageService.getQCResults());
+                  setNotifications(StorageService.getNotifications());
+                  setAuditLogs(StorageService.getAuditLogs());
                 }}
+                onRetakeScan={() => setActiveTab('qc-scan')}
+                onNavigateToTab={handleNavigateToTab}
               />
             )}
 
