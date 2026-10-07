@@ -160,20 +160,22 @@ Format respon HARUS JSON valid dengan struktur:
             }
           });
 
-          // Multimodal call using gemini-2.5-flash as primary fast vision model
+          // Multimodal call using gemini-3.8-flash with proper parts object
+          const imagePart = {
+            inlineData: {
+              data: cleanBase64,
+              mimeType: cleanMime
+            }
+          };
+          const textPart = {
+            text: prompt
+          };
+
           const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: [
-              {
-                inlineData: {
-                  data: cleanBase64,
-                  mimeType: cleanMime
-                }
-              },
-              {
-                text: prompt
-              }
-            ],
+            model: "gemini-3.8-flash",
+            contents: {
+              parts: [imagePart, textPart]
+            },
             config: {
               responseMimeType: "application/json"
             }
@@ -186,8 +188,7 @@ Format respon HARUS JSON valid dengan struktur:
             ocrResult = JSON.parse(rawText);
           }
         } catch (geminiErr: any) {
-          console.warn('Gemini vision API error, falling back to smart extractor:', geminiErr?.message || geminiErr);
-          // Try alternative model if gemini-2.5-flash encounters an issue
+          console.warn('Gemini vision API error with gemini-3.8-flash, trying gemini-flash-latest:', geminiErr?.message || geminiErr);
           try {
             const ai = new GoogleGenAI({
               apiKey: apiKey,
@@ -195,19 +196,20 @@ Format respon HARUS JSON valid dengan struktur:
                 headers: { 'User-Agent': 'aistudio-build' }
               }
             });
+            const imagePart = {
+              inlineData: {
+                data: cleanBase64,
+                mimeType: cleanMime
+              }
+            };
+            const textPart = {
+              text: prompt
+            };
             const response2 = await ai.models.generateContent({
-              model: "gemini-3.8-flash",
-              contents: [
-                {
-                  inlineData: {
-                    data: cleanBase64,
-                    mimeType: cleanMime
-                  }
-                },
-                {
-                  text: prompt
-                }
-              ],
+              model: "gemini-flash-latest",
+              contents: {
+                parts: [imagePart, textPart]
+              },
               config: {
                 responseMimeType: "application/json"
               }
@@ -217,8 +219,8 @@ Format respon HARUS JSON valid dengan struktur:
             if (rawText2) {
               ocrResult = JSON.parse(rawText2);
             }
-          } catch (retryErr) {
-            console.warn('Second Gemini model retry also failed, using smart fallback');
+          } catch (retryErr: any) {
+            console.warn('Retry model also encountered issue, proceeding with smart laboratory fallback:', retryErr?.message || retryErr);
           }
         }
       }
