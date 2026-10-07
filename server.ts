@@ -17,7 +17,7 @@ async function startServer() {
     const hint = (instrumentHint || '').toLowerCase();
 
     // 1. If Dimih 3980 is requested / hinted
-    if (hint.includes('dimih') || hint.includes('3980')) {
+    if (hint.includes('dimih') || hint.includes('3980') || hint.includes('hema') || hint.includes('cbc')) {
       return {
         scan: {
           scan_id: `SCAN-${Date.now().toString().slice(-6)}`,
@@ -34,39 +34,63 @@ async function startServer() {
         },
         results: [
           {
-            parameter: { value: 'Hemoglobin', original_text: 'HGB', confidence: 0.97 },
+            parameter: { value: 'Leukosit / WBC', original_text: 'WBC', confidence: 0.98 },
             level: { value: 'Level 1', original_text: 'L1', confidence: 0.95 },
             lot: { value: 'LOT-EC8C-9912', confidence: 0.95 },
-            result: { value: 13.5, original_text: '13.5 g/dL', confidence: 0.98 },
-            unit: { value: 'g/dL', confidence: 0.98 },
-            mean: { value: 13.6, confidence: 0.95 },
-            sd: { value: 0.4, confidence: 0.95 },
-            source_text: 'HGB 13.5 g/dL [13.6 +/- 0.4]',
-            overall_confidence: 0.97,
-            needs_verification: false
-          },
-          {
-            parameter: { value: 'Leukosit / WBC', original_text: 'WBC', confidence: 0.96 },
-            level: { value: 'Level 1', original_text: 'L1', confidence: 0.95 },
-            lot: { value: 'LOT-EC8C-9912', confidence: 0.95 },
-            result: { value: 7.2, original_text: '7.2 10^3/uL', confidence: 0.97 },
+            result: { value: 7.2, original_text: '7.2 10^3/uL', confidence: 0.98 },
             unit: { value: '10^3/uL', confidence: 0.98 },
             mean: { value: 7.0, confidence: 0.95 },
             sd: { value: 0.5, confidence: 0.95 },
             source_text: 'WBC 7.2 10^3/uL [7.0 +/- 0.5]',
+            overall_confidence: 0.98,
+            needs_verification: false
+          },
+          {
+            parameter: { value: 'Eritrosit / RBC', original_text: 'RBC', confidence: 0.97 },
+            level: { value: 'Level 1', original_text: 'L1', confidence: 0.95 },
+            lot: { value: 'LOT-EC8C-9912', confidence: 0.95 },
+            result: { value: 4.52, original_text: '4.52 10^6/uL', confidence: 0.98 },
+            unit: { value: '10^6/uL', confidence: 0.98 },
+            mean: { value: 4.50, confidence: 0.95 },
+            sd: { value: 0.20, confidence: 0.95 },
+            source_text: 'RBC 4.52 10^6/uL [4.50 +/- 0.20]',
+            overall_confidence: 0.97,
+            needs_verification: false
+          },
+          {
+            parameter: { value: 'Hemoglobin / HGB', original_text: 'HGB', confidence: 0.98 },
+            level: { value: 'Level 1', original_text: 'L1', confidence: 0.95 },
+            lot: { value: 'LOT-EC8C-9912', confidence: 0.95 },
+            result: { value: 13.5, original_text: '13.5 g/dL', confidence: 0.99 },
+            unit: { value: 'g/dL', confidence: 0.98 },
+            mean: { value: 13.6, confidence: 0.95 },
+            sd: { value: 0.4, confidence: 0.95 },
+            source_text: 'HGB 13.5 g/dL [13.6 +/- 0.4]',
+            overall_confidence: 0.98,
+            needs_verification: false
+          },
+          {
+            parameter: { value: 'Hematokrit / HCT', original_text: 'HCT', confidence: 0.96 },
+            level: { value: 'Level 1', original_text: 'L1', confidence: 0.95 },
+            lot: { value: 'LOT-EC8C-9912', confidence: 0.95 },
+            result: { value: 40.8, original_text: '40.8 %', confidence: 0.97 },
+            unit: { value: '%', confidence: 0.98 },
+            mean: { value: 40.5, confidence: 0.95 },
+            sd: { value: 1.8, confidence: 0.95 },
+            source_text: 'HCT 40.8 % [40.5 +/- 1.8]',
             overall_confidence: 0.96,
             needs_verification: false
           },
           {
-            parameter: { value: 'Trombosit / PLT', original_text: 'PLT', confidence: 0.95 },
+            parameter: { value: 'Trombosit / PLT', original_text: 'PLT', confidence: 0.97 },
             level: { value: 'Level 1', original_text: 'L1', confidence: 0.95 },
             lot: { value: 'LOT-EC8C-9912', confidence: 0.95 },
-            result: { value: 245, original_text: '245 10^3/uL', confidence: 0.96 },
+            result: { value: 245, original_text: '245 10^3/uL', confidence: 0.98 },
             unit: { value: '10^3/uL', confidence: 0.98 },
             mean: { value: 250, confidence: 0.95 },
             sd: { value: 15, confidence: 0.95 },
             source_text: 'PLT 245 10^3/uL [250 +/- 15]',
-            overall_confidence: 0.95,
+            overall_confidence: 0.97,
             needs_verification: false
           }
         ]
@@ -90,7 +114,7 @@ async function startServer() {
       },
       results: [
         {
-          parameter: { value: 'Glucose', original_text: 'GLU', confidence: 0.98 },
+          parameter: { value: 'Glucose (Glukosa Darah CST-240)', original_text: 'GLU', confidence: 0.98 },
           level: { value: 'Level 1', original_text: 'L1', confidence: 0.95 },
           lot: { value: 'LOT-CST1-2026A', confidence: 0.95 },
           result: { value: 104.2, original_text: 'Conc: 104.2', confidence: 0.99 },
@@ -103,7 +127,7 @@ async function startServer() {
           verification_reason: null
         },
         {
-          parameter: { value: 'Cholesterol Total', original_text: 'CHOL', confidence: 0.97 },
+          parameter: { value: 'Cholesterol Total (CST-240)', original_text: 'CHOL', confidence: 0.97 },
           level: { value: 'Level 1', original_text: 'L1', confidence: 0.95 },
           lot: { value: 'LOT-CST1-2026A', confidence: 0.95 },
           result: { value: 161.5, original_text: 'Conc: 161.5', confidence: 0.98 },
@@ -116,7 +140,7 @@ async function startServer() {
           verification_reason: null
         },
         {
-          parameter: { value: 'Urea / Ureum', original_text: 'UREA', confidence: 0.96 },
+          parameter: { value: 'Urea / Ureum (CST-240)', original_text: 'UREA', confidence: 0.96 },
           level: { value: 'Level 1', original_text: 'L1', confidence: 0.94 },
           lot: { value: 'LOT-CST1-2026A', confidence: 0.95 },
           result: { value: 37.6, original_text: 'Conc: 37.6', confidence: 0.98 },
@@ -129,7 +153,7 @@ async function startServer() {
           verification_reason: null
         },
         {
-          parameter: { value: 'Creatinine', original_text: 'CREA', confidence: 0.96 },
+          parameter: { value: 'Creatinine (CST-240)', original_text: 'CREA', confidence: 0.96 },
           level: { value: 'Level 1', original_text: 'L1', confidence: 0.94 },
           lot: { value: 'LOT-CST1-2026A', confidence: 0.95 },
           result: { value: 1.23, original_text: 'Conc: 1.23', confidence: 0.98 },
@@ -164,50 +188,42 @@ async function startServer() {
         : 'image/jpeg';
 
       const prompt = `Anda adalah Laboratory Quality Control (QC) & Medical Laboratory Vision OCR Specialist tingkat enterprise.
-Tugas Anda adalah membaca dan mengekstrak HANYA data hasil pemeriksaan Quality Control (QC) yang BENAR-BENAR TERCETAK pada foto struk / printout alat analyzer / monitor mesin laboratorium (khususnya Chemistry Analyzer CST-240 / CS-T240 / Dirui, Cobas c311, Sysmex XN series, Dirui Dimih 3980, Mindray BS-240, dsb).
+Tugas Anda adalah membaca dan mengekstrak SELURUH data hasil pemeriksaan Quality Control (QC) dari foto struk termal / printout / layar monitor mesin laboratorium yang diunggah secara akurat.
 
-ATURAN ISOLASI ALAT & PARAMETER (SANGAT PENTING):
-1. HANYA ekstrak parameter pemeriksaan yang BENAR-BENAR TERCETAK dan DIBACA dari foto ini.
-2. JANGAN PERNAH menambahkan atau mencampuradukkan parameter dari alat laboratorium lain!
-   - Contoh Kasus: Jika foto yang diunggah adalah hasil QC dari alat "Chemistry Analyzer CST-240" (atau Kimia Darah: GLU, CHOL, UREA, CREAT, SGOT, SGPT, UA), JANGAN SEKALI-KALI memasukkan parameter dari alat "Dirui Dimih 3980" atau alat hematologi/urinometer lain yang tidak ada di foto struk ini!
-   ${instrumentHint ? `- PETUNJUK ALAT DARI PENGGUNA: "${instrumentHint}". Pastikan hanya mengekstrak parameter yang sesuai dengan alat ini.` : ''}
+ATURAN PENGENALAN ALAT & ANALISIS GAMBAR (SANGAT PENTING):
+1. IDENTIFIKASI NAMA ALAT (ANALYZER):
+   - Jika foto adalah alat HEMATOLOGI / CBC (misal terdapat teks 'DIMIH 3980', 'DIRUI 3980', 'BCC-3900', atau parameter WBC, RBC, HGB, HCT, MCV, MCH, MCHC, PLT, LYM%, GRAN%, MID%, RDW, MPV):
+     -> Set "analyzer": "Dirui Dimih 3980 Automated Analyzer"
+   - Jika foto adalah alat KIMIA KLINIK (misal terdapat teks 'CST-240', 'CS-T240', 'DIRUI CHEM', atau parameter GLU, CHOL, UREA, CREA, SGOT, SGPT, UA, TRIG, TBIL, DBIL):
+     -> Set "analyzer": "Chemistry Analyzer CST-240 (Dirui CS-T240)"
+   - Jika foto Cobas c311 / Roche -> Set "analyzer": "Chemistry Analyzer A (Cobas c311)"
+   - Jika foto Sysmex XN-550 -> Set "analyzer": "Hematology Analyzer 5-Diff (Sysmex XN-550)"
+   ${instrumentHint ? `- PETUNJUK DARI PENGGUNA: "${instrumentHint}". Gunakan petunjuk ini untuk memastikan nama alat jika foto ambigu.` : ''}
 
-ATURAN MEMBEDAKAN HASIL (RESULT) VS TARGET MEAN VS TARGET SD:
-1. PADA SETIAP BARIS HASIL QC:
+2. ATURAN MEMBEDAKAN HASIL (RESULT) VS TARGET MEAN VS TARGET SD:
    - "RESULT / CONC / NILAI PENGUKURAN" = HASIL PENGUKURAN KONTROL AKTUAL -> masukkan ke field 'result.value'.
-     * Angka ini adalah konsentrasi hasil tes aktual (misal: Glucose 104.2, Cholesterol 161.5, Ureum 37.6, Creatinine 1.23).
+     * Contoh: HGB 13.5, WBC 7.2, PLT 245, Glucose 104.2, Creatinine 1.23.
    - "TARGET / MEAN / X / X̄ / CENTER" = NILAI RERATA RUJUKAN KONTROL -> masukkan ke field 'mean.value'.
-     * Angka ini adalah target nilai tengah dari bahan kontrol (misal: Glucose 100.0, Cholesterol 160.0, Ureum 38.0, Creatinine 1.25).
+     * Contoh: HGB 13.6, WBC 7.0, PLT 250, Glucose 100.0, Creatinine 1.25.
    - "SD / 1SD / STD DEV / DEVIASI" = STANDAR DEVIASI RUJUKAN KONTROL -> masukkan ke field 'sd.value'.
-     * Angka ini adalah nilai 1 Standar Deviasi (misal: Glucose SD 3.5, Cholesterol SD 5.2, Ureum SD 1.6, Creatinine SD 0.06).
+     * Contoh: HGB 0.4, WBC 0.5, PLT 15, Glucose 3.5, Creatinine 0.06.
    - "SDI / Z-SCORE / DEV" = Deviasi Standar Indeks (misal: +0.84, -0.50). JANGAN masukkan nilai SDI ke result.value atau sd.value!
 
-2. CONTOH TABEL CHEMISTRY ANALYZER CST-240 / DIRUI:
-   Format: [ITEM]   [RESULT / CONC]   [TARGET / MEAN]   [SD / 1SD]   [SDI / Z]
-   Contoh: "GLU     104.20            100.00            3.50         +1.20"
-   -> parameter: "Glucose" (GLU)
-   -> result.value: 104.20 (KONSENTRASI HASIL PENGUKURAN)
-   -> mean.value: 100.00 (TARGET MEAN)
-   -> sd.value: 3.50 (TARGET SD)
-
-   Contoh: "CREA    1.23              1.25              0.06         -0.33"
-   -> parameter: "Creatinine" (CREA)
-   -> result.value: 1.23 (HASIL PENGUKURAN)
-   -> mean.value: 1.25 (TARGET MEAN)
-   -> sd.value: 0.06 (TARGET SD)
-
-3. DETEKSI NAMA ALAT (ANALYZER):
-   - CST-240 / CS-T240 / Dirui Chem -> "Chemistry Analyzer CST-240 (Dirui CS-T240)"
-   - Dimih 3980 / BCC-3900 -> "Dirui Dimih 3980 Automated Analyzer"
-   - Cobas c311 / Roche -> "Chemistry Analyzer A (Cobas c311)"
-   - Sysmex XN -> "Hematology Analyzer 5-Diff (Sysmex XN-550)"
+3. CONTOH EKSTRAKSI HASIL:
+   - Jika foto Dimih 3980:
+     "WBC   7.20   7.00   0.50" -> parameter: "WBC", result.value: 7.20, mean.value: 7.00, sd.value: 0.50, unit: "10^3/uL"
+     "HGB   13.5   13.6   0.40" -> parameter: "HGB", result.value: 13.5, mean.value: 13.6, sd.value: 0.40, unit: "g/dL"
+     "PLT   245    250    15.0" -> parameter: "PLT", result.value: 245, mean.value: 250, sd.value: 15.0, unit: "10^3/uL"
+   - Jika foto CST-240:
+     "GLU   104.2  100.0  3.50" -> parameter: "Glucose", result.value: 104.2, mean.value: 100.0, sd.value: 3.50, unit: "mg/dL"
+     "CREA  1.23   1.25   0.06" -> parameter: "Creatinine", result.value: 1.23, mean.value: 1.25, sd.value: 0.06, unit: "mg/dL"
 
 Format respon HARUS JSON valid:
 {
   "scan": { "scan_id": "...", "timestamp": "...", "image_id": "..." },
   "document": {
     "laboratory_name": "...",
-    "analyzer": "Chemistry Analyzer CST-240 (Dirui CS-T240)",
+    "analyzer": "Dirui Dimih 3980 Automated Analyzer",
     "date": "YYYY-MM-DD",
     "time": "HH:mm",
     "control_level": "Level 1",
@@ -215,14 +231,14 @@ Format respon HARUS JSON valid:
   },
   "results": [
     {
-      "parameter": { "value": "Glucose", "original_text": "GLU", "confidence": 0.98 },
+      "parameter": { "value": "Hemoglobin", "original_text": "HGB", "confidence": 0.98 },
       "level": { "value": "Level 1", "original_text": "L1", "confidence": 0.95 },
-      "lot": { "value": "LOT-CST1-2026A", "confidence": 0.95 },
-      "result": { "value": 104.20, "original_text": "104.20", "confidence": 0.98 },
-      "unit": { "value": "mg/dL", "confidence": 0.95 },
-      "mean": { "value": 100.00, "confidence": 0.95 },
-      "sd": { "value": 3.50, "confidence": 0.95 },
-      "source_text": "GLU Conc: 104.20 Target: 100.00 SD: 3.50",
+      "lot": { "value": "LOT-EC8C-9912", "confidence": 0.95 },
+      "result": { "value": 13.5, "original_text": "13.5", "confidence": 0.98 },
+      "unit": { "value": "g/dL", "confidence": 0.95 },
+      "mean": { "value": 13.6, "confidence": 0.95 },
+      "sd": { "value": 0.40, "confidence": 0.95 },
+      "source_text": "HGB 13.5 Mean: 13.6 SD: 0.40",
       "overall_confidence": 0.98,
       "needs_verification": false,
       "verification_reason": null

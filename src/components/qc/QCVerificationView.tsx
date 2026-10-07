@@ -283,6 +283,8 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
       sdPosition: '+0.00 SD',
       status: 'pass',
       violations: [],
+      schemaValid: true,
+      schemaWarnings: [],
       isSelected: true,
       date: today,
       time: time,

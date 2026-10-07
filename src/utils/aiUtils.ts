@@ -1,5 +1,6 @@
 import { Parameter, Instrument, ControlMaterial, QCResult, WestgardViolation, QCStatus } from '../types';
 import { calculateZScore, formatSDPosition, evaluateWestgardRules, DEFAULT_WESTGARD_RULES } from './qcCalculations';
+import { validateQCItemSchema, ValidationResult, PARAMETER_SCHEMAS } from './schemaValidation';
 
 export interface ExtractedAIItem {
   parameter?: { value?: string; original_text?: string; confidence?: number };
@@ -44,13 +45,18 @@ export interface VerifiedQCItem {
   status: QCStatus;
   violations: WestgardViolation[];
   
+  // Schema validation metadata
+  schemaValid: boolean;
+  schemaWarnings: string[];
+  schemaExpectedFormat?: string;
+  
   // Selection
   isSelected: boolean;
   date: string;
   time: string;
 }
 
-// Parameter alias dictionaries for common clinical laboratory tests (including CST-240 & Dirui codes)
+// Parameter alias dictionaries for common clinical laboratory tests (including CST-240 & Dirui Dimih 3980 codes)
 const PARAM_ALIASES: Record<string, string[]> = {
   'glu': ['glucose', 'glu', 'gluc', 'glu-g', 'gds', 'gdp', 'glukosa', 'blood sugar', 'gula darah'],
   'chol': ['cholesterol', 'chol', 'cho', 't-cho', 'tc', 'kolesterol', 'chol total', 'cholesterol total'],
@@ -66,9 +72,19 @@ const PARAM_ALIASES: Record<string, string[]> = {
   'dbil': ['direct bilirubin', 'dbil', 'd-bil', 'bilirubin direk'],
   'hgb': ['hemoglobin', 'hgb', 'hb', 'haemoglobin'],
   'wbc': ['white blood cell', 'wbc', 'leukosit', 'leuko'],
-  'plt': ['platelet', 'plt', 'trombosit', 'thrombocyte'],
   'rbc': ['red blood cell', 'rbc', 'eritrosit', 'erythrocyte'],
   'hct': ['hematocrit', 'hct', 'hematokrit', 'pcv'],
+  'mcv': ['mcv', 'mean corpuscular volume'],
+  'mch': ['mch', 'mean corpuscular hemoglobin'],
+  'mchc': ['mchc', 'mean corpuscular hemoglobin concentration'],
+  'plt': ['platelet', 'plt', 'trombosit', 'thrombocyte'],
+  'lym': ['lymphocyte', 'lym', 'lym%', 'ly%', 'limfosit'],
+  'gran': ['granulocyte', 'gran', 'gran%', 'neu', 'neu%', 'neutrophil'],
+  'mid': ['mid', 'mid%', 'mxd', 'mxd%', 'mon', 'mon%', 'monocyte'],
+  'rdw': ['rdw', 'rdw-cv', 'rdw-sd'],
+  'mpv': ['mpv', 'mean platelet volume'],
+  'pdw': ['pdw'],
+  'pct': ['pct', 'plateletcrit']
 };
 
 export function matchParameter(
@@ -119,7 +135,7 @@ export function matchParameter(
     // 4. Alias match
     for (const [key, aliases] of Object.entries(PARAM_ALIASES)) {
       if (aliases.some(alias => searchStr.includes(alias) || searchStr.split(/[\s,/_.-]+/).includes(alias))) {
-        const match = pool.find(p => p.id.toLowerCase().includes(key) || p.code.toLowerCase().includes(key));
+        const match = pool.find(p => p.code.toLowerCase() === key || p.id.toLowerCase().includes(key));
         if (match) return match;
       }
     }
@@ -136,6 +152,32 @@ export function matchInstrument(
   if (!rawName) return instruments[0] || null;
   const searchStr = rawName.toLowerCase().trim();
 
+  // Dirui Dimih 3980 keywords
+  if (
+    searchStr.includes('dimih') || 
+    searchStr.includes('3980') || 
+    searchStr.includes('dimih 3980') ||
+    searchStr.includes('bcc-3900') ||
+    searchStr.includes('cbc') ||
+    searchStr.includes('hematology')
+  ) {
+    const dimih = instruments.find(i => i.id === 'inst-dirui-3980' || i.name.toLowerCase().includes('3980') || i.model.toLowerCase().includes('3980'));
+    if (dimih) return dimih;
+  }
+
+  // CST-240 / CS-T240 Analyzer keywords
+  if (
+    searchStr.includes('cst-240') || 
+    searchStr.includes('cs-t240') || 
+    searchStr.includes('cst240') || 
+    searchStr.includes('cst 240') ||
+    (searchStr.includes('dirui') && (searchStr.includes('chem') || searchStr.includes('cst')))
+  ) {
+    const cst = instruments.find(i => i.id === 'inst-cst240' || i.name.toLowerCase().includes('cst') || i.model.toLowerCase().includes('cst'));
+    if (cst) return cst;
+  }
+
+  // General check across all instruments
   for (const inst of instruments) {
     if (
       inst.name.toLowerCase().includes(searchStr) ||
@@ -148,18 +190,6 @@ export function matchInstrument(
     }
   }
 
-  // CST-240 / CS-T240 Analyzer keywords
-  if (searchStr.includes('cst-240') || searchStr.includes('cs-t240') || searchStr.includes('cst240') || searchStr.includes('cst 240')) {
-    const cst = instruments.find(i => i.id === 'inst-cst240' || i.name.toLowerCase().includes('cst') || i.model.toLowerCase().includes('cst'));
-    if (cst) return cst;
-  }
-
-  // Dirui Dimih 3980 keywords
-  if (searchStr.includes('dimih') || searchStr.includes('3980') || searchStr.includes('dimih 3980')) {
-    const dimih = instruments.find(i => i.id === 'inst-dirui-3980' || i.name.toLowerCase().includes('3980') || i.model.toLowerCase().includes('3980'));
-    if (dimih) return dimih;
-  }
-
   // Cobas c311 keywords
   if (searchStr.includes('cobas') || searchStr.includes('roche') || searchStr.includes('c311')) {
     const cobas = instruments.find(i => i.name.toLowerCase().includes('cobas') || i.model.toLowerCase().includes('cobas'));
@@ -170,12 +200,6 @@ export function matchInstrument(
   if (searchStr.includes('sysmex') || searchStr.includes('xn')) {
     const sysmex = instruments.find(i => i.name.toLowerCase().includes('sysmex'));
     if (sysmex) return sysmex;
-  }
-
-  // Dirui generic chemistry fallback
-  if (searchStr.includes('dirui')) {
-    const dirui = instruments.find(i => i.name.toLowerCase().includes('cst') || i.name.toLowerCase().includes('dirui'));
-    if (dirui) return dirui;
   }
 
   return instruments[0] || null;
@@ -268,6 +292,8 @@ export function buildVerifiedItemsFromAI(
         sdPosition,
         status,
         violations,
+        schemaValid: true,
+        schemaWarnings: [],
         isSelected: true,
         date: today,
         time: time
@@ -304,99 +330,123 @@ export function buildVerifiedItemsFromAI(
       const itemLot = item.lot?.value || documentMeta?.lot_number || (itemLevel === 'Level 2' ? 'LOT-CCM2-2026B' : 'LOT-CST1-2026A');
       
       // Result value: The actual measured QC concentration read from photo/struk
-      let resultValue: number;
+      let rawResultValue: number;
       if (typeof item.result?.value === 'number' && !isNaN(item.result.value)) {
-        resultValue = item.result.value;
+        rawResultValue = item.result.value;
       } else {
         const parsed = parseFloat(String(item.result?.original_text || '0').replace(/,/g, '.').replace(/[^0-9.-]/g, ''));
-        resultValue = !isNaN(parsed) && parsed > 0 ? parsed : (matchedParam?.targetMean || 100);
+        rawResultValue = !isNaN(parsed) && parsed > 0 ? parsed : (matchedParam?.targetMean || 100);
       }
 
       // Target SD: Prioritize the OCR extracted SD value from the photo, fallback to Master Data
-      let targetSD: number;
+      let rawTargetSD: number;
       if (typeof item.sd?.value === 'number' && !isNaN(item.sd.value) && item.sd.value > 0) {
-        targetSD = item.sd.value;
+        rawTargetSD = item.sd.value;
       } else {
         const parsedSD = parseFloat(String(item.sd?.original_text || '0').replace(/,/g, '.').replace(/[^0-9.-]/g, ''));
-        targetSD = !isNaN(parsedSD) && parsedSD > 0 ? parsedSD : (matchedParam?.targetSD || 3.5);
+        rawTargetSD = !isNaN(parsedSD) && parsedSD > 0 ? parsedSD : (matchedParam?.targetSD || 3.5);
       }
 
       // Target Mean: Prioritize the OCR extracted Mean value from the photo if available, fallback to Master Data
-      let targetMean: number;
+      let rawTargetMean: number;
       if (typeof item.mean?.value === 'number' && !isNaN(item.mean.value) && item.mean.value > 0) {
-        targetMean = item.mean.value;
+        rawTargetMean = item.mean.value;
       } else {
         const parsedMean = parseFloat(String(item.mean?.original_text || '0').replace(/,/g, '.').replace(/[^0-9.-]/g, ''));
-        targetMean = !isNaN(parsedMean) && parsedMean > 0 ? parsedMean : (matchedParam?.targetMean || 100);
+        rawTargetMean = !isNaN(parsedMean) && parsedMean > 0 ? parsedMean : (matchedParam?.targetMean || 100);
       }
 
       // Intelligent Auto-Detection & Fix for Inverted Result vs Target SD:
       const code = (matchedParam?.code || paramName).toUpperCase();
       if (
         (code.includes('GLU') || code.includes('CHOL') || code.includes('TRIG')) &&
-        resultValue <= 15 && targetSD >= 40
+        rawResultValue <= 15 && rawTargetSD >= 40
       ) {
-        const temp = resultValue;
-        resultValue = targetSD;
-        targetSD = temp;
+        const temp = rawResultValue;
+        rawResultValue = rawTargetSD;
+        rawTargetSD = temp;
       } else if (
         (code.includes('UREA') || code.includes('BUN') || code.includes('AST') || code.includes('ALT') || code.includes('SGOT') || code.includes('SGPT')) &&
-        resultValue <= 8 && targetSD >= 20
+        rawResultValue <= 8 && rawTargetSD >= 20
       ) {
-        const temp = resultValue;
-        resultValue = targetSD;
-        targetSD = temp;
+        const temp = rawResultValue;
+        rawResultValue = rawTargetSD;
+        rawTargetSD = temp;
       } else if (
         (code.includes('CREA') || code.includes('TBIL') || code.includes('DBIL')) &&
-        resultValue < 0.25 && targetSD >= 0.5
+        rawResultValue < 0.25 && rawTargetSD >= 0.5
       ) {
-        const temp = resultValue;
-        resultValue = targetSD;
-        targetSD = temp;
+        const temp = rawResultValue;
+        rawResultValue = rawTargetSD;
+        rawTargetSD = temp;
       }
 
       const unit = item.unit?.value || matchedParam?.unit || 'mg/dL';
-      
-      // Calculate Z-Score = (Result - Mean) / SD
-      const zScore = calculateZScore(resultValue, targetMean, targetSD);
+
+      const isDimih = matchedInst?.id === 'inst-dirui-3980' || matchedInst?.name.toLowerCase().includes('3980') || matchedInst?.name.toLowerCase().includes('dimih');
+      const defaultParamForInst = isDimih 
+        ? (parameters.find(p => p.instrumentId === 'inst-dirui-3980') || parameters.find(p => p.id.includes('dimih') || p.code === 'HGB'))
+        : (parameters.find(p => p.instrumentId === 'inst-cst240') || parameters.find(p => p.id.includes('cst') || p.code === 'GLU'));
+
+      const finalParam = matchedParam || defaultParamForInst || parameters[0];
+
+      // Validate with clinical schema
+      const validation = validateQCItemSchema(
+        rawResultValue, 
+        rawTargetMean, 
+        rawTargetSD, 
+        finalParam?.code || paramName, 
+        finalParam
+      );
+
+      const finalResultValue = validation.sanitizedValue;
+      const finalTargetMean = validation.sanitizedMean;
+      const finalTargetSD = validation.sanitizedSD;
+
+      // Recalculate Z-Score with sanitized values
+      const zScore = calculateZScore(finalResultValue, finalTargetMean, finalTargetSD);
       const sdPosition = formatSDPosition(zScore);
 
       // Evaluate Westgard rules
-      const history = existingResults.filter(r => r.parameterId === (matchedParam?.id || 'param-cst-glu'));
+      const history = existingResults.filter(r => r.parameterId === finalParam?.id);
       const tempId = `QC-SCAN-TEMP-${index}`;
       const { status, violations } = evaluateWestgardRules(
-        { id: tempId, value: resultValue, mean: targetMean, sd: targetSD, zScore },
+        { id: tempId, value: finalResultValue, mean: finalTargetMean, sd: finalTargetSD, zScore },
         history,
         DEFAULT_WESTGARD_RULES
       );
 
       const confidence = item.overall_confidence ?? item.result?.confidence ?? 0.9;
-      const needsVerification = item.needs_verification ?? (confidence < 0.8 || status !== 'pass');
+      const needsVerification = item.needs_verification ?? (confidence < 0.8 || status !== 'pass' || !validation.formatMatch);
 
       return {
         id: `VERIFY-${Date.now()}-${index}`,
-        sourceText: item.source_text || item.result?.original_text || `Hasil QC: ${resultValue} ${unit}`,
+        sourceText: item.source_text || item.result?.original_text || `Hasil QC: ${finalResultValue} ${unit}`,
         confidence,
         needsVerification,
-        verificationReason: item.verification_reason || (status !== 'pass' ? `Status QC: ${status.toUpperCase()}` : null),
+        verificationReason: item.verification_reason || (status !== 'pass' ? `Status QC: ${status.toUpperCase()}` : (!validation.formatMatch ? validation.warnings[0] : null)),
         
-        instrumentId: matchedInst?.id || 'inst-cst240',
-        instrumentName: matchedInst?.name || 'Chemistry Analyzer CST-240 (Dirui CS-T240)',
-        parameterId: matchedParam?.id || 'param-cst-glu',
-        parameterName: matchedParam?.name || 'Glucose (Glukosa Darah CST-240)',
-        parameterCode: matchedParam?.code || 'GLU',
+        instrumentId: matchedInst?.id || (isDimih ? 'inst-dirui-3980' : 'inst-cst240'),
+        instrumentName: matchedInst?.name || (isDimih ? 'Dirui Dimih 3980 Automated Analyzer' : 'Chemistry Analyzer CST-240 (Dirui CS-T240)'),
+        parameterId: finalParam?.id || (isDimih ? 'param-dimih-hgb' : 'param-cst-glu'),
+        parameterName: finalParam?.name || (isDimih ? 'Hemoglobin / HGB (Dirui Dimih 3980)' : 'Glucose (Glukosa Darah CST-240)'),
+        parameterCode: finalParam?.code || (isDimih ? 'HGB' : 'GLU'),
         controlLevel: itemLevel,
         lotNumber: itemLot,
         
-        resultValue,
-        unit,
-        targetMean,
-        targetSD,
+        resultValue: finalResultValue,
+        unit: validation.schema?.unit || unit,
+        targetMean: finalTargetMean,
+        targetSD: finalTargetSD,
         
         zScore,
         sdPosition,
         status,
         violations,
+        
+        schemaValid: validation.isValid && validation.formatMatch,
+        schemaWarnings: validation.warnings,
+        schemaExpectedFormat: validation.schema ? `${validation.schema.expectedType.toUpperCase()} (${validation.schema.minPhysiological} - ${validation.schema.maxPhysiological} ${validation.schema.unit})` : undefined,
         
         isSelected: true,
         date: today,
