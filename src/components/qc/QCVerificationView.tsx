@@ -78,6 +78,18 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
     );
   });
 
+  // Keep items synchronized whenever extractedData, documentMeta or parameters change
+  React.useEffect(() => {
+    const newItems = buildVerifiedItemsFromAI(
+      extractedData,
+      documentMeta,
+      parameters,
+      instruments,
+      existingResults
+    );
+    setItems(newItems);
+  }, [extractedData, documentMeta, parameters, instruments]);
+
   // Re-calculate row when any field changes
   const updateItemField = (id: string, field: keyof VerifiedQCItem, value: any) => {
     setItems(prev => prev.map(item => {
