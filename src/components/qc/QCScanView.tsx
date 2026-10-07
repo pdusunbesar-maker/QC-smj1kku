@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   Camera, 
   Upload, 
@@ -17,7 +17,9 @@ import {
   Image as ImageIcon,
   Edit,
   Filter,
-  ShieldCheck
+  ShieldCheck,
+  ClipboardPaste,
+  Check
 } from 'lucide-react';
 import { StorageService } from '../../services/storage';
 import { Instrument } from '../../types';
@@ -198,6 +200,67 @@ const SAMPLE_PRESETS = [
   }
 ];
 
+/**
+ * Compresses an image file or data URI on a hidden HTML5 canvas
+ * Resizes max dimension to 1600px with high JPEG quality (0.85)
+ * Returns clean base64 data and standard dataURL
+ */
+async function optimizeImageForOCR(fileOrDataUrl: File | string): Promise<{ dataUrl: string; base64: string }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'Anonymous';
+
+    img.onload = () => {
+      try {
+        const MAX_DIMENSION = 1600;
+        let { width, height } = img;
+
+        if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+          if (width > height) {
+            height = Math.round((height * MAX_DIMENSION) / width);
+            width = MAX_DIMENSION;
+          } else {
+            width = Math.round((width * MAX_DIMENSION) / height);
+            height = MAX_DIMENSION;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          throw new Error('Canvas context not available');
+        }
+
+        // Fill white background in case of transparent PNG
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+        const base64 = dataUrl.split(',')[1];
+        resolve({ dataUrl, base64 });
+      } catch (err) {
+        reject(err);
+      }
+    };
+
+    img.onerror = (e) => reject(new Error('Gagal memuat format gambar: ' + e));
+
+    if (typeof fileOrDataUrl === 'string') {
+      img.src = fileOrDataUrl;
+    } else {
+      const reader = new FileReader();
+      reader.onload = () => {
+        img.src = reader.result as string;
+      };
+      reader.onerror = (e) => reject(new Error('Gagal membaca file: ' + e));
+      reader.readAsDataURL(fileOrDataUrl);
+    }
+  });
+}
+
 export const QCScanView: React.FC<QCScanViewProps> = ({ onScanComplete }) => {
   const [instruments, setInstruments] = useState<Instrument[]>([]);
   const [selectedInstrumentId, setSelectedInstrumentId] = useState<string>('inst-cst240');
@@ -205,6 +268,7 @@ export const QCScanView: React.FC<QCScanViewProps> = ({ onScanComplete }) => {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [rawBase64, setRawBase64] = useState<string | null>(null);
+  const [isCompressing, setIsCompressing] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [scanStep, setScanStep] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -212,6 +276,7 @@ export const QCScanView: React.FC<QCScanViewProps> = ({ onScanComplete }) => {
   const [cameraFacing, setCameraFacing] = useState<'user' | 'environment'>('environment');
   const [documentMeta, setDocumentMeta] = useState<any>(null);
   const [activePresetResults, setActivePresetResults] = useState<any[] | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -228,6 +293,54 @@ export const QCScanView: React.FC<QCScanViewProps> = ({ onScanComplete }) => {
       stopCamera();
     };
   }, []);
+
+  // Clipboard Paste Listener (Ctrl+V / Cmd+V)
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      if (e.clipboardData && e.clipboardData.items) {
+        const items = e.clipboardData.items;
+        for (let i = 0; i < items.length; i++) {
+          if (items[i].type.indexOf('image') !== -1) {
+            const blob = items[i].getAsFile();
+            if (blob) {
+              processImageFile(blob);
+              break;
+            }
+          }
+        }
+      }
+    };
+
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, []);
+
+  const processImageFile = async (selectedFile: File) => {
+    setErrorMsg(null);
+    setIsCompressing(true);
+    setFile(selectedFile);
+    setDocumentMeta(null);
+    setActivePresetResults(null);
+
+    try {
+      const { dataUrl, base64 } = await optimizeImageForOCR(selectedFile);
+      setPreviewUrl(dataUrl);
+      setRawBase64(base64);
+    } catch (err: any) {
+      console.warn('Canvas optimization error, fallback to raw FileReader:', err);
+      const reader = new FileReader();
+      reader.onload = () => {
+        const resultStr = reader.result as string;
+        setPreviewUrl(resultStr);
+        if (resultStr.includes(',')) {
+          setRawBase64(resultStr.split(',')[1]);
+        }
+      };
+      reader.readAsDataURL(selectedFile);
+    } finally {
+      setIsCompressing(false);
+    }
+  };
 
   const startCamera = async () => {
     setErrorMsg(null);
@@ -246,7 +359,6 @@ export const QCScanView: React.FC<QCScanViewProps> = ({ onScanComplete }) => {
     } catch (err: any) {
       console.warn('Camera access error, fallback to file input:', err);
       setIsCameraActive(false);
-      // Fallback: trigger file input with capture
       if (fileInputRef.current) {
         fileInputRef.current.click();
       }
@@ -286,20 +398,25 @@ export const QCScanView: React.FC<QCScanViewProps> = ({ onScanComplete }) => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
-      setErrorMsg(null);
-      setFile(selectedFile);
-      setDocumentMeta(null);
-      setActivePresetResults(null);
+      processImageFile(selectedFile);
+    }
+  };
 
-      const reader = new FileReader();
-      reader.onload = () => {
-        const resultStr = reader.result as string;
-        setPreviewUrl(resultStr);
-        if (resultStr.includes(',')) {
-          setRawBase64(resultStr.split(',')[1]);
-        }
-      };
-      reader.readAsDataURL(selectedFile);
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const droppedFile = e.dataTransfer.files?.[0];
+    if (droppedFile && droppedFile.type.startsWith('image/')) {
+      processImageFile(droppedFile);
     }
   };
 
@@ -332,18 +449,18 @@ export const QCScanView: React.FC<QCScanViewProps> = ({ onScanComplete }) => {
     if (!previewUrl) return;
     setIsScanning(true);
     setErrorMsg(null);
-    setScanStep('1. Mempersiapkan gambar struk QC...');
+    setScanStep('1. Mengoptimalkan gambar struk QC...');
 
     const targetInst = getTargetInstrument();
     const instHintName = targetInst ? targetInst.name : (selectedInstrumentId === 'auto' ? undefined : selectedInstrumentId);
 
     try {
-      // If user selected a preset directly, use high precision preset data
+      // If preset is selected directly, transition fast
       if (activePresetResults && activePresetResults.length > 0) {
         setScanStep('2. AI Vision sedang membaca data laboratorium...');
-        await new Promise(r => setTimeout(r, 500));
+        await new Promise(r => setTimeout(r, 400));
         setScanStep('3. Mengisolasi parameter sesuai alat...');
-        await new Promise(r => setTimeout(r, 300));
+        await new Promise(r => setTimeout(r, 200));
         onScanComplete(activePresetResults, previewUrl, {
           ...(documentMeta || {}),
           analyzer: targetInst?.name || documentMeta?.analyzer || 'Chemistry Analyzer CST-240 (Dirui CS-T240)',
@@ -355,36 +472,35 @@ export const QCScanView: React.FC<QCScanViewProps> = ({ onScanComplete }) => {
 
       setScanStep(`2. AI Vision OCR sedang membaca struk ${instHintName ? `[Alat: ${instHintName}]` : ''}...`);
 
+      // Ensure we have clean base64 data
       let base64ToSend = rawBase64;
-      if (!base64ToSend && previewUrl.startsWith('data:')) {
-        base64ToSend = previewUrl.split(',')[1];
+      if (!base64ToSend) {
+        const { base64 } = await optimizeImageForOCR(file || previewUrl);
+        base64ToSend = base64;
       }
 
-      if (!base64ToSend && previewUrl.startsWith('http')) {
-        try {
-          const imgResp = await fetch(previewUrl);
-          const blob = await imgResp.blob();
-          base64ToSend = await new Promise((resolve) => {
-            const r = new FileReader();
-            r.onload = () => resolve((r.result as string).split(',')[1]);
-            r.readAsDataURL(blob);
-          });
-        } catch (e) {
-          console.warn('Could not fetch external image as base64, using fallback text');
-        }
-      }
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 25000);
 
       const response = await fetch('/api/qc/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({ 
-          imageBase64: base64ToSend || 'FALLBACK_IMG_DATA', 
-          mimeType: file?.type || 'image/jpeg',
+          imageBase64: base64ToSend, 
+          mimeType: 'image/jpeg',
           instrumentHint: instHintName
         })
       });
 
-      setScanStep('3. Memvalidasi & memfilter parameter sesuai alat...');
+      clearTimeout(timeoutId);
+
+      setScanStep('3. Memvalidasi & mencocokkan parameter dengan Master Data...');
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || `Server HTTP Error ${response.status}`);
+      }
 
       const data = await response.json();
       const results = data.results || [];
@@ -401,7 +517,7 @@ export const QCScanView: React.FC<QCScanViewProps> = ({ onScanComplete }) => {
       onScanComplete(results, previewUrl, meta);
     } catch (error: any) {
       console.error('OCR Error:', error);
-      setErrorMsg('Gagal terhubung ke AI Vision. Mengarahkan langsung ke form verifikasi.');
+      setErrorMsg('Gagal membaca gambar via AI Vision: ' + (error.message || 'Koneksi terputus') + '. Mengalihkan ke form verifikasi.');
       handleManualFallback();
     } finally {
       setIsScanning(false);
@@ -419,16 +535,16 @@ export const QCScanView: React.FC<QCScanViewProps> = ({ onScanComplete }) => {
           <div className="space-y-1">
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full text-xs font-semibold backdrop-blur-sm">
               <Sparkles className="h-3.5 w-3.5 text-amber-300" />
-              <span>AI Vision & OCR Engine v2.6 — Strict Instrument Isolation</span>
+              <span>AI Vision & OCR Engine v2.7 — High Resolution Support</span>
             </div>
             <h1 className="text-2xl font-bold tracking-tight">Scan Hasil QC dari Foto / Struk</h1>
             <p className="text-blue-100 text-sm">
-              Ekstraksi hasil QC akurat (Result vs Target Mean vs Target SD). Parameter diisolasi khusus untuk alat yang dipilih.
+              Unggah foto struk cetak, tangkapan layar monitor alat, atau gunakan kamera langsung untuk ekstraksi cerdas.
             </p>
           </div>
           <div className="flex items-center gap-2 text-xs bg-white/10 p-3 rounded-xl backdrop-blur-sm border border-white/10">
             <ShieldCheck className="h-4 w-4 text-emerald-300 shrink-0" />
-            <span>Anti Campur-Aduk Parameter Alat Lain</span>
+            <span>Format CST-240 & Dirui Didukung</span>
           </div>
         </div>
       </div>
@@ -469,7 +585,7 @@ export const QCScanView: React.FC<QCScanViewProps> = ({ onScanComplete }) => {
         <div className="mt-3 text-xs bg-blue-50/70 border border-blue-200 text-blue-800 p-3 rounded-xl flex items-start gap-2">
           <CheckCircle2 className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
           <span>
-            <strong>Proteksi Alat Aktif:</strong> Saat memindai struk alat <strong>{selectedInstObj ? selectedInstObj.name : 'CST-240'}</strong>, sistem secara ketat hanya membaca parameter milik alat tersebut dan mencegah masuknya parameter dari alat lain (seperti Dirui Dimih 3980 atau alat hematologi lainnya).
+            <strong>Proteksi Alat Aktif:</strong> Saat memindai struk alat <strong>{selectedInstObj ? selectedInstObj.name : 'CST-240'}</strong>, sistem secara otomatis mengekstrak Hasil (Result/Conc), Target Mean, dan Target SD, serta mengabaikan parameter milik mesin lain.
           </span>
         </div>
       </div>
@@ -489,7 +605,7 @@ export const QCScanView: React.FC<QCScanViewProps> = ({ onScanComplete }) => {
               onClick={handleManualFallback}
               className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold shrink-0 flex items-center gap-1.5"
             >
-              <Edit className="h-3.5 w-3.5" /> Lanjut ke Verifikasi
+              <Edit className="h-3.5 w-3.5" /> Lanjut ke Form Verifikasi
             </button>
           )}
         </div>
@@ -553,10 +669,17 @@ export const QCScanView: React.FC<QCScanViewProps> = ({ onScanComplete }) => {
         <div className="space-y-6">
           {/* Upload Dropzone */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Box 1: File Upload */}
+            {/* Box 1: File Upload + Drag & Drop */}
             <div 
               onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-slate-300 hover:border-blue-500 hover:bg-blue-50/40 bg-white p-8 rounded-2xl flex flex-col items-center justify-center text-center cursor-pointer transition-all group min-h-[260px]"
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`border-2 border-dashed p-8 rounded-2xl flex flex-col items-center justify-center text-center cursor-pointer transition-all group min-h-[260px] ${
+                isDragOver 
+                  ? 'border-blue-500 bg-blue-50' 
+                  : 'border-slate-300 hover:border-blue-500 hover:bg-blue-50/40 bg-white'
+              }`}
             >
               <input 
                 ref={fileInputRef}
@@ -569,8 +692,8 @@ export const QCScanView: React.FC<QCScanViewProps> = ({ onScanComplete }) => {
                 <Upload className="h-8 w-8" />
               </div>
               <h3 className="font-bold text-slate-800 text-base mb-1">Unggah Foto Struk QC</h3>
-              <p className="text-xs text-slate-500 max-w-xs mb-4">
-                Klik untuk memilih foto dari komputer atau galeri ponsel (JPG, PNG, WEBP hingga 25MB)
+              <p className="text-xs text-slate-500 max-w-xs mb-3">
+                Klik untuk memilih file foto, seret file ke sini, atau tempel tangkapan layar (Ctrl+V)
               </p>
               <span className="px-4 py-2 bg-blue-600 group-hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-sm flex items-center gap-1.5">
                 <ImageIcon className="h-4 w-4" /> Pilih File Gambar
@@ -586,7 +709,7 @@ export const QCScanView: React.FC<QCScanViewProps> = ({ onScanComplete }) => {
                 <Camera className="h-8 w-8" />
               </div>
               <h3 className="font-bold text-slate-800 text-base mb-1">Ambil Foto Langsung (Kamera)</h3>
-              <p className="text-xs text-slate-500 max-w-xs mb-4">
+              <p className="text-xs text-slate-500 max-w-xs mb-3">
                 Gunakan kamera smartphone atau webcam untuk memotret kertas struk QC langsung di depan alat
               </p>
               <span className="px-4 py-2 bg-emerald-600 group-hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm flex items-center gap-1.5">
@@ -660,11 +783,18 @@ export const QCScanView: React.FC<QCScanViewProps> = ({ onScanComplete }) => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
             {/* Image Preview */}
             <div className="md:col-span-1 bg-slate-900 rounded-xl overflow-hidden flex items-center justify-center max-h-[320px] p-2">
-              <img 
-                src={previewUrl || ''} 
-                alt="Pratinjau Struk QC" 
-                className="max-h-[300px] w-auto object-contain rounded-lg shadow"
-              />
+              {isCompressing ? (
+                <div className="text-white text-xs flex flex-col items-center gap-2 p-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-blue-400" />
+                  <span>Mengoptimalkan resolusi gambar...</span>
+                </div>
+              ) : (
+                <img 
+                  src={previewUrl || ''} 
+                  alt="Pratinjau Struk QC" 
+                  className="max-h-[300px] w-auto object-contain rounded-lg shadow"
+                />
+              )}
             </div>
 
             {/* Scan Action Controls */}
@@ -696,7 +826,8 @@ export const QCScanView: React.FC<QCScanViewProps> = ({ onScanComplete }) => {
                   <button
                     type="button"
                     onClick={scanQC}
-                    className="w-full sm:w-auto flex-1 px-6 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-bold text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
+                    disabled={isCompressing}
+                    className="w-full sm:w-auto flex-1 px-6 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 text-white rounded-xl font-bold text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
                   >
                     <Sparkles className="h-4 w-4 text-amber-300" />
                     <span>Baca Hasil QC dengan AI Vision</span>

@@ -265,8 +265,12 @@ Format respon HARUS JSON valid:
           });
 
           let rawText = response.text || '';
-          // Clean JSON markdown wrapping if present
           rawText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+          const firstBrace = rawText.indexOf('{');
+          const lastBrace = rawText.lastIndexOf('}');
+          if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+            rawText = rawText.substring(firstBrace, lastBrace + 1);
+          }
           if (rawText) {
             ocrResult = JSON.parse(rawText);
           }
@@ -299,6 +303,11 @@ Format respon HARUS JSON valid:
             });
             let rawText2 = response2.text || '';
             rawText2 = rawText2.replace(/```json/gi, '').replace(/```/g, '').trim();
+            const firstBrace2 = rawText2.indexOf('{');
+            const lastBrace2 = rawText2.lastIndexOf('}');
+            if (firstBrace2 !== -1 && lastBrace2 !== -1 && lastBrace2 > firstBrace2) {
+              rawText2 = rawText2.substring(firstBrace2, lastBrace2 + 1);
+            }
             if (rawText2) {
               ocrResult = JSON.parse(rawText2);
             }
