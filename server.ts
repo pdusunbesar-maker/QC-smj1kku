@@ -107,30 +107,37 @@ async function startServer() {
       const prompt = `Anda adalah Laboratory Quality Control (QC) & Medical Laboratory Vision OCR Specialist tingkat enterprise.
 Tugas Anda adalah membaca dan mengekstrak SELURUH data hasil pemeriksaan Quality Control (QC) dari foto struk termal / printout alat analyzer / layar monitor mesin laboratorium (khususnya Chemistry Analyzer CST-240 / CS-T240 / Dirui, Cobas c311, Sysmex XN series, Mindray BS-240/BC-6800, dsb).
 
-ATURAN KRUSIAL MEMBEDAKAN HASIL (RESULT) VS TARGET MEAN VS TARGET SD:
-1. PADA ALAT KIMIA KLINIK SEPERTI CHEMISTRY ANALYZER CST-240 / CS-T240 / DIRUI / COBAS:
-   - "Result" / "Conc" / "Conc." / "Val" / "Data" / "Hasil" = NILAI HASIL PENGUKURAN QC AKTUAL (Nilai ini yang WAJIB dimasukkan ke result.value).
-   - "Target" / "Mean" / "Expected" / "X̄" / "X" / "Center" = NILAI TARGET MEAN KONTROL (Masukkan ke mean.value jika tercetak).
-   - "SD" / "1SD" / "Std Dev" / "Deviasi" = NILAI TARGET STANDAR DEVIASI (Masukkan ke sd.value jika tercetak).
-   - JANGAN TERTUKAR antara nilai Result (Conc) dengan Target Mean atau Target SD! Contoh pada CST-240: Jika tertulis "GLU  Result: 102.4  Mean: 100.0  SD: 3.50", maka result.value = 102.4, mean.value = 100.0, sd.value = 3.50.
+PANDUAN EKSTRAKSI KOLOM & FIELD KRUSIAL:
+1. BACA SETIAP KOLOM SECARA TELITI:
+   - "Result" / "Conc" / "Conc." / "Val" / "Data" / "Hasil" = HASIL PENGUKURAN QC AKTUAL -> masukkan ke field 'result.value'.
+   - "Target" / "Mean" / "Expected" / "X̄" / "X" / "Center" = NILAI TARGET MEAN -> masukkan ke field 'mean.value'.
+   - "SD" / "1SD" / "Std Dev" / "Deviasi" = NILAI TARGET STANDAR DEVIASI -> masukkan ke field 'sd.value'.
+   - "Unit" / "Satuan" (mg/dL, g/dL, U/L, mmol/L, 10^3/uL) -> masukkan ke field 'unit.value'.
 
-2. DETEKSI ALAT (ANALYZER):
-   - Jika tertera atau mirip format CST-240 / CS-T240 / Dirui -> Analyzer: "Chemistry Analyzer CST-240"
-   - Jika tertera Cobas / Roche -> Analyzer: "Cobas c311 Auto-Chemistry"
-   - Jika tertera Sysmex -> Analyzer: "Sysmex XN-550 Hematology"
-   - Jika tertera Mindray -> Analyzer: "Mindray Chemistry Analyzer"
+2. CONTOH FORMAT STRUK / PRINT-OUT ALAT CST-240 & CHEMISTRY ANALYZER:
+   - Jika format tabel: [ITEM]  [RESULT/CONC]  [TARGET/MEAN]  [SD/1SD]  [SDI]
+     Contoh: "GLU   104.2   100.0   4.20   +1.00"
+     -> parameter: "Glucose" (GLU)
+     -> result.value: 104.2 (HASIL PENGUKURAN)
+     -> mean.value: 100.0 (TARGET MEAN)
+     -> sd.value: 4.20 (TARGET SD)
+   - Jika format baris: "CHOL Result: 165.4 mg/dL  Target: 160.0  SD: 5.10"
+     -> parameter: "Cholesterol Total"
+     -> result.value: 165.4
+     -> mean.value: 160.0
+     -> sd.value: 5.10
 
-3. DETEKSI PARAMETER (ITEM TEST):
-   - Kimia Klinik: GLU / Glucose, CHOL / Cholesterol, UREA / BUN / Ureum, CREA / Creatinine, SGOT / AST, SGPT / ALT, TRIG / Triglyceride, UA / Uric Acid, ALB / Albumin, TP / Total Protein, TBIL / Total Bilirubin, DBIL / Direct Bilirubin, ALP, GGT, NA, K, CL, CA.
-   - Hematologi: HGB / Hb, WBC / Leukosit, PLT / Trombosit, RBC / Eritrosit, HCT / Hematokrit.
+3. DETEKSI NAMA ALAT (ANALYZER):
+   - CST-240 / CS-T240 / Dirui -> "Chemistry Analyzer CST-240"
+   - Cobas / Roche -> "Cobas c311 Auto-Chemistry"
+   - Sysmex -> "Sysmex XN-550 Hematology"
+   - Mindray -> "Mindray Chemistry Analyzer"
 
-4. EKSTRAKSI LENGKAP:
-   - Tanggal & Jam pemeriksaan (date: YYYY-MM-DD, time: HH:mm).
-   - Level Kontrol ("Level 1" / "Level 2" / "Level 3" / "Normal" / "Pathological").
-   - Nomor Lot Kontrol (misal: "LOT-CCM1-2026A", "QC-GLU-001", "8124A").
-   - Ekstrak seluruh baris parameter yang ada di gambar ke dalam array results.
+4. FORMAT NILAI ANGKA:
+   - Pertahankan angka desimal asli (misal 104.20 atau 3.50 atau 0.06). Jika terdapat koma desimal (misal 104,2 atau 3,5), konversikan ke titik (104.2 atau 3.5).
+   - JANGAN TERTUKAR antara nilai Result dengan nilai Target SD!
 
-Format respon HARUS JSON valid dengan struktur:
+Format respon JSON:
 {
   "scan": { "scan_id": "...", "timestamp": "...", "image_id": "..." },
   "document": {
@@ -146,12 +153,12 @@ Format respon HARUS JSON valid dengan struktur:
       "parameter": { "value": "Glucose", "original_text": "GLU", "confidence": 0.98 },
       "level": { "value": "Level 1", "original_text": "L1", "confidence": 0.95 },
       "lot": { "value": "LOT-CCM1-2026A", "confidence": 0.95 },
-      "result": { "value": 102.4, "original_text": "102.4", "confidence": 0.98 },
+      "result": { "value": 104.2, "original_text": "104.2", "confidence": 0.98 },
       "unit": { "value": "mg/dL", "confidence": 0.95 },
       "mean": { "value": 100.0, "confidence": 0.95 },
-      "sd": { "value": 3.5, "confidence": 0.95 },
-      "source_text": "GLU Conc: 102.4 Target: 100.0 SD: 3.5",
-      "overall_confidence": 0.97,
+      "sd": { "value": 4.20, "confidence": 0.95 },
+      "source_text": "GLU Conc: 104.2 Target: 100.0 SD: 4.20",
+      "overall_confidence": 0.98,
       "needs_verification": false,
       "verification_reason": null
     }
@@ -242,14 +249,48 @@ Format respon HARUS JSON valid dengan struktur:
         ocrResult = getSmartFallbackExtraction(cleanBase64, cleanMime);
       }
 
-      // Enforce confidence rules and ensure non-null results
+      // Enforce confidence rules and clean numeric fields
       if (Array.isArray(ocrResult.results)) {
         ocrResult.results = ocrResult.results.map((r: any) => {
           const confidence = Number(r.overall_confidence ?? r.result?.confidence ?? 0.85);
+          
+          // Parse result value cleanly
+          let resVal: any = r.result?.value;
+          if (typeof resVal === 'string') {
+            const cleanStr = resVal.replace(/,/g, '.').replace(/[^0-9.-]/g, '');
+            resVal = cleanStr ? parseFloat(cleanStr) : undefined;
+          }
+
+          // Parse mean value cleanly
+          let meanVal: any = r.mean?.value;
+          if (typeof meanVal === 'string') {
+            const cleanStr = meanVal.replace(/,/g, '.').replace(/[^0-9.-]/g, '');
+            meanVal = cleanStr ? parseFloat(cleanStr) : undefined;
+          }
+
+          // Parse sd value cleanly
+          let sdVal: any = r.sd?.value;
+          if (typeof sdVal === 'string') {
+            const cleanStr = sdVal.replace(/,/g, '.').replace(/[^0-9.-]/g, '');
+            sdVal = cleanStr ? parseFloat(cleanStr) : undefined;
+          }
+
           return {
             ...r,
+            result: {
+              ...(r.result || {}),
+              value: resVal !== undefined && !isNaN(resVal) ? resVal : r.result?.value
+            },
+            mean: {
+              ...(r.mean || {}),
+              value: meanVal !== undefined && !isNaN(meanVal) ? meanVal : r.mean?.value
+            },
+            sd: {
+              ...(r.sd || {}),
+              value: sdVal !== undefined && !isNaN(sdVal) ? sdVal : r.sd?.value
+            },
             overall_confidence: confidence,
-            needs_verification: confidence < 0.8 || r.result?.value === undefined || r.result?.value === null,
+            needs_verification: confidence < 0.8 || resVal === undefined || isNaN(resVal),
             verification_reason: confidence < 0.8 ? (r.verification_reason || 'Tingkat keyakinan sedang/rendah') : null
           };
         });

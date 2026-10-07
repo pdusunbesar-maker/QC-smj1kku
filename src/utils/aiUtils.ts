@@ -7,8 +7,8 @@ export interface ExtractedAIItem {
   lot?: { value?: string; confidence?: number };
   result?: { value?: number; original_text?: string; confidence?: number };
   unit?: { value?: string; confidence?: number };
-  mean?: { value?: number; confidence?: number };
-  sd?: { value?: number; confidence?: number };
+  mean?: { value?: number; original_text?: string; confidence?: number };
+  sd?: { value?: number; original_text?: string; confidence?: number };
   analyzer?: string;
   source_text?: string;
   overall_confidence?: number;
@@ -225,22 +225,34 @@ export function buildVerifiedItemsFromAI(
     
     const itemLot = item.lot?.value || documentMeta?.lot_number || (itemLevel === 'Level 2' ? 'LOT-CCM2-2026B' : 'LOT-CCM1-2026A');
     
-    // Result value: The actual measured QC concentration read from alat (CST-240 / Cobas / Sysmex)
-    const resultValue = typeof item.result?.value === 'number' 
-      ? item.result.value 
-      : parseFloat(String(item.result?.original_text || '0')) || (matchedParam?.targetMean || 100);
-    
-    // Target Mean: Prefer Master Data targetMean for accuracy, fallback to OCR mean
-    const targetMean = matchedParam?.targetMean 
-      ? matchedParam.targetMean 
-      : (typeof item.mean?.value === 'number' ? item.mean.value : 100);
-    
-    // Target SD: Prefer Master Data targetSD for accuracy, fallback to OCR SD
-    const targetSD = matchedParam?.targetSD 
-      ? matchedParam.targetSD 
-      : (typeof item.sd?.value === 'number' ? item.sd.value : 3.5);
-    
-    const unit = matchedParam?.unit || item.unit?.value || 'mg/dL';
+    // Result value: The actual measured QC concentration read from photo/struk (CST-240 / Cobas / Sysmex)
+    let resultValue: number;
+    if (typeof item.result?.value === 'number' && !isNaN(item.result.value)) {
+      resultValue = item.result.value;
+    } else {
+      const parsed = parseFloat(String(item.result?.original_text || '0').replace(/,/g, '.').replace(/[^0-9.-]/g, ''));
+      resultValue = !isNaN(parsed) && parsed > 0 ? parsed : (matchedParam?.targetMean || 100);
+    }
+
+    // Target SD: Prioritize the OCR extracted SD value from the photo, fallback to Master Data
+    let targetSD: number;
+    if (typeof item.sd?.value === 'number' && !isNaN(item.sd.value) && item.sd.value > 0) {
+      targetSD = item.sd.value;
+    } else {
+      const parsedSD = parseFloat(String(item.sd?.original_text || '0').replace(/,/g, '.').replace(/[^0-9.-]/g, ''));
+      targetSD = !isNaN(parsedSD) && parsedSD > 0 ? parsedSD : (matchedParam?.targetSD || 3.5);
+    }
+
+    // Target Mean: Prioritize the OCR extracted Mean value from the photo if available, fallback to Master Data
+    let targetMean: number;
+    if (typeof item.mean?.value === 'number' && !isNaN(item.mean.value) && item.mean.value > 0) {
+      targetMean = item.mean.value;
+    } else {
+      const parsedMean = parseFloat(String(item.mean?.original_text || '0').replace(/,/g, '.').replace(/[^0-9.-]/g, ''));
+      targetMean = !isNaN(parsedMean) && parsedMean > 0 ? parsedMean : (matchedParam?.targetMean || 100);
+    }
+
+    const unit = item.unit?.value || matchedParam?.unit || 'mg/dL';
     
     // Calculate Z-Score = (Result - Mean) / SD
     const zScore = calculateZScore(resultValue, targetMean, targetSD);
