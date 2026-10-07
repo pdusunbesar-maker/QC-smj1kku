@@ -211,12 +211,34 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return parameters.find(p => p.id === selectedPreviewParamId) || parameters[0];
   }, [parameters, selectedPreviewParamId]);
 
-  // QC points for the preview chart
+  // QC points for the preview chart (1 plot per date)
   const previewPoints = useMemo(() => {
     if (!previewParam) return [];
-    return qcResults
-      .filter(r => r.parameterId === previewParam.id)
-      .slice(-14); // latest 14 data points
+    const filtered = qcResults.filter(r => r.parameterId === previewParam.id);
+    
+    // Group by date (1 plot point per date)
+    const dateMap = new Map<string, QCResult[]>();
+    filtered.forEach(r => {
+      const list = dateMap.get(r.date) || [];
+      list.push(r);
+      dateMap.set(r.date, list);
+    });
+
+    const points: Array<QCResult & { allRunsCount: number }> = [];
+    dateMap.forEach((dayRuns) => {
+      const latest = dayRuns[dayRuns.length - 1];
+      const hasReject = dayRuns.some(d => d.status === 'reject');
+      const hasWarning = dayRuns.some(d => d.status === 'warning');
+      const status = hasReject ? 'reject' : (hasWarning ? 'warning' : 'pass');
+
+      points.push({
+        ...latest,
+        status,
+        allRunsCount: dayRuns.length
+      });
+    });
+
+    return points.sort((a, b) => a.date.localeCompare(b.date)).slice(-14);
   }, [qcResults, previewParam]);
 
   // Recent 6 QC Results for Table
