@@ -946,7 +946,17 @@ export class StorageService {
 
   // --- Instruments ---
   static getInstruments(): Instrument[] {
-    return getStored<Instrument[]>(KEYS.INSTRUMENTS, INITIAL_INSTRUMENTS);
+    const list = getStored<Instrument[]>(KEYS.INSTRUMENTS, INITIAL_INSTRUMENTS);
+    // Sanitize: Purge any deleted instruments (e.g. Cobas c311 / inst-chem-a)
+    const cleaned = list.filter(i => i.id !== 'inst-chem-a' && !i.name.toLowerCase().includes('cobas c311'));
+    if (cleaned.length !== list.length) {
+      setStored(KEYS.INSTRUMENTS, cleaned);
+      const sb = getSupabase();
+      if (sb) {
+        sb.from('instruments').delete().eq('id', 'inst-chem-a').then();
+      }
+    }
+    return cleaned;
   }
 
   static saveInstrument(instrument: Instrument): void {
@@ -974,6 +984,13 @@ export class StorageService {
     const list = this.getInstruments().filter(i => i.id !== id);
     setStored(KEYS.INSTRUMENTS, list);
 
+    // Cascade delete parameters, control materials, and QC results linked to deleted instrument
+    const activeParams = this.getParameters().filter(p => p.instrumentId !== id);
+    setStored(KEYS.PARAMETERS, activeParams);
+
+    const activeQC = this.getQCResults().filter(r => r.instrumentId !== id);
+    setStored(KEYS.QC_RESULTS, activeQC);
+
     const sb = getSupabase();
     if (sb) {
       sb.from('instruments')
@@ -982,16 +999,37 @@ export class StorageService {
         .then(({ error }) => {
           if (error) console.error('Supabase deleteInstrument error:', error);
         });
+      sb.from('test_parameters')
+        .delete()
+        .eq('instrument_id', id)
+        .then(({ error }) => {
+          if (error) console.error('Supabase delete Parameters error:', error);
+        });
+      sb.from('qc_results')
+        .delete()
+        .eq('instrument_id', id)
+        .then(({ error }) => {
+          if (error) console.error('Supabase delete QC Results error:', error);
+        });
     }
 
     if (target) {
-      this.logAudit('UPDATE_MASTER_DATA', `Menghapus instrumen: ${target.name} (${target.code})`);
+      this.logAudit('UPDATE_MASTER_DATA', `Menghapus instrumen: ${target.name} (${target.code}) beserta parameter dan hasil terkait.`);
     }
   }
 
   // --- Control Materials ---
   static getControlMaterials(): ControlMaterial[] {
-    return getStored<ControlMaterial[]>(KEYS.CONTROL_MATERIALS, INITIAL_CONTROL_MATERIALS);
+    const list = getStored<ControlMaterial[]>(KEYS.CONTROL_MATERIALS, INITIAL_CONTROL_MATERIALS);
+    const cleaned = list.filter(m => m.id !== 'ctrl-pnu-1' && !m.name.toLowerCase().includes('precinorm'));
+    if (cleaned.length !== list.length) {
+      setStored(KEYS.CONTROL_MATERIALS, cleaned);
+      const sb = getSupabase();
+      if (sb) {
+        sb.from('control_materials').delete().eq('id', 'ctrl-pnu-1').then();
+      }
+    }
+    return cleaned;
   }
 
   static saveControlMaterial(material: ControlMaterial): void {
@@ -1033,7 +1071,17 @@ export class StorageService {
 
   // --- Parameters ---
   static getParameters(): Parameter[] {
-    return getStored<Parameter[]>(KEYS.PARAMETERS, INITIAL_PARAMETERS);
+    const list = getStored<Parameter[]>(KEYS.PARAMETERS, INITIAL_PARAMETERS);
+    const activeInsts = new Set(this.getInstruments().map(i => i.id));
+    const cleaned = list.filter(p => p.instrumentId !== 'inst-chem-a' && activeInsts.has(p.instrumentId) && !p.name.toLowerCase().includes('cobas c311'));
+    if (cleaned.length !== list.length) {
+      setStored(KEYS.PARAMETERS, cleaned);
+      const sb = getSupabase();
+      if (sb) {
+        sb.from('test_parameters').delete().eq('instrument_id', 'inst-chem-a').then();
+      }
+    }
+    return cleaned;
   }
 
   static saveParameter(param: Parameter): void {
@@ -1084,7 +1132,16 @@ export class StorageService {
 
   // --- QC Results ---
   static getQCResults(): QCResult[] {
-    const list = getStored<QCResult[]>(KEYS.QC_RESULTS, []);
+    const rawList = getStored<QCResult[]>(KEYS.QC_RESULTS, []);
+    let list = rawList.filter(r => r.instrumentId !== 'inst-chem-a' && !r.instrumentName?.toLowerCase().includes('cobas c311'));
+    if (list.length !== rawList.length) {
+      setStored(KEYS.QC_RESULTS, list);
+      const sb = getSupabase();
+      if (sb) {
+        sb.from('qc_results').delete().eq('instrument_id', 'inst-chem-a').then();
+      }
+    }
+
     if (list.length === 0) {
       const demo = generateDemoQCResults();
       setStored(KEYS.QC_RESULTS, demo);
@@ -1099,6 +1156,21 @@ export class StorageService {
         const merged = [...list, ...additions].sort((a, b) => b.timestamp - a.timestamp);
         setStored(KEYS.QC_RESULTS, merged);
         return merged;
+      }
+    }
+
+    // Ensure 3-day shift demonstration items are present
+    if (!list.some(r => r.id.startsWith('QC-SHIFT-ALT-'))) {
+      const demo = generateDemoQCResults();
+      const shiftItems = demo.filter(d => d.id.startsWith('QC-SHIFT-ALT-'));
+      if (shiftItems.length > 0) {
+        const existingIds = new Set(list.map(r => r.id));
+        const needed = shiftItems.filter(s => !existingIds.has(s.id));
+        if (needed.length > 0) {
+          const merged = [...list, ...needed].sort((a, b) => b.timestamp - a.timestamp);
+          setStored(KEYS.QC_RESULTS, merged);
+          return merged;
+        }
       }
     }
     return list;

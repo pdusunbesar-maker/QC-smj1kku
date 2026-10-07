@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   CheckCircle2, 
   AlertTriangle, 
@@ -50,7 +50,7 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
   const [selectedInstrumentId, setSelectedInstrumentId] = useState(instruments[0]?.id || '');
   const [selectedParameterId, setSelectedParameterId] = useState(parameters[0]?.id || '');
   const [selectedLevel, setSelectedLevel] = useState<'Level 1' | 'Level 2' | 'Level 3'>('Level 1');
-  const [lotNumber, setLotNumber] = useState('LOT-CCM1-2026A');
+  const [lotNumber, setLotNumber] = useState(controls[0]?.lotNumber || 'LOT-CST1-2026A');
   const [inputValue, setInputValue] = useState<string>('');
   const [notes, setNotes] = useState('');
   const [isSaved, setIsSaved] = useState(false);
@@ -72,6 +72,25 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
   const currentInstrument = useMemo(() => {
     return instruments.find(i => i.id === selectedInstrumentId) || instruments[0];
   }, [instruments, selectedInstrumentId]);
+
+  // Auto-sync Control Lot Number and Level with Master Data when Parameter changes
+  useEffect(() => {
+    if (!currentParam) return;
+    const matchedControl = controls.find(c => c.id === currentParam.controlMaterialId);
+    if (matchedControl) {
+      setLotNumber(matchedControl.lotNumber);
+      setSelectedLevel(matchedControl.level);
+    } else if (controls.length > 0) {
+      setLotNumber(controls[0].lotNumber);
+      setSelectedLevel(controls[0].level);
+    }
+  }, [selectedParameterId, currentParam, controls]);
+
+  // Active matched control material object from Master Data
+  const activeControlMaterial = useMemo(() => {
+    return controls.find(c => c.lotNumber === lotNumber) || 
+           controls.find(c => c.id === currentParam?.controlMaterialId);
+  }, [controls, lotNumber, currentParam]);
 
   // Live calculation of Z-Score, position, and Westgard preview
   const liveAnalysis = useMemo(() => {
@@ -304,56 +323,144 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
                   onChange={(e) => setSelectedParameterId(e.target.value)}
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs focus:border-emerald-500 focus:outline-none bg-white font-medium"
                 >
-                  {availableParameters.map(p => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} [{p.code}] - Target Mean: {p.targetMean} {p.unit}
-                    </option>
-                  ))}
+                  {availableParameters.map(p => {
+                    const lcl = p.minAcceptable !== undefined && p.minAcceptable !== null 
+                      ? Number(p.minAcceptable).toFixed(p.decimalPlaces) 
+                      : (p.targetMean - 3 * p.targetSD).toFixed(p.decimalPlaces);
+                    const ucl = p.maxAcceptable !== undefined && p.maxAcceptable !== null 
+                      ? Number(p.maxAcceptable).toFixed(p.decimalPlaces) 
+                      : (p.targetMean + 3 * p.targetSD).toFixed(p.decimalPlaces);
+                    return (
+                      <option key={p.id} value={p.id}>
+                        {p.name} [{p.code}] - Mean: {p.targetMean} | Target Range: {lcl} - {ucl} {p.unit}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
             </div>
 
             {/* Control Material Level & Lot */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Level Bahan Kontrol *
-                </label>
-                <select
-                  value={selectedLevel}
-                  onChange={(e) => setSelectedLevel(e.target.value as any)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs focus:border-emerald-500 focus:outline-none bg-white"
-                >
-                  <option value="Level 1">Level 1 (Normal)</option>
-                  <option value="Level 2">Level 2 (Patologis / High)</option>
-                  <option value="Level 3">Level 3 (Low / Khusus)</option>
-                </select>
+            <div className="space-y-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Level Bahan Kontrol *
+                  </label>
+                  <select
+                    value={selectedLevel}
+                    onChange={(e) => setSelectedLevel(e.target.value as any)}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs focus:border-emerald-500 focus:outline-none bg-white font-medium"
+                  >
+                    <option value="Level 1">Level 1 (Normal)</option>
+                    <option value="Level 2">Level 2 (Patologis / High)</option>
+                    <option value="Level 3">Level 3 (Low / Khusus)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Pilih Nomor Lot Kontrol (Master Data) *
+                    </label>
+                    {currentParam?.controlMaterialId && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const matched = controls.find(c => c.id === currentParam.controlMaterialId);
+                          if (matched) {
+                            setLotNumber(matched.lotNumber);
+                            setSelectedLevel(matched.level);
+                          }
+                        }}
+                        className="text-[10px] text-emerald-700 hover:underline font-semibold"
+                        title="Otomatis pilih lot yang terhubung di Master Data Parameter"
+                      >
+                        Reset Lot Parameter
+                      </button>
+                    )}
+                  </div>
+                  <select
+                    value={controls.some(c => c.lotNumber === lotNumber) ? lotNumber : 'CUSTOM'}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === 'CUSTOM') {
+                        // Keep current lotNumber string or set empty for manual input
+                      } else {
+                        const matched = controls.find(c => c.lotNumber === val);
+                        if (matched) {
+                          setLotNumber(matched.lotNumber);
+                          setSelectedLevel(matched.level);
+                        }
+                      }
+                    }}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-mono font-semibold focus:border-emerald-500 focus:outline-none bg-white"
+                  >
+                    {controls.map(c => {
+                      const isParamDefault = c.id === currentParam?.controlMaterialId;
+                      return (
+                        <option key={c.id} value={c.lotNumber}>
+                          {c.lotNumber} - {c.name} ({c.level}){isParamDefault ? ' ★ [Master Default]' : ''} · Exp: {c.expirationDate}
+                        </option>
+                      );
+                    })}
+                    <option value="CUSTOM">+ Lot Baru / Input Manual Lainnya...</option>
+                  </select>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Nomor Lot Kontrol *
-                </label>
-                <input
-                  type="text"
-                  value={lotNumber}
-                  onChange={(e) => setLotNumber(e.target.value)}
-                  placeholder="Contoh: LOT-CCM1-2026A"
-                  required
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-mono focus:border-emerald-500 focus:outline-none"
-                />
-              </div>
+              {/* Secondary custom lot input if user selected CUSTOM */}
+              {!controls.some(c => c.lotNumber === lotNumber) && (
+                <div className="p-2.5 bg-amber-50 rounded-lg border border-amber-200 text-xs space-y-1">
+                  <label className="block font-semibold text-amber-900">Input Manual No Lot Khusus / Baru:</label>
+                  <input
+                    type="text"
+                    value={lotNumber}
+                    onChange={(e) => setLotNumber(e.target.value)}
+                    placeholder="Ketikkan Nomor Lot..."
+                    required
+                    className="w-full rounded-lg border border-amber-300 px-3 py-1.5 font-mono text-xs font-bold bg-white text-slate-900"
+                  />
+                </div>
+              )}
+
+              {/* Synchronization Indicator Badge */}
+              {activeControlMaterial && (
+                <div className="flex items-center gap-2 p-2 rounded-lg bg-emerald-50/80 border border-emerald-200 text-xs text-emerald-950 font-medium">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <div className="flex-1 flex flex-wrap items-center justify-between gap-1">
+                    <span>
+                      <strong>Tersinkron Master Data:</strong> {activeControlMaterial.name} ({activeControlMaterial.manufacturer})
+                    </span>
+                    <span className="font-mono text-[11px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold">
+                      Lot: {activeControlMaterial.lotNumber} · Exp: {activeControlMaterial.expirationDate}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Value Entry with Target Guide */}
             <div className="rounded-lg bg-slate-50 p-4 border border-slate-200/80 space-y-2">
-              <div className="flex items-center justify-between text-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs gap-1.5">
                 <span className="font-semibold text-slate-700">
                   Hasil Pengukuran Alat ({currentParam?.unit}) *
                 </span>
-                <span className="font-mono text-slate-500">
-                  Target: Mean {currentParam?.targetMean} ± SD {currentParam?.targetSD} (Rentang ±2SD: {(currentParam?.targetMean - 2 * currentParam?.targetSD).toFixed(1)} - {(currentParam?.targetMean + 2 * currentParam?.targetSD).toFixed(1)})
-                </span>
+                {currentParam && (
+                  <div className="flex flex-wrap items-center gap-2 font-mono text-[11px]">
+                    <span className="text-slate-600">
+                      Mean: <strong>{currentParam.targetMean}</strong> ± SD: <strong>{currentParam.targetSD}</strong>
+                    </span>
+                    <span className="text-slate-300">·</span>
+                    <span className="text-[#0B5FA5] font-bold bg-blue-50/80 px-2 py-0.5 rounded border border-blue-200">
+                      Target Range (LCL/UCL): {currentParam.minAcceptable !== undefined && currentParam.minAcceptable !== null
+                        ? Number(currentParam.minAcceptable).toFixed(currentParam.decimalPlaces)
+                        : (currentParam.targetMean - 3 * currentParam.targetSD).toFixed(currentParam.decimalPlaces)} - {currentParam.maxAcceptable !== undefined && currentParam.maxAcceptable !== null
+                        ? Number(currentParam.maxAcceptable).toFixed(currentParam.decimalPlaces)
+                        : (currentParam.targetMean + 3 * currentParam.targetSD).toFixed(currentParam.decimalPlaces)} {currentParam.unit}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="relative">

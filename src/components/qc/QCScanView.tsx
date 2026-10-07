@@ -40,10 +40,13 @@ import {
   Play
 } from 'lucide-react';
 import { StorageService } from '../../services/storage';
-import { Instrument, Parameter } from '../../types';
+import { Instrument, Parameter, ControlMaterial } from '../../types';
 import { validateExtractedResultsBatch, PARAMETER_SCHEMAS } from '../../utils/schemaValidation';
 
 interface QCScanViewProps {
+  controls?: ControlMaterial[];
+  parameters?: Parameter[];
+  instruments?: Instrument[];
   onScanComplete: (results: any[], previewUrl: string | null, documentMeta?: any) => void;
 }
 
@@ -286,45 +289,45 @@ const SAMPLE_PRESETS = [
     ]
   },
   {
-    id: 'sample-cobas',
-    title: 'Cobas c311 Auto-Chemistry',
-    description: 'Glukosa, Kolesterol, Ureum, Kreatinin (Roche Diagnostics)',
-    badge: 'Cobas c311',
-    instrumentId: 'inst-chem-a',
+    id: 'sample-hema550',
+    title: 'Sysmex XN-550 Hematology 5-Diff',
+    description: 'WBC, RBC, HGB, HCT, PLT, NEUT%, LYMPH% (Sysmex XN-Series)',
+    badge: 'Sysmex XN-550',
+    instrumentId: 'inst-hema-a',
     color: 'border-emerald-500 bg-emerald-50/50 text-emerald-800',
     dataUrl: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?w=800&auto=format&fit=crop&q=80',
     documentMeta: {
-      analyzer: 'Chemistry Analyzer A (Cobas c311)',
-      instrument_id: 'inst-chem-a',
+      analyzer: 'Hematology Analyzer 5-Diff (Sysmex XN-550)',
+      instrument_id: 'inst-hema-a',
       control_level: 'Level 1',
-      lot_number: 'LOT-CCM1-2026A',
+      lot_number: 'LOT-EIGHT-1026',
       laboratory_name: 'RSUD SULTAN MUHAMMAD JAMALUDIN I',
       date: new Date().toISOString().split('T')[0],
       time: new Date().toTimeString().split(' ')[0].substring(0, 5)
     },
     presetResults: [
       {
-        parameter: { value: 'Glucose (Glukosa Darah Cobas c311)', original_text: 'GLUC', confidence: 0.97 },
+        parameter: { value: 'Leukosit / WBC (Sysmex XN-550)', original_text: 'WBC', confidence: 0.98 },
         level: { value: 'Level 1', original_text: 'L1', confidence: 0.96 },
-        lot: { value: 'LOT-CCM1-2026A', confidence: 0.95 },
-        result: { value: 101.5, original_text: '101.5', confidence: 0.98 },
-        unit: { value: 'mg/dL', confidence: 0.98 },
-        mean: { value: 100.0, confidence: 0.95 },
-        sd: { value: 3.5, confidence: 0.95 },
-        source_text: 'GLUC 101.5 mg/dL',
-        overall_confidence: 0.97,
+        lot: { value: 'LOT-EIGHT-1026', confidence: 0.95 },
+        result: { value: 7.15, original_text: '7.15', confidence: 0.99 },
+        unit: { value: '10^3/uL', confidence: 0.98 },
+        mean: { value: 7.20, confidence: 0.95 },
+        sd: { value: 0.35, confidence: 0.95 },
+        source_text: 'WBC 7.15 10^3/uL',
+        overall_confidence: 0.98,
         needs_verification: false
       },
       {
-        parameter: { value: 'Cholesterol Total (Cobas c311)', original_text: 'CHOL', confidence: 0.95 },
+        parameter: { value: 'Hemoglobin / HGB (Sysmex XN-550)', original_text: 'HGB', confidence: 0.98 },
         level: { value: 'Level 1', original_text: 'L1', confidence: 0.96 },
-        lot: { value: 'LOT-CCM1-2026A', confidence: 0.95 },
-        result: { value: 162.0, original_text: '162.0', confidence: 0.98 },
-        unit: { value: 'mg/dL', confidence: 0.98 },
-        mean: { value: 160.0, confidence: 0.95 },
-        sd: { value: 5.2, confidence: 0.95 },
-        source_text: 'CHOL 162.0 mg/dL',
-        overall_confidence: 0.95,
+        lot: { value: 'LOT-EIGHT-1026', confidence: 0.95 },
+        result: { value: 12.8, original_text: '12.8', confidence: 0.99 },
+        unit: { value: 'g/dL', confidence: 0.98 },
+        mean: { value: 12.9, confidence: 0.95 },
+        sd: { value: 0.4, confidence: 0.95 },
+        source_text: 'HGB 12.8 g/dL',
+        overall_confidence: 0.98,
         needs_verification: false
       }
     ]
@@ -412,9 +415,14 @@ async function cropAndOptimizeImage(
   });
 }
 
-export const QCScanView: React.FC<QCScanViewProps> = ({ onScanComplete }) => {
-  const [instruments, setInstruments] = useState<Instrument[]>([]);
-  const [parameters, setParameters] = useState<Parameter[]>([]);
+export const QCScanView: React.FC<QCScanViewProps> = ({ 
+  controls, 
+  parameters: propParameters, 
+  instruments: propInstruments, 
+  onScanComplete 
+}) => {
+  const [instruments, setInstruments] = useState<Instrument[]>(() => propInstruments || []);
+  const [parameters, setParameters] = useState<Parameter[]>(() => propParameters || []);
   const [selectedInstrumentId, setSelectedInstrumentId] = useState<string>('auto');
   
   // Mode: Single image vs Batch multi-image
@@ -1108,11 +1116,12 @@ export const QCScanView: React.FC<QCScanViewProps> = ({ onScanComplete }) => {
               onChange={(e) => setSelectedInstrumentId(e.target.value)}
               className="px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
             >
-              <option value="auto">🔍 Auto-Detect dari Foto (Semua Alat)</option>
-              <option value="inst-cst240">🧪 Chemistry Analyzer CST-240 (Dirui CS-T240)</option>
-              <option value="inst-dirui-3980">🔬 Dirui Dimih 3980 Automated Analyzer</option>
-              <option value="inst-chem-a">🏥 Chemistry Analyzer A (Cobas c311)</option>
-              <option value="inst-hema-a">🩸 Hematology Analyzer (Sysmex XN-550)</option>
+              <option value="auto">🔍 Auto-Detect dari Foto (Semua Alat Master)</option>
+              {instruments.map((inst) => (
+                <option key={inst.id} value={inst.id}>
+                  🧪 {inst.name} ({inst.code})
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -1608,7 +1617,9 @@ export const QCScanView: React.FC<QCScanViewProps> = ({ onScanComplete }) => {
                 </h3>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {SAMPLE_PRESETS.map((preset) => (
+                {SAMPLE_PRESETS
+                  .filter(preset => instruments.length === 0 || instruments.some(inst => inst.id === preset.instrumentId))
+                  .map((preset) => (
                   <button
                     key={preset.id}
                     type="button"

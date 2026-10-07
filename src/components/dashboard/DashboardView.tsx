@@ -23,7 +23,8 @@ import {
   CalendarDays,
   Camera,
   X,
-  Sparkles
+  Sparkles,
+  BellRing
 } from 'lucide-react';
 import { QCResult, CAPA, NonConformity, Instrument, Parameter, AuditLog } from '../../types';
 import { useAuth } from '../../context/AuthContext';
@@ -31,6 +32,8 @@ import { StorageService } from '../../services/storage';
 import { SummaryCardsPanel } from './panels/SummaryCardsPanel';
 import { CriticalAlertsPanel } from './panels/CriticalAlertsPanel';
 import { MonthlyQCVolumeChartPanel } from './panels/MonthlyQCVolumeChartPanel';
+import { AutomatedRunningAverageAlertsPanel } from './panels/AutomatedRunningAverageAlertsPanel';
+import { RunningAverageAlertService } from '../../services/runningAverageAlertService';
 
 interface DashboardViewProps {
   qcResults: QCResult[];
@@ -57,6 +60,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [selectedPeriod, setSelectedPeriod] = useState<'today' | '7d' | '30d' | 'all'>('today');
   const [selectedPreviewParamId, setSelectedPreviewParamId] = useState<string>(parameters[0]?.id || '');
   const [savedNotification, setSavedNotification] = useState<any>(() => initialData?.qcSaved ? initialData : null);
+  const [dismissedShiftNotification, setDismissedShiftNotification] = useState(false);
+
+  // Dynamic evaluation of 3-consecutive-days running average shift alerts
+  const runningAvgAlerts = useMemo(() => {
+    return RunningAverageAlertService.detectRunningAverageAlerts(
+      qcResults,
+      parameters,
+      instruments,
+      { thresholdSD: 1.0, consecutiveDays: 3 }
+    );
+  }, [qcResults, parameters, instruments]);
+
+  const activeShiftAlerts = useMemo(() => {
+    return runningAvgAlerts.filter(a => a.isActive);
+  }, [runningAvgAlerts]);
 
   useEffect(() => {
     if (initialData?.qcSaved) {
@@ -149,6 +167,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       tab: string;
       payload?: any;
     }> = [];
+
+    // 0. Active 3-Day Running Average Shift Alerts (High Urgency)
+    activeShiftAlerts.slice(0, 2).forEach(a => {
+      items.push({
+        id: `runavg-${a.id}`,
+        type: 'reject',
+        title: `🚨 ${a.parameterName} (${a.parameterCode})`,
+        subtitle: `Running average (${a.latestRunningMean} ${a.unit}) > ${a.thresholdSD}SD (${a.latestZScore > 0 ? '+' : ''}${a.latestZScore}SD) selama ${a.consecutiveDaysCount} hari`,
+        tag: '3-Day Shift Alert',
+        actionText: 'Investigasi',
+        tab: 'levey-jennings',
+        payload: { parameterId: a.parameterId },
+      });
+    });
 
     // 1. Rejected QC Results
     const recentRejects = qcResults.filter(r => r.status === 'reject').slice(0, 3);
@@ -336,6 +368,51 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       )}
       
+      {/* Automated 3-Day Running Average Shift Alert Notification Banner */}
+      {activeShiftAlerts.length > 0 && !dismissedShiftNotification && (
+        <div className="rounded-2xl border-2 border-rose-300 bg-linear-to-r from-rose-50 via-white to-amber-50/60 p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <div className="h-10 w-10 rounded-xl bg-rose-600 flex items-center justify-center text-white shadow-xs shrink-0 mt-0.5">
+              <BellRing className="h-5 w-5 animate-bounce" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-bold text-rose-950 text-sm sm:text-base">
+                  🚨 Peringatan Otomatis: Pergeseran Running Average QC Terdeteksi!
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-rose-200 text-rose-900 border border-rose-300">
+                  {activeShiftAlerts.length} Parameter Kritis
+                </span>
+              </div>
+              <p className="text-xs text-rose-900/90 mt-1 leading-relaxed">
+                Running average parameter <strong>{activeShiftAlerts.map(a => `${a.parameterName} (${a.parameterCode})`).join(', ')}</strong> telah melampaui ambang batas SD selama <strong>3 hari berturut-turut</strong>. Menandakan pergeseran analitik sistematis (Systematic Analytical Shift / Bias) yang memerlukan tindakan korektif segera.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+            <button
+              type="button"
+              onClick={() => {
+                const el = document.getElementById('automated-running-avg-panel');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+            >
+              <span>Lihat Rincian Analisis</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setDismissedShiftNotification(true)}
+              className="p-2 text-slate-400 hover:text-slate-700 hover:bg-white rounded-xl transition-colors cursor-pointer"
+              title="Tutup Banner"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+      
       {/* ========================================================================= */}
       {/* 1. COMMAND CENTER HEADER & WELCOME AREA                                   */}
       {/* ========================================================================= */}
@@ -438,9 +515,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         openCapa={capaMetrics.open}
       />
 
+      {/* ========================================================================= */}
+      {/* 2.5. SISTEM PERINGATAN OTOMATIS: 3-DAY RUNNING AVERAGE SHIFT ALERTS       */}
+      {/* ========================================================================= */}
+      <div id="automated-running-avg-panel" className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-12">
+          <AutomatedRunningAverageAlertsPanel 
+            qcResults={qcResults}
+            parameters={parameters}
+            instruments={instruments}
+            onNavigateToTab={onNavigateToTab}
+          />
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-12">
-          <CriticalAlertsPanel alerts={attentionItems.filter(i => i.type === 'reject')} />
+          <CriticalAlertsPanel 
+            alerts={attentionItems.filter(i => i.type === 'reject')} 
+            onNavigateToTab={onNavigateToTab}
+          />
         </div>
       </div>
 

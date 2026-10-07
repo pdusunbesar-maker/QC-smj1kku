@@ -215,12 +215,17 @@ function AppContent() {
 
             {/* 3. Scan QC View */}
             {activeTab === 'qc-scan' && (
-              <QCScanView onScanComplete={(results, previewUrl, docMeta) => {
-                setScannedResults(results);
-                setScanPreviewUrl(previewUrl);
-                setScannedDocumentMeta(docMeta);
-                setActiveTab('qc-verification');
-              }} />
+              <QCScanView 
+                controls={controls}
+                parameters={parameters}
+                instruments={instruments}
+                onScanComplete={(results, previewUrl, docMeta) => {
+                  setScannedResults(results);
+                  setScanPreviewUrl(previewUrl);
+                  setScannedDocumentMeta(docMeta);
+                  setActiveTab('qc-verification');
+                }} 
+              />
             )}
 
             {/* 4. Scan QC Verification View */}
@@ -231,6 +236,7 @@ function AppContent() {
                 documentMeta={scannedDocumentMeta}
                 parameters={parameters}
                 instruments={instruments}
+                controls={controls}
                 existingResults={qcResults}
                 onSave={(savedData) => {
                   setQcResults(StorageService.getQCResults());

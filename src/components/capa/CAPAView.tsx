@@ -480,7 +480,7 @@ export const CAPAView: React.FC<CAPAViewProps> = ({
                   value={problemStatement}
                   onChange={(e) => setProblemStatement(e.target.value)}
                   required
-                  placeholder="Contoh: Terjadi pergeseran sistematik pada parameter Glucose Cobas c311..."
+                  placeholder="Contoh: Terjadi pergeseran sistematik pada parameter Glucose CST-240..."
                   className="w-full rounded-lg border border-slate-200 px-3 py-2"
                 />
               </div>

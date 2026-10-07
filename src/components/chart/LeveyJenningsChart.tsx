@@ -24,7 +24,7 @@ import {
   Filter
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
-import html2canvas from 'html2canvas';
+import html2canvas from 'html2canvas-pro';
 import { QCResult, Parameter, QCStatistics, LaboratoryInfo, QCStatus, WestgardViolation } from '../../types';
 import { calculateQCStatistics } from '../../utils/qcCalculations';
 import { StorageService } from '../../services/storage';

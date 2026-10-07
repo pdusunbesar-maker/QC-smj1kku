@@ -1,6 +1,7 @@
 import { Parameter, Instrument, ControlMaterial, QCResult, WestgardViolation, QCStatus } from '../types';
 import { calculateZScore, formatSDPosition, evaluateWestgardRules, DEFAULT_WESTGARD_RULES } from './qcCalculations';
 import { validateQCItemSchema, ValidationResult, PARAMETER_SCHEMAS } from './schemaValidation';
+import { StorageService } from '../services/storage';
 
 export interface ExtractedAIItem {
   parameter?: { value?: string; original_text?: string; confidence?: number };
@@ -262,13 +263,15 @@ export function buildVerifiedItemsFromAI(
   parameters: Parameter[],
   instruments: Instrument[],
   existingResults: QCResult[] = [],
-  filterInstrumentId?: string
+  filterInstrumentId?: string,
+  controls?: ControlMaterial[]
 ): VerifiedQCItem[] {
+  const masterControls = controls && controls.length > 0 ? controls : StorageService.getControlMaterials();
   const today = documentMeta?.date || new Date().toISOString().split('T')[0];
   const time = documentMeta?.time || new Date().toTimeString().split(' ')[0].substring(0, 5);
   const docAnalyzer = documentMeta?.analyzer;
   const controlLevel = matchControlLevel(documentMeta?.control_level);
-  const lotNumber = documentMeta?.lot_number || (controlLevel === 'Level 2' ? 'LOT-CCM2-2026B' : 'LOT-CST1-2026A');
+  const lotNumber = documentMeta?.lot_number || (masterControls[0]?.lotNumber || 'LOT-CST1-2026A');
 
   // Determine the target instrument for this document
   let defaultInst = (filterInstrumentId ? instruments.find(i => i.id === filterInstrumentId) : null) 
@@ -377,9 +380,16 @@ export function buildVerifiedItemsFromAI(
         || defaultInst;
 
       const matchedParam = matchParameter(paramName, item.parameter?.original_text, parameters, matchedInst?.id);
-      const itemLevel = matchControlLevel(item.level?.value || documentMeta?.control_level);
+      const matchedControl = masterControls.find(c => c.id === matchedParam?.controlMaterialId);
+
+      const itemLevel = matchControlLevel(
+        item.level?.value || documentMeta?.control_level || matchedControl?.level
+      );
       
-      const itemLot = item.lot?.value || documentMeta?.lot_number || (itemLevel === 'Level 2' ? 'LOT-CCM2-2026B' : 'LOT-CST1-2026A');
+      const itemLot = item.lot?.value || 
+                      documentMeta?.lot_number || 
+                      matchedControl?.lotNumber || 
+                      (matchedControl?.lotNumber || masterControls[0]?.lotNumber || 'LOT-CST1-2026A');
       
       // 1. Result value: The actual measured QC concentration read from photo/struk
       let rawResultValue: number = 0;

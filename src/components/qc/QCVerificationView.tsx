@@ -27,7 +27,7 @@ import {
   Images,
   Loader2
 } from 'lucide-react';
-import { Parameter, Instrument, QCResult, WestgardViolation, QCStatus } from '../../types';
+import { Parameter, Instrument, ControlMaterial, QCResult, WestgardViolation, QCStatus } from '../../types';
 import { calculateZScore, formatSDPosition, evaluateWestgardRules, DEFAULT_WESTGARD_RULES } from '../../utils/qcCalculations';
 import { buildVerifiedItemsFromAI, VerifiedQCItem } from '../../utils/aiUtils';
 import { StorageService } from '../../services/storage';
@@ -39,6 +39,7 @@ interface QCVerificationViewProps {
   documentMeta?: any;
   parameters: Parameter[];
   instruments: Instrument[];
+  controls?: ControlMaterial[];
   existingResults?: QCResult[];
   onSave?: (results: QCResult[]) => void;
   onRetakeScan?: () => void;
@@ -51,12 +52,16 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
   documentMeta,
   parameters, 
   instruments,
+  controls,
   existingResults = [],
   onSave,
   onRetakeScan,
   onNavigateToTab
 }) => {
   const { user } = useAuth();
+  const masterControls = useMemo(() => {
+    return controls && controls.length > 0 ? controls : StorageService.getControlMaterials();
+  }, [controls]);
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [isSavedSuccess, setIsSavedSuccess] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -78,9 +83,7 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
   const detectedInstrumentId = useMemo(() => {
     if (documentMeta?.instrument_id) return documentMeta.instrument_id;
     const docName = (documentMeta?.analyzer || '').toLowerCase();
-    if (docName.includes('cst') || docName.includes('cs-t240')) return 'inst-cst240';
-    if (docName.includes('dimih') || docName.includes('3980')) return 'inst-dirui-3980';
-    if (docName.includes('cobas') || docName.includes('c311')) return 'inst-chem-a';
+    if (docName.includes('cst') || docName.includes('cs-t240') || docName.includes('cobas') || docName.includes('c311')) return 'inst-cst240';
     if (docName.includes('sysmex') || docName.includes('xn')) return 'inst-hema-a';
     return 'ALL';
   }, [documentMeta]);
@@ -121,7 +124,7 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
 
       const updated = { ...item, [field]: value };
 
-      // When user changes parameter from dropdown, automatically synchronize Target Mean, Target SD, Unit, and Instrument
+      // When user changes parameter from dropdown, automatically synchronize Target Mean, Target SD, Unit, Instrument, and Control Lot
       if (field === 'parameterId') {
         const param = parameters.find(p => p.id === value);
         if (param) {
@@ -136,6 +139,12 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
               updated.instrumentId = inst.id;
               updated.instrumentName = inst.name;
             }
+          }
+          // Auto-sync Control Lot Number and Level with Master Data
+          const matchedCtrl = masterControls.find(c => c.id === param.controlMaterialId);
+          if (matchedCtrl) {
+            updated.lotNumber = matchedCtrl.lotNumber;
+            updated.controlLevel = matchedCtrl.level;
           }
         }
       }
@@ -185,7 +194,7 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
     }));
   };
 
-  // Sync specific item targets back to Master Data default
+  // Sync specific item targets and control lot back to Master Data default
   const syncWithMasterData = (id: string) => {
     setItems(prev => prev.map(item => {
       if (item.id !== id) return item;
@@ -197,6 +206,8 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
       const val = item.resultValue;
       const zScore = calculateZScore(val, mean, sd);
       const sdPosition = formatSDPosition(zScore);
+
+      const matchedCtrl = masterControls.find(c => c.id === param.controlMaterialId);
 
       const history = existingResults.filter(r => r.parameterId === item.parameterId);
       const { status, violations } = evaluateWestgardRules(
@@ -210,10 +221,27 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
         targetMean: mean,
         targetSD: sd,
         unit: param.unit,
+        lotNumber: matchedCtrl?.lotNumber || item.lotNumber,
+        controlLevel: matchedCtrl?.level || item.controlLevel,
         zScore,
         sdPosition,
         status,
         violations
+      };
+    }));
+  };
+
+  // Sync all items' control lot numbers with Master Data Parameter defaults
+  const syncAllLotsWithMasterData = () => {
+    setItems(prev => prev.map(item => {
+      const param = parameters.find(p => p.id === item.parameterId);
+      if (!param) return item;
+      const matchedCtrl = masterControls.find(c => c.id === param.controlMaterialId);
+      if (!matchedCtrl) return item;
+      return {
+        ...item,
+        lotNumber: matchedCtrl.lotNumber,
+        controlLevel: matchedCtrl.level
       };
     }));
   };
@@ -531,7 +559,16 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
         </div>
 
         {/* Action Summary Pill */}
-        <div className="flex items-center gap-2 text-xs">
+        <div className="flex items-center gap-2 text-xs flex-wrap">
+          <button
+            type="button"
+            onClick={syncAllLotsWithMasterData}
+            className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-[#0B5FA5] font-bold text-xs rounded-xl border border-blue-200 flex items-center gap-1.5 transition-colors cursor-pointer"
+            title="Satu klik menyinkronkan seluruh nomor lot dan level dengan Master Data Kontrol"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            <span>Sync Lot Master Data</span>
+          </button>
           <div className="bg-slate-100 px-3 py-1.5 rounded-xl font-semibold text-slate-700">
             Terpilih: <strong>{selectedItems.length}</strong> / {displayedItems.length}
           </div>
@@ -881,24 +918,53 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
 
                       {/* Level & Lot */}
                       <div className="space-y-1">
-                        <label className="text-slate-700 font-bold">Level & Lot Kontrol</label>
+                        <div className="flex items-center justify-between text-xs">
+                          <label className="text-slate-700 font-bold">Level & Lot Kontrol</label>
+                          {masterControls.some(c => c.lotNumber === item.lotNumber) ? (
+                            <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded">
+                              ✓ Sync Master
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded">
+                              Custom Lot
+                            </span>
+                          )}
+                        </div>
                         <div className="flex gap-1.5">
                           <select
                             value={item.controlLevel}
                             onChange={(e) => updateItemField(item.id, 'controlLevel', e.target.value as any)}
-                            className="w-1/2 border border-slate-300 rounded-xl p-2 font-medium bg-white focus:ring-2 focus:ring-[#0B5FA5]"
+                            className="w-1/3 border border-slate-300 rounded-xl p-2 font-medium bg-white focus:ring-2 focus:ring-[#0B5FA5]"
                           >
                             <option value="Level 1">Level 1</option>
                             <option value="Level 2">Level 2</option>
                             <option value="Level 3">Level 3</option>
                           </select>
-                          <input
-                            type="text"
-                            value={item.lotNumber}
-                            onChange={(e) => updateItemField(item.id, 'lotNumber', e.target.value)}
-                            placeholder="No Lot"
-                            className="w-1/2 border border-slate-300 rounded-xl p-2 font-mono text-xs font-semibold bg-white"
-                          />
+                          <select
+                            value={masterControls.some(c => c.lotNumber === item.lotNumber) ? item.lotNumber : 'CUSTOM'}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val !== 'CUSTOM') {
+                                const matched = masterControls.find(c => c.lotNumber === val);
+                                if (matched) {
+                                  updateItemField(item.id, 'lotNumber', matched.lotNumber);
+                                  updateItemField(item.id, 'controlLevel', matched.level);
+                                }
+                              }
+                            }}
+                            className="w-2/3 border border-slate-300 rounded-xl p-2 font-mono text-xs font-bold bg-white focus:ring-2 focus:ring-[#0B5FA5]"
+                          >
+                            {masterControls.map(c => {
+                              const paramObj = parameters.find(p => p.id === item.parameterId);
+                              const isParamDefault = paramObj?.controlMaterialId === c.id;
+                              return (
+                                <option key={c.id} value={c.lotNumber}>
+                                  {c.lotNumber}{isParamDefault ? ' ★ [Default]' : ''} ({c.level})
+                                </option>
+                              );
+                            })}
+                            <option value="CUSTOM">+ Lot Manual ({item.lotNumber})</option>
+                          </select>
                         </div>
                       </div>
                     </div>

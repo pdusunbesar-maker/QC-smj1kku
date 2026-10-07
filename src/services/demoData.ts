@@ -155,21 +155,6 @@ export const INITIAL_INSTRUMENTS: Instrument[] = [
     nextMaintenanceDate: '2026-10-18'
   },
   {
-    id: 'inst-chem-a',
-    name: 'Chemistry Analyzer A (Cobas c311)',
-    code: 'CHEM-A',
-    brand: 'Roche Diagnostics',
-    model: 'Cobas c311 Auto-Chemistry',
-    serialNumber: 'SN-ROCHE-2023-90812',
-    unit: 'Patologi Klinik - Kimia Klinik',
-    location: 'Meja Kimia Darah Utama',
-    status: 'active',
-    lastCalibrationDate: '2026-09-01',
-    nextCalibrationDate: '2027-03-01',
-    lastMaintenanceDate: '2026-09-25',
-    nextMaintenanceDate: '2026-10-25'
-  },
-  {
     id: 'inst-hema-a',
     name: 'Hematology Analyzer 5-Diff (Sysmex XN-550)',
     code: 'HEMA-A',
@@ -727,83 +712,21 @@ export const INITIAL_PARAMETERS: Parameter[] = [
     minAcceptable: 7.4,
     maxAcceptable: 11.6,
     decimalPlaces: 1
-  },
-
-  // Cobas c311 Parameters
-  {
-    id: 'param-glu',
-    code: 'GLU',
-    name: 'Glucose (Glukosa Darah Cobas c311)',
-    unit: 'mg/dL',
-    method: 'Heksokinase / UV enzymatic',
-    instrumentId: 'inst-chem-a',
-    controlMaterialId: 'ctrl-pnu-1',
-    targetMean: 100.0,
-    targetSD: 3.5,
-    targetCV: 3.5,
-    minAcceptable: 89.5,
-    maxAcceptable: 110.5,
-    decimalPlaces: 1
-  },
-  {
-    id: 'param-chol',
-    code: 'CHOL',
-    name: 'Cholesterol Total (Cobas c311)',
-    unit: 'mg/dL',
-    method: 'CHOD-PAP Enzymatic Colorimetric',
-    instrumentId: 'inst-chem-a',
-    controlMaterialId: 'ctrl-pnu-1',
-    targetMean: 160.0,
-    targetSD: 5.2,
-    targetCV: 3.25,
-    minAcceptable: 144.4,
-    maxAcceptable: 175.6,
-    decimalPlaces: 1
-  },
-  {
-    id: 'param-urea',
-    code: 'UREA',
-    name: 'Urea / Ureum Darah (Cobas c311)',
-    unit: 'mg/dL',
-    method: 'Urease / GLDH Kinetic UV',
-    instrumentId: 'inst-chem-a',
-    controlMaterialId: 'ctrl-pnu-1',
-    targetMean: 38.0,
-    targetSD: 1.6,
-    targetCV: 4.21,
-    minAcceptable: 33.2,
-    maxAcceptable: 42.8,
-    decimalPlaces: 1
-  },
-  {
-    id: 'param-creat',
-    code: 'CREAT',
-    name: 'Creatinine / Kreatinin Serum (Cobas c311)',
-    unit: 'mg/dL',
-    method: 'Jaffe rate-blanked compensated',
-    instrumentId: 'inst-chem-a',
-    controlMaterialId: 'ctrl-pnu-1',
-    targetMean: 1.25,
-    targetSD: 0.06,
-    targetCV: 4.8,
-    minAcceptable: 1.07,
-    maxAcceptable: 1.43,
-    decimalPlaces: 2
   }
 ];
 
 // Helper to generate 35 realistic chronological demo QC records
 export function generateDemoQCResults(): QCResult[] {
   const results: QCResult[] = [];
-  const targetMean = 100.0;
+  const targetMean = 104.0;
   const targetSD = 3.5;
   const unit = 'mg/dL';
-  const paramId = 'param-glu';
-  const paramCode = 'GLU';
-  const paramName = 'Glucose (Glukosa Darah Sewaktu/Puasa)';
-  const instrumentId = 'inst-chem-a';
-  const instrumentName = 'Chemistry Analyzer A (Cobas c311)';
-  const lot = 'LOT-CCM1-2026A';
+  const paramId = 'param-cst-glu';
+  const paramCode = 'GLU-HK';
+  const paramName = 'Glucose Hexokinase / GLU-HK (CST-240)';
+  const instrumentId = 'inst-cst240';
+  const instrumentName = 'Chemistry Analyzer CST-240 (Dirui CS-T240)';
+  const lot = 'LOT-CST1-2026A';
 
   // Specific simulation values that demonstrate Westgard scenarios naturally
   // 35 days sequence:
@@ -941,7 +864,7 @@ export function generateDemoQCResults(): QCResult[] {
   }
 
   // --- Multi-Month Historical QC Records Generator for Laboratory Workload Evaluation ---
-  // Covers past 11 calendar months (Nov 2025 - Oct 2026) across CST-240, DIMIH 3980, Cobas c311, and Sysmex XN-550
+  // Covers past 11 calendar months (Nov 2025 - Oct 2026) across CST-240, DIMIH 3980, and Sysmex XN-550
   const sampleParams = [
     INITIAL_PARAMETERS.find(p => p.id === 'param-cst-alb'),
     INITIAL_PARAMETERS.find(p => p.id === 'param-cst-alt'),
@@ -949,7 +872,7 @@ export function generateDemoQCResults(): QCResult[] {
     INITIAL_PARAMETERS.find(p => p.id === 'param-dimih-wbc'),
     INITIAL_PARAMETERS.find(p => p.id === 'param-dimih-hgb'),
     INITIAL_PARAMETERS.find(p => p.id === 'param-hema-wbc'),
-    INITIAL_PARAMETERS.find(p => p.id === 'param-creat')
+    INITIAL_PARAMETERS.find(p => p.id === 'param-cst-cre')
   ].filter(Boolean) as typeof INITIAL_PARAMETERS;
 
   // Month offsets: -11 (Nov 2025) to 0 (Oct 2026)
@@ -1061,6 +984,60 @@ export function generateDemoQCResults(): QCResult[] {
     });
   }
 
+  // --- Simulated 3 Consecutive Days Shift Scenario for Running Average Alert ---
+  // Parameter: SGPT / ALT CST-240 (param-cst-alt), targetMean: 32.0, targetSD: 1.7
+  // Consecutive days: 2026-10-05, 2026-10-06, 2026-10-07
+  // Day 1 (10-05): value 34.3 (z = +1.35 SD)
+  // Day 2 (10-06): value 34.6 (z = +1.53 SD)
+  // Day 3 (10-07): value 34.9 (z = +1.71 SD)
+  const altParam = INITIAL_PARAMETERS.find(p => p.id === 'param-cst-alt');
+  if (altParam) {
+    const shiftDays = [
+      { date: '2026-10-05', val: 34.3, z: 1.35 },
+      { date: '2026-10-06', val: 34.6, z: 1.53 },
+      { date: '2026-10-07', val: 34.9, z: 1.71 },
+    ];
+
+    shiftDays.forEach((sdItem, sIdx) => {
+      // Remove any existing test for altParam on this date to ensure clean 3-day shift
+      const existingIdx = results.findIndex(r => r.parameterId === altParam.id && r.date === sdItem.date);
+      if (existingIdx !== -1) {
+        results.splice(existingIdx, 1);
+      }
+
+      results.push({
+        id: `QC-SHIFT-ALT-${sdItem.date.replace(/-/g, '')}`,
+        date: sdItem.date,
+        time: '08:15',
+        timestamp: new Date(`${sdItem.date}T08:15:00`).getTime(),
+        operatorId: 'user-analis',
+        operatorName: 'Budi Pratama, A.Md.AK',
+        instrumentId: altParam.instrumentId,
+        instrumentName: 'Chemistry Analyzer CST-240 (Dirui CS-T240)',
+        parameterId: altParam.id,
+        parameterName: altParam.name,
+        parameterCode: altParam.code,
+        controlLevel: 'Level 1',
+        lotNumber: 'LOT-CST1-2026A',
+        value: sdItem.val,
+        unit: altParam.unit,
+        mean: altParam.targetMean,
+        sd: altParam.targetSD,
+        zScore: sdItem.z,
+        sdPosition: formatSDPosition(sdItem.z),
+        status: 'pass',
+        violations: [],
+        notes: `Pemeriksaan Kontrol Harian Rutin - Terdeteksi tren pergeseran running average (+${sdItem.z}SD)`,
+        isDemo: false,
+        reviewStatus: 'pending',
+        reviewedBy: undefined,
+        reviewedByName: undefined,
+        reviewedAt: undefined,
+        reviewComment: undefined,
+      });
+    });
+  }
+
   return results;
 }
 
@@ -1070,15 +1047,15 @@ export const INITIAL_NON_CONFORMITIES: NonConformity[] = [
     date: '2026-09-29',
     time: '08:10',
     unit: 'Patologi Klinik - Kimia Klinik',
-    instrumentId: 'inst-chem-a',
-    instrumentName: 'Chemistry Analyzer A (Cobas c311)',
-    parameterId: 'param-glu',
-    parameterName: 'Glucose (Glukosa Darah Sewaktu/Puasa)',
+    instrumentId: 'inst-cst240',
+    instrumentName: 'Chemistry Analyzer CST-240 (Dirui CS-T240)',
+    parameterId: 'param-cst-glu',
+    parameterName: 'Glucose Hexokinase / GLU-HK (CST-240)',
     qcResultId: 'QC-DEMO-GLU-029',
     westgardRule: '2:2s (Dua hasil berturut-turut melebihi +2SD)',
     severity: 'major',
     category: 'Westgard Violation',
-    description: 'Pemeriksaan bahan kontrol Glucose Level 1 pada tanggal 28 dan 29 September berturut-turut menunjukkan nilai 107.8 mg/dL (+2.23SD) dan 108.2 mg/dL (+2.34SD), melanggar aturan Westgard 2:2s (Reject).',
+    description: 'Pemeriksaan bahan kontrol Glucose Level 1 pada tanggal 28 dan 29 September berturut-turut menunjukkan nilai 111.8 mg/dL (+2.23SD) dan 112.2 mg/dL (+2.34SD), melanggar aturan Westgard 2:2s (Reject).',
     impact: 'Pemeriksaan sampel pasien ditunda sementara selama 45 menit sampai reagen dan kalibrasi terverifikasi ulang.',
     initialAnalysis: 'Diduga terjadi penguapan minor pada botol reagen Glucose R1 yang terbuka lebih dari 3 minggu atau pergeseran kurva kalibrasi.',
     immediateAction: 'Penghentian running sampel pasien Glucose, penggantian cassette reagen dengan lot baru, dan kalibrasi ulang parameter Glucose.',
@@ -1097,8 +1074,8 @@ export const INITIAL_CAPAS: CAPA[] = [
     source: 'Pelanggaran Westgard',
     department: 'Instalasi Patologi Klinik - Subunit Kimia Klinik',
     pic: 'Siti Rahmawati, S.Tr.Kes (PJ Mutu)',
-    problemStatement: 'Terjadi pergeseran sistematik positif (Systematic Positive Shift) pada parameter Glucose alat Cobas c311 yang memicu pelanggaran aturan Westgard 2:2s selama dua hari berturut-turut.',
-    nonConformityDescription: 'Hasil QC Level 1 tanggal 28/09 (107.8 mg/dL) dan 29/09 (108.2 mg/dL) keduanya berada di atas +2SD terhadap target mean 100.0 mg/dL.',
+    problemStatement: 'Terjadi pergeseran sistematik positif (Systematic Positive Shift) pada parameter Glucose alat Chemistry Analyzer CST-240 yang memicu pelanggaran aturan Westgard 2:2s selama dua hari berturut-turut.',
+    nonConformityDescription: 'Hasil QC Level 1 tanggal 28/09 (111.8 mg/dL) dan 29/09 (112.2 mg/dL) keduanya berada di atas +2SD terhadap target mean 104.0 mg/dL.',
     supportingEvidence: 'Grafik Levey-Jennings tanggal 25-29 September 2026, logbook kalibrasi instrumen, dan rekam suhu kulkas reagen.',
     rcaMethod: 'Kombinasi 5 Why & Fishbone',
     fishbone: {
@@ -1132,11 +1109,11 @@ export const INITIAL_CAPAS: CAPA[] = [
       why5: 'Mengapa belum ada sistem peringatan dini? Karena SOP manajemen reagen belum mengintegrasikan penghitungan hari buka reagen secara otomatis.',
       rootCauseConclusion: 'Kombinasi antara evaporasi reagen on-board melebihi 25 hari dan deviasi faktor kalibrasi yang tidak segera terdeteksi akibat sistem tracking manual.'
     },
-    identifiedRootCause: 'Evaporasi reagen on-board Cobas c311 yang melebihi masa stabilitas operasional serta akumulasi residu pada probe pipet.',
+    identifiedRootCause: 'Evaporasi reagen on-board CST-240 yang melebihi masa stabilitas operasional serta akumulasi residu pada probe pipet.',
     correctiveActions: [
       {
         id: 'ca-1',
-        description: 'Lakukan pembersihan menyeluruh (decontamination wash) pada sample probe dan reagent probe Cobas c311.',
+        description: 'Lakukan pembersihan menyeluruh (decontamination wash) pada sample probe dan reagent probe CST-240.',
         pic: 'Budi Pratama, A.Md.AK',
         dueDate: '2026-09-29',
         status: 'completed',
@@ -1145,7 +1122,7 @@ export const INITIAL_CAPAS: CAPA[] = [
       },
       {
         id: 'ca-2',
-        description: 'Buka cassette reagen Glucose baru dan larutkan vial kontrol PreciControl CCM1 yang baru.',
+        description: 'Buka cassette reagen Glucose baru dan larutkan vial kontrol Dirui Level 1 yang baru.',
         pic: 'Budi Pratama, A.Md.AK',
         dueDate: '2026-09-29',
         status: 'completed',
@@ -1154,12 +1131,12 @@ export const INITIAL_CAPAS: CAPA[] = [
       },
       {
         id: 'ca-3',
-        description: 'Jalankan full calibration 2-point dengan Calibrator f.a.s. dan running ulang QC Level 1 & Level 2.',
+        description: 'Jalankan full calibration 2-point dengan Calibrator CST dan running ulang QC Level 1 & Level 2.',
         pic: 'Siti Rahmawati, S.Tr.Kes',
         dueDate: '2026-09-29',
         status: 'completed',
         completedDate: '2026-09-29',
-        notes: 'Hasil QC ulang: Level 1 = 100.5 mg/dL (+0.14 SD), Level 2 = 241.0 mg/dL (+0.12 SD). Lolos kriteria penerimaan.'
+        notes: 'Hasil QC ulang: Level 1 = 104.2 mg/dL (+0.06 SD), Level 2 = 241.0 mg/dL (+0.12 SD). Lolos kriteria penerimaan.'
       }
     ],
     preventiveActions: [
@@ -1181,7 +1158,7 @@ export const INITIAL_CAPAS: CAPA[] = [
       }
     ],
     verificationMethod: 'Pemantauan grafik Levey-Jennings Glucose selama 7 hari berturut-turut pasca perbaikan dan verifikasi nilai CV% tetap di bawah 3.5%.',
-    verificationResult: 'Selama 4 hari terakhir (30 Sep - 3 Okt), nilai QC Glucose stabil di rentang 99.7 - 101.1 mg/dL (|Z| < 0.5 SD). Tidak ada aturan Westgard yang terlanggar.',
+    verificationResult: 'Selama 4 hari terakhir (30 Sep - 3 Okt), nilai QC Glucose stabil di rentang 103.7 - 104.8 mg/dL (|Z| < 0.5 SD). Tidak ada aturan Westgard yang terlanggar.',
     verificationDate: '2026-10-03',
     verifier: 'user-admin',
     verifierName: 'dr. Hendra Wijaya, Sp.PK',
@@ -1212,8 +1189,8 @@ export const INITIAL_AUDIT_LOGS: AuditLog[] = [
     userName: 'Budi Pratama, A.Md.AK',
     userRole: 'analis',
     action: 'INPUT_QC',
-    details: 'Input QC Glukosa Level 1 nilai 100.4 mg/dL (Z-Score: +0.11 SD). Status: PASS',
-    newData: { parameter: 'GLU', value: 100.4, status: 'pass' }
+    details: 'Input QC Glukosa Level 1 nilai 104.2 mg/dL (Z-Score: +0.06 SD). Status: PASS',
+    newData: { parameter: 'GLU-HK', value: 104.2, status: 'pass' }
   },
   {
     id: 'AUD-003',
@@ -1280,7 +1257,7 @@ export const INITIAL_NOTIFICATIONS: AppNotification[] = [
     timestamp: '2026-09-25 10:00:00',
     type: 'warning',
     title: 'Jadwal Pemeliharaan Instrumen',
-    message: 'Chemistry Analyzer A (Cobas c311) mendekati jadwal pemeliharaan bulanan pada 25 Oktober 2026.',
+    message: 'Chemistry Analyzer CST-240 (Dirui CS-T240) mendekati jadwal pemeliharaan bulanan pada 25 Oktober 2026.',
     linkTab: 'master-data',
     read: true
   }

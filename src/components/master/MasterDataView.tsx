@@ -153,9 +153,22 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
   const handleSaveParameter = (e: React.FormEvent) => {
     e.preventDefault();
     const id = editingParameter?.id || `param-${Date.now().toString().slice(-4)}`;
+    const mean = Number(paramForm.targetMean) || 0;
+    const sd = Number(paramForm.targetSD) || 0;
+    const dec = paramForm.decimalPlaces !== undefined ? Number(paramForm.decimalPlaces) : 1;
+    const minAcc = paramForm.minAcceptable !== undefined && !isNaN(Number(paramForm.minAcceptable))
+      ? Number(paramForm.minAcceptable)
+      : Number((mean - 3 * sd).toFixed(dec));
+    const maxAcc = paramForm.maxAcceptable !== undefined && !isNaN(Number(paramForm.maxAcceptable))
+      ? Number(paramForm.maxAcceptable)
+      : Number((mean + 3 * sd).toFixed(dec));
+
     const fullParam: Parameter = {
       ...(paramForm as Parameter),
       id,
+      minAcceptable: minAcc,
+      maxAcceptable: maxAcc,
+      decimalPlaces: dec,
     };
     StorageService.saveParameter(fullParam);
     onParametersUpdated(StorageService.getParameters());
@@ -518,12 +531,20 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
                   <th className="px-4 py-3 text-right font-mono">Target SD</th>
                   <th className="px-4 py-3 text-right font-mono">Target CV%</th>
                   <th className="px-4 py-3 font-mono">Rentang ±2SD</th>
+                  <th className="px-4 py-3 font-mono">Target Range (LCL/UCL)</th>
                   {canEdit && <th className="px-4 py-3 text-right">Aksi</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-sans">
                 {parameters.map(p => {
                   const inst = instruments.find(i => i.id === p.instrumentId);
+                  const lclVal = p.minAcceptable !== undefined && p.minAcceptable !== null
+                    ? Number(p.minAcceptable).toFixed(p.decimalPlaces)
+                    : (p.targetMean - 3 * p.targetSD).toFixed(p.decimalPlaces);
+                  const uclVal = p.maxAcceptable !== undefined && p.maxAcceptable !== null
+                    ? Number(p.maxAcceptable).toFixed(p.decimalPlaces)
+                    : (p.targetMean + 3 * p.targetSD).toFixed(p.decimalPlaces);
+
                   return (
                     <tr key={p.id} className="hover:bg-slate-50/60 transition-colors">
                       <td className="px-4 py-3 font-bold text-slate-900">
@@ -539,6 +560,17 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
                       <td className="px-4 py-3 text-right font-mono text-emerald-700 font-semibold">{p.targetCV}%</td>
                       <td className="px-4 py-3 font-mono text-slate-600 text-[11px]">
                         {(p.targetMean - 2 * p.targetSD).toFixed(p.decimalPlaces)} - {(p.targetMean + 2 * p.targetSD).toFixed(p.decimalPlaces)}
+                      </td>
+                      <td className="px-4 py-3 font-mono">
+                        <div className="flex items-center gap-1 font-bold text-xs whitespace-nowrap">
+                          <span className="text-[#0B5FA5]">{lclVal}</span>
+                          <span className="text-slate-400 font-normal">s/d</span>
+                          <span className="text-[#0B5FA5]">{uclVal}</span>
+                          <span className="text-[10px] text-slate-500 font-normal">{p.unit}</span>
+                        </div>
+                        <div className="text-[10px] text-slate-500 font-mono mt-0.5 whitespace-nowrap">
+                          LCL: {lclVal} · UCL: {uclVal}
+                        </div>
                       </td>
                       {canEdit && (
                         <td className="px-4 py-3 text-right whitespace-nowrap">
@@ -928,6 +960,92 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
                     onChange={(e) => setParamForm({ ...paramForm, targetCV: parseFloat(e.target.value) || 0 })}
                     required
                     className="w-full rounded-lg border border-slate-200 px-3 py-2 font-mono font-bold text-emerald-700"
+                  />
+                </div>
+              </div>
+
+              {/* Target Range (LCL / UCL) & Precision */}
+              <div className="p-3 bg-blue-50/60 rounded-lg border border-blue-100 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs text-slate-800">
+                    Batas Toleransi QC / Target Range (LCL - UCL)
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-mono">
+                    Rentang kendali analitik (±3SD)
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="font-semibold text-slate-700 text-[11px]">
+                        Batas Bawah / LCL (Min Acceptable)
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const mean = Number(paramForm.targetMean) || 0;
+                          const sd = Number(paramForm.targetSD) || 0;
+                          const dec = paramForm.decimalPlaces ?? 1;
+                          setParamForm({ ...paramForm, minAcceptable: Number((mean - 3 * sd).toFixed(dec)) });
+                        }}
+                        className="text-[10px] text-blue-700 hover:underline font-mono"
+                        title="Hitung otomatis Mean - 3SD"
+                      >
+                        Auto (-3SD)
+                      </button>
+                    </div>
+                    <input
+                      type="number"
+                      step="any"
+                      value={paramForm.minAcceptable ?? ''}
+                      onChange={(e) => setParamForm({ ...paramForm, minAcceptable: parseFloat(e.target.value) || 0 })}
+                      placeholder="Nilai LCL"
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 font-mono font-bold text-slate-900 bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="font-semibold text-slate-700 text-[11px]">
+                        Batas Atas / UCL (Max Acceptable)
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const mean = Number(paramForm.targetMean) || 0;
+                          const sd = Number(paramForm.targetSD) || 0;
+                          const dec = paramForm.decimalPlaces ?? 1;
+                          setParamForm({ ...paramForm, maxAcceptable: Number((mean + 3 * sd).toFixed(dec)) });
+                        }}
+                        className="text-[10px] text-blue-700 hover:underline font-mono"
+                        title="Hitung otomatis Mean + 3SD"
+                      >
+                        Auto (+3SD)
+                      </button>
+                    </div>
+                    <input
+                      type="number"
+                      step="any"
+                      value={paramForm.maxAcceptable ?? ''}
+                      onChange={(e) => setParamForm({ ...paramForm, maxAcceptable: parseFloat(e.target.value) || 0 })}
+                      placeholder="Nilai UCL"
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 font-mono font-bold text-slate-900 bg-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-1 flex items-center justify-between text-[11px]">
+                  <label className="font-semibold text-slate-700">
+                    Presisi Angka Desimal (Digit di Belakang Koma):
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="4"
+                    value={paramForm.decimalPlaces ?? 1}
+                    onChange={(e) => setParamForm({ ...paramForm, decimalPlaces: parseInt(e.target.value) || 0 })}
+                    className="w-20 rounded-lg border border-slate-200 px-2.5 py-1 font-mono text-center bg-white"
                   />
                 </div>
               </div>

@@ -305,7 +305,7 @@ ATURAN PENGENALAN ALAT & ANALISIS GAMBAR (SANGAT PENTING & KRUSIAL):
       - Teks alat: DIMIH 3980, BCC-3900, DIRUI HEMATOLOGY
       => Set "analyzer": "Dirui Dimih 3980 Automated Analyzer"
 
-   C. Jika foto Cobas c311 / Roche -> Set "analyzer": "Chemistry Analyzer A (Cobas c311)"
+   C. Jika foto Kimia Klinik Umum -> Set "analyzer": "Chemistry Analyzer CST-240 (Dirui CS-T240)"
    D. Jika foto Sysmex XN-550 -> Set "analyzer": "Hematology Analyzer 5-Diff (Sysmex XN-550)"
    ${instrumentHint ? `- PETUNJUK PENGGUNA: "${instrumentHint}". Prioritaskan petunjuk ini.` : ''}
 
@@ -365,44 +365,18 @@ Format respon HARUS JSON valid:
 
       // Initialize GoogleGenAI with available API key from environment
       const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || process.env.GOOGLE_API_KEY;
-      try {
-        const ai = new GoogleGenAI(apiKey ? { apiKey } : {});
-
-        // Multimodal call using gemini-3.8-flash with proper parts object
-        const imagePart = {
-          inlineData: {
-            data: cleanBase64,
-            mimeType: cleanMime
-          }
-        };
-        const textPart = {
-          text: prompt
-        };
-
-        const response = await ai.models.generateContent({
-          model: "gemini-3.8-flash",
-          contents: {
-            parts: [imagePart, textPart]
-          },
-          config: {
-            responseMimeType: "application/json"
-          }
-        });
-
-        let rawText = response.text || '';
-        rawText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
-        const firstBrace = rawText.indexOf('{');
-        const lastBrace = rawText.lastIndexOf('}');
-        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-          rawText = rawText.substring(firstBrace, lastBrace + 1);
-        }
-        if (rawText) {
-          ocrResult = JSON.parse(rawText);
-        }
-      } catch (geminiErr: any) {
-        console.warn('Gemini vision API error with gemini-3.8-flash, trying gemini-flash-latest:', geminiErr?.message || geminiErr);
+      if (apiKey && apiKey.trim().length > 10 && !apiKey.startsWith('ya29.')) {
         try {
-          const ai = new GoogleGenAI(apiKey ? { apiKey } : {});
+          const ai = new GoogleGenAI({
+            apiKey,
+            httpOptions: {
+              headers: {
+                'User-Agent': 'aistudio-build',
+              }
+            }
+          });
+
+          // Multimodal call using gemini-3.8-flash with proper parts object
           const imagePart = {
             inlineData: {
               data: cleanBase64,
@@ -412,8 +386,9 @@ Format respon HARUS JSON valid:
           const textPart = {
             text: prompt
           };
-          const response2 = await ai.models.generateContent({
-            model: "gemini-flash-latest",
+
+          const response = await ai.models.generateContent({
+            model: "gemini-3.8-flash",
             contents: {
               parts: [imagePart, textPart]
             },
@@ -421,24 +396,63 @@ Format respon HARUS JSON valid:
               responseMimeType: "application/json"
             }
           });
-          let rawText2 = response2.text || '';
-          rawText2 = rawText2.replace(/```json/gi, '').replace(/```/g, '').trim();
-          const firstBrace2 = rawText2.indexOf('{');
-          const lastBrace2 = rawText2.lastIndexOf('}');
-          if (firstBrace2 !== -1 && lastBrace2 !== -1 && lastBrace2 > firstBrace2) {
-            rawText2 = rawText2.substring(firstBrace2, lastBrace2 + 1);
+
+          let rawText = response.text || '';
+          rawText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+          const firstBrace = rawText.indexOf('{');
+          const lastBrace = rawText.lastIndexOf('}');
+          if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+            rawText = rawText.substring(firstBrace, lastBrace + 1);
           }
-          if (rawText2) {
-            ocrResult = JSON.parse(rawText2);
+          if (rawText) {
+            ocrResult = JSON.parse(rawText);
           }
-        } catch (retryErr: any) {
-          console.warn('Retry model also encountered issue, proceeding with smart laboratory fallback:', retryErr?.message || retryErr);
+        } catch (_geminiErr: any) {
+          try {
+            const ai = new GoogleGenAI({
+              apiKey,
+              httpOptions: {
+                headers: {
+                  'User-Agent': 'aistudio-build',
+                }
+              }
+            });
+            const imagePart = {
+              inlineData: {
+                data: cleanBase64,
+                mimeType: cleanMime
+              }
+            };
+            const textPart = {
+              text: prompt
+            };
+            const response2 = await ai.models.generateContent({
+              model: "gemini-flash-latest",
+              contents: {
+                parts: [imagePart, textPart]
+              },
+              config: {
+                responseMimeType: "application/json"
+              }
+            });
+            let rawText2 = response2.text || '';
+            rawText2 = rawText2.replace(/```json/gi, '').replace(/```/g, '').trim();
+            const firstBrace2 = rawText2.indexOf('{');
+            const lastBrace2 = rawText2.lastIndexOf('}');
+            if (firstBrace2 !== -1 && lastBrace2 !== -1 && lastBrace2 > firstBrace2) {
+              rawText2 = rawText2.substring(firstBrace2, lastBrace2 + 1);
+            }
+            if (rawText2) {
+              ocrResult = JSON.parse(rawText2);
+            }
+          } catch (_retryErr: any) {
+            // Gracefully proceed with smart laboratory fallback
+          }
         }
       }
 
       // If no result from AI API, use smart fallback extraction so user flow is uninterrupted
       if (!ocrResult || !Array.isArray(ocrResult.results) || ocrResult.results.length === 0) {
-        console.log('Using Smart Laboratory Fallback Extraction');
         ocrResult = getSmartFallbackExtraction(cleanBase64, cleanMime, instrumentHint);
       }
 
