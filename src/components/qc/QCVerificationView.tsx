@@ -3,7 +3,6 @@ import {
   Save, 
   AlertTriangle, 
   CheckCircle, 
-  Edit3, 
   Trash2, 
   Plus, 
   RotateCcw, 
@@ -14,31 +13,20 @@ import {
   Calculator, 
   ZoomIn, 
   ZoomOut, 
-  Sparkles,
-  Building,
-  Calendar,
-  Clock,
-  Layers,
-  FileCheck2,
-  AlertOctagon,
+  Sparkles, 
+  FileCheck2, 
+  AlertOctagon, 
   ExternalLink,
   Sliders,
-  RefreshCw
+  RefreshCw,
+  Filter,
+  ShieldCheck
 } from 'lucide-react';
 import { Parameter, Instrument, QCResult, WestgardViolation, QCStatus } from '../../types';
-import { useAuth } from '../../context/AuthContext';
+import { calculateZScore, formatSDPosition, evaluateWestgardRules, DEFAULT_WESTGARD_RULES } from '../../utils/qcCalculations';
+import { buildVerifiedItemsFromAI, VerifiedQCItem } from '../../utils/aiUtils';
 import { StorageService } from '../../services/storage';
-import { 
-  calculateZScore, 
-  formatSDPosition, 
-  evaluateWestgardRules,
-  DEFAULT_WESTGARD_RULES 
-} from '../../utils/qcCalculations';
-import { 
-  buildVerifiedItemsFromAI, 
-  VerifiedQCItem, 
-  matchControlLevel 
-} from '../../utils/aiUtils';
+import { useAuth } from '../../context/AuthContext';
 
 interface QCVerificationViewProps {
   extractedData: any[];
@@ -69,6 +57,20 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
   const [savedCount, setSavedCount] = useState<number>(0);
   const [lastSavedItems, setLastSavedItems] = useState<QCResult[]>([]);
 
+  // Detected instrument from scan
+  const detectedInstrumentId = useMemo(() => {
+    if (documentMeta?.instrument_id) return documentMeta.instrument_id;
+    const docName = (documentMeta?.analyzer || '').toLowerCase();
+    if (docName.includes('cst') || docName.includes('cs-t240')) return 'inst-cst240';
+    if (docName.includes('dimih') || docName.includes('3980')) return 'inst-dirui-3980';
+    if (docName.includes('cobas') || docName.includes('c311')) return 'inst-chem-a';
+    if (docName.includes('sysmex') || docName.includes('xn')) return 'inst-hema-a';
+    return 'ALL';
+  }, [documentMeta]);
+
+  // Active filter for view (e.g. 'ALL', 'inst-cst240', 'inst-dirui-3980')
+  const [instrumentFilter, setInstrumentFilter] = useState<string>('ALL');
+
   // Initialize verified items from AI extraction
   const [items, setItems] = useState<VerifiedQCItem[]>(() => {
     return buildVerifiedItemsFromAI(
@@ -76,7 +78,8 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
       documentMeta, 
       parameters, 
       instruments, 
-      existingResults
+      existingResults,
+      documentMeta?.instrument_id
     );
   });
 
@@ -87,9 +90,13 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
       documentMeta,
       parameters,
       instruments,
-      existingResults
+      existingResults,
+      documentMeta?.instrument_id
     );
     setItems(newItems);
+    if (documentMeta?.instrument_id && documentMeta.instrument_id !== 'auto') {
+      setInstrumentFilter(documentMeta.instrument_id);
+    }
   }, [extractedData, documentMeta, parameters, instruments]);
 
   // Re-calculate row when any field changes
@@ -123,6 +130,19 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
         const inst = instruments.find(i => i.id === value);
         if (inst) {
           updated.instrumentName = inst.name;
+          // Auto switch to first parameter of this instrument if current parameter belongs to another
+          const curParam = parameters.find(p => p.id === updated.parameterId);
+          if (curParam && curParam.instrumentId && curParam.instrumentId !== inst.id) {
+            const matchingParam = parameters.find(p => p.instrumentId === inst.id);
+            if (matchingParam) {
+              updated.parameterId = matchingParam.id;
+              updated.parameterName = matchingParam.name;
+              updated.parameterCode = matchingParam.code;
+              updated.targetMean = matchingParam.targetMean;
+              updated.targetSD = matchingParam.targetSD;
+              updated.unit = matchingParam.unit;
+            }
+          }
         }
       }
 
@@ -213,8 +233,19 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
     }));
   };
 
+  // Remove all items that don't belong to a specific instrument
+  const isolateToInstrument = (instId: string) => {
+    setItems(prev => prev.filter(i => i.instrumentId === instId));
+    setInstrumentFilter(instId);
+  };
+
   const toggleSelectAll = (selected: boolean) => {
-    setItems(prev => prev.map(i => ({ ...i, isSelected: selected })));
+    setItems(prev => prev.map(i => {
+      if (instrumentFilter === 'ALL' || i.instrumentId === instrumentFilter) {
+        return { ...i, isSelected: selected };
+      }
+      return i;
+    }));
   };
 
   const toggleSelectItem = (id: string) => {
@@ -226,8 +257,11 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
   };
 
   const addNewRow = () => {
-    const defaultParam = parameters[0];
-    const defaultInst = instruments[0];
+    const targetInstId = instrumentFilter !== 'ALL' ? instrumentFilter : (detectedInstrumentId !== 'ALL' ? detectedInstrumentId : 'inst-cst240');
+    const targetInst = instruments.find(i => i.id === targetInstId) || instruments[0];
+    const instParams = parameters.filter(p => p.instrumentId === targetInst?.id);
+    const defaultParam = instParams[0] || parameters[0];
+
     const today = new Date().toISOString().split('T')[0];
     const time = new Date().toTimeString().split(' ')[0].substring(0, 5);
 
@@ -236,13 +270,13 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
       sourceText: 'Baris Parameter Tambahan',
       confidence: 1.0,
       needsVerification: false,
-      instrumentId: defaultInst?.id || 'inst-chem-a',
-      instrumentName: defaultInst?.name || 'Chemistry Analyzer A (Cobas c311)',
-      parameterId: defaultParam?.id || 'param-glu',
-      parameterName: defaultParam?.name || 'Glucose',
+      instrumentId: targetInst?.id || 'inst-cst240',
+      instrumentName: targetInst?.name || 'Chemistry Analyzer CST-240 (Dirui CS-T240)',
+      parameterId: defaultParam?.id || 'param-cst-glu',
+      parameterName: defaultParam?.name || 'Glucose (Glukosa Darah CST-240)',
       parameterCode: defaultParam?.code || 'GLU',
       controlLevel: 'Level 1',
-      lotNumber: 'LOT-CCM1-2026A',
+      lotNumber: 'LOT-CST1-2026A',
       resultValue: defaultParam?.targetMean || 100,
       unit: defaultParam?.unit || 'mg/dL',
       targetMean: defaultParam?.targetMean || 100,
@@ -258,7 +292,13 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
     setItems(prev => [...prev, newItem]);
   };
 
-  const selectedItems = useMemo(() => items.filter(i => i.isSelected), [items]);
+  // Filter items by active instrument filter
+  const displayedItems = useMemo(() => {
+    if (instrumentFilter === 'ALL') return items;
+    return items.filter(i => i.instrumentId === instrumentFilter);
+  }, [items, instrumentFilter]);
+
+  const selectedItems = useMemo(() => displayedItems.filter(i => i.isSelected), [displayedItems]);
 
   const stats = useMemo(() => {
     const total = selectedItems.length;
@@ -267,6 +307,15 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
     const reject = selectedItems.filter(i => i.status === 'reject' || i.status === 'fail').length;
     return { total, normal, warning, reject };
   }, [selectedItems]);
+
+  // Check how many items belong to CST-240 vs other machines
+  const instrumentCounts = useMemo(() => {
+    const map: Record<string, number> = {};
+    items.forEach(i => {
+      map[i.instrumentId] = (map[i.instrumentId] || 0) + 1;
+    });
+    return map;
+  }, [items]);
 
   const handleSaveAll = () => {
     if (selectedItems.length === 0) return;
@@ -420,14 +469,14 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
             <h1 className="text-xl font-bold text-slate-900">Verifikasi & Sinkronisasi Hasil QC dari Foto</h1>
           </div>
           <p className="text-xs text-slate-500 pl-8">
-            Nilai <strong>Hasil (Result/Conc)</strong> dibaca dari alat (CST-240 / Cobas), sementara <strong>Target Mean</strong> & <strong>Target SD</strong> otomatis disinkronkan dengan Master Data.
+            Nilai <strong>Hasil (Result/Conc)</strong> dibaca dari alat, sementara <strong>Target Mean</strong> & <strong>Target SD</strong> otomatis disinkronkan dengan Master Data alat terkait.
           </p>
         </div>
 
         {/* Action Summary Pill */}
         <div className="flex items-center gap-2 text-xs">
           <div className="bg-slate-100 px-3 py-1.5 rounded-xl font-semibold text-slate-700">
-            Total: <strong>{items.length}</strong>
+            Terpilih: <strong>{selectedItems.length}</strong> / {displayedItems.length}
           </div>
           <div className="bg-emerald-50 text-emerald-800 px-3 py-1.5 rounded-xl font-semibold border border-emerald-200">
             Pass: <strong>{stats.normal}</strong>
@@ -443,6 +492,62 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
             </div>
           )}
         </div>
+      </div>
+
+      {/* Instrument Filter & Separation Banner */}
+      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5 mr-2">
+            <Filter className="h-3.5 w-3.5 text-blue-600" /> Filter Alat:
+          </span>
+          <button
+            type="button"
+            onClick={() => setInstrumentFilter('ALL')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              instrumentFilter === 'ALL'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+            }`}
+          >
+            Semua Hasil ({items.length})
+          </button>
+          {instruments.map(inst => {
+            const count = instrumentCounts[inst.id] || 0;
+            if (count === 0 && instrumentFilter !== inst.id) return null;
+            return (
+              <button
+                key={inst.id}
+                type="button"
+                onClick={() => setInstrumentFilter(inst.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  instrumentFilter === inst.id
+                    ? 'bg-[#0B5FA5] text-white shadow-sm'
+                    : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <span>{inst.name.split('(')[0].trim()}</span>
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-black/10 font-mono">
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Clean Foreign Parameters button if multiple instruments are detected */}
+        {Object.keys(instrumentCounts).length > 1 && (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => isolateToInstrument('inst-cst240')}
+              className="px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-900 border border-blue-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
+              title="Hapus parameter dari alat lain dan simpan hanya parameter CST-240"
+            >
+              <ShieldCheck className="h-3.5 w-3.5 text-blue-700" />
+              <span>Hanya Simpan CST-240</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Main Split Content */}
@@ -509,8 +614,8 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
             {documentMeta && (
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1.5 text-slate-700">
                 <div className="font-bold text-slate-900 border-b border-slate-200 pb-1 flex items-center justify-between">
-                  <span>Metadata Hasil Pembacaan</span>
-                  <span className="text-[10px] text-blue-600 font-bold">CST-240 / Vision</span>
+                  <span>Metadata Pembacaan</span>
+                  <span className="text-[10px] text-blue-600 font-bold">Terverifikasi</span>
                 </div>
                 {documentMeta.analyzer && (
                   <div className="flex justify-between">
@@ -556,31 +661,40 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => toggleSelectAll(selectedItems.length !== items.length)}
+                  onClick={() => toggleSelectAll(selectedItems.length !== displayedItems.length)}
                   className="px-3 py-1.5 border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-medium rounded-xl"
                 >
-                  {selectedItems.length === items.length ? 'Batal Pilih Semua' : 'Pilih Semua'}
+                  {selectedItems.length === displayedItems.length ? 'Batal Pilih Semua' : 'Pilih Semua'}
                 </button>
               </div>
             </div>
 
             {/* Items List */}
-            {items.length === 0 ? (
+            {displayedItems.length === 0 ? (
               <div className="p-12 text-center border-2 border-dashed border-slate-200 rounded-2xl space-y-3">
                 <AlertTriangle className="h-8 w-8 text-amber-500 mx-auto" />
-                <p className="font-bold text-slate-800 text-sm">Tidak ada parameter yang terbaca dari gambar</p>
-                <p className="text-xs text-slate-500">Klik "Tambah Baris" untuk memasukkan parameter QC secara manual.</p>
-                <button
-                  type="button"
-                  onClick={addNewRow}
-                  className="px-4 py-2 bg-[#0B5FA5] text-white text-xs font-bold rounded-xl"
-                >
-                  + Tambah Parameter Manual
-                </button>
+                <p className="font-bold text-slate-800 text-sm">Tidak ada parameter untuk filter alat ini</p>
+                <p className="text-xs text-slate-500">Klik "Tambah Baris" untuk memasukkan parameter QC secara manual atau pilih "Semua Hasil".</p>
+                <div className="flex justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setInstrumentFilter('ALL')}
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl"
+                  >
+                    Tampilkan Semua Hasil
+                  </button>
+                  <button
+                    type="button"
+                    onClick={addNewRow}
+                    className="px-4 py-2 bg-[#0B5FA5] text-white text-xs font-bold rounded-xl"
+                  >
+                    + Tambah Parameter Manual
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="space-y-4">
-                {items.map((item, idx) => (
+                {displayedItems.map((item, idx) => (
                   <div 
                     key={item.id}
                     className={`border-2 rounded-2xl p-4 transition-all ${
@@ -622,7 +736,7 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
 
                     {/* Parameter & Instrument Selection (Row 1) */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs mb-3">
-                      {/* Parameter Dropdown - Synchronizes Mean, SD, Unit on change */}
+                      {/* Parameter Dropdown - Filtered/Grouped */}
                       <div className="space-y-1">
                         <div className="flex justify-between items-center">
                           <label className="text-slate-700 font-bold">Parameter Pemeriksaan</label>
@@ -633,9 +747,18 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
                           onChange={(e) => updateItemField(item.id, 'parameterId', e.target.value)}
                           className="w-full border-2 border-slate-300 rounded-xl p-2 font-bold text-slate-800 bg-white focus:ring-2 focus:ring-[#0B5FA5] focus:border-[#0B5FA5]"
                         >
-                          {parameters.map(p => (
-                            <option key={p.id} value={p.id}>{p.name} [{p.code}]</option>
-                          ))}
+                          {/* Options for current instrument first */}
+                          <optgroup label={`Parameter ${item.instrumentName.split('(')[0]}`}>
+                            {parameters.filter(p => p.instrumentId === item.instrumentId).map(p => (
+                              <option key={p.id} value={p.id}>{p.name} [{p.code}]</option>
+                            ))}
+                          </optgroup>
+                          {/* Other parameters */}
+                          <optgroup label="Parameter Alat Lain">
+                            {parameters.filter(p => p.instrumentId !== item.instrumentId).map(p => (
+                              <option key={p.id} value={p.id}>{p.name} [{p.code}]</option>
+                            ))}
+                          </optgroup>
                         </select>
                       </div>
 
@@ -702,108 +825,110 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-slate-50/80 p-3 rounded-xl border border-slate-200">
-                      {/* Box 1: RESULT (Nilai Hasil Pengukuran Aktual dari Alat CST-240) */}
-                      <div className="space-y-1 bg-white p-2.5 rounded-xl border-2 border-blue-500 shadow-sm">
-                        <div className="flex justify-between items-center">
-                          <label className="text-blue-950 font-extrabold text-[11px] uppercase tracking-wider">
-                            1. Hasil QC (Result/Conc)
-                          </label>
-                          <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-1.5 py-0.5 rounded">
-                            {item.unit}
-                          </span>
+                        {/* Box 1: RESULT (Nilai Hasil Pengukuran Aktual dari Alat) */}
+                        <div className="space-y-1 bg-white p-2.5 rounded-xl border-2 border-blue-500 shadow-sm">
+                          <div className="flex justify-between items-center">
+                            <label className="text-blue-950 font-extrabold text-[11px] uppercase tracking-wider">
+                              1. Hasil QC (Result/Conc)
+                            </label>
+                            <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-1.5 py-0.5 rounded">
+                              {item.unit}
+                            </span>
+                          </div>
+                          <input
+                            type="number"
+                            step="any"
+                            value={item.resultValue}
+                            onChange={(e) => updateItemField(item.id, 'resultValue', parseFloat(e.target.value) || 0)}
+                            className="w-full font-mono font-black text-xl text-blue-700 bg-transparent outline-none"
+                          />
+                          <span className="text-[10px] text-slate-400 block">Dibaca dari struk/layar</span>
                         </div>
-                        <input
-                          type="number"
-                          step="any"
-                          value={item.resultValue}
-                          onChange={(e) => updateItemField(item.id, 'resultValue', parseFloat(e.target.value) || 0)}
-                          className="w-full font-mono font-black text-xl text-blue-700 bg-transparent outline-none"
-                        />
-                        <span className="text-[10px] text-slate-400 block">Dibaca dari struk/layar</span>
-                      </div>
 
-                      {/* Box 2: TARGET MEAN (X̄) */}
-                      <div className="space-y-1 bg-white p-2.5 rounded-xl border border-slate-300">
-                        <div className="flex justify-between items-center">
-                          <label className="text-slate-700 font-bold text-[11px] uppercase tracking-wider">
-                            2. Target Mean (X̄)
-                          </label>
-                          <button
-                            type="button"
-                            onClick={() => syncWithMasterData(item.id)}
-                            className="text-[10px] text-[#0B5FA5] hover:underline flex items-center gap-0.5 font-bold"
-                            title="Reset ke nilai Master Data"
-                          >
-                            <RefreshCw className="h-2.5 w-2.5" /> Sync
-                          </button>
+                        {/* Box 2: TARGET MEAN (X̄) */}
+                        <div className="space-y-1 bg-white p-2.5 rounded-xl border border-slate-300">
+                          <div className="flex justify-between items-center">
+                            <label className="text-slate-700 font-bold text-[11px] uppercase tracking-wider">
+                              2. Target Mean (X̄)
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => syncWithMasterData(item.id)}
+                              className="text-[10px] text-[#0B5FA5] hover:underline flex items-center gap-0.5 font-bold"
+                              title="Reset ke nilai Master Data"
+                            >
+                              <RefreshCw className="h-2.5 w-2.5" /> Sync
+                            </button>
+                          </div>
+                          <input
+                            type="number"
+                            step="any"
+                            value={item.targetMean}
+                            onChange={(e) => updateItemField(item.id, 'targetMean', parseFloat(e.target.value) || 0)}
+                            className="w-full font-mono font-bold text-base text-slate-800 bg-transparent outline-none"
+                          />
+                          <span className="text-[10px] text-slate-400 block">Nilai rujukan rata-rata</span>
                         </div>
-                        <input
-                          type="number"
-                          step="any"
-                          value={item.targetMean}
-                          onChange={(e) => updateItemField(item.id, 'targetMean', parseFloat(e.target.value) || 0)}
-                          className="w-full font-mono font-bold text-base text-slate-800 bg-transparent outline-none"
-                        />
-                        <span className="text-[10px] text-slate-400 block">Nilai rujukan rata-rata</span>
-                      </div>
 
-                      {/* Box 3: TARGET SD (1 SD) */}
-                      <div className="space-y-1 bg-white p-2.5 rounded-xl border border-slate-300">
-                        <div className="flex justify-between items-center">
-                          <label className="text-slate-700 font-bold text-[11px] uppercase tracking-wider">
-                            3. Target SD (1 SD)
-                          </label>
-                          <button
-                            type="button"
-                            onClick={() => syncWithMasterData(item.id)}
-                            className="text-[10px] text-[#0B5FA5] hover:underline flex items-center gap-0.5 font-bold"
-                            title="Reset ke nilai Master Data"
-                          >
-                            <RefreshCw className="h-2.5 w-2.5" /> Sync
-                          </button>
+                        {/* Box 3: TARGET SD (1 SD) */}
+                        <div className="space-y-1 bg-white p-2.5 rounded-xl border border-slate-300">
+                          <div className="flex justify-between items-center">
+                            <label className="text-slate-700 font-bold text-[11px] uppercase tracking-wider">
+                              3. Target SD (1 SD)
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => syncWithMasterData(item.id)}
+                              className="text-[10px] text-[#0B5FA5] hover:underline flex items-center gap-0.5 font-bold"
+                              title="Reset ke nilai Master Data"
+                            >
+                              <RefreshCw className="h-2.5 w-2.5" /> Sync
+                            </button>
+                          </div>
+                          <input
+                            type="number"
+                            step="any"
+                            value={item.targetSD}
+                            onChange={(e) => updateItemField(item.id, 'targetSD', parseFloat(e.target.value) || 0)}
+                            className="w-full font-mono font-bold text-base text-slate-800 bg-transparent outline-none"
+                          />
+                          <span className="text-[10px] text-slate-400 block">Standar Deviasi 1 SD</span>
                         </div>
-                        <input
-                          type="number"
-                          step="any"
-                          value={item.targetSD}
-                          onChange={(e) => updateItemField(item.id, 'targetSD', parseFloat(e.target.value) || 0)}
-                          className="w-full font-mono font-bold text-base text-slate-800 bg-transparent outline-none"
-                        />
-                        <span className="text-[10px] text-slate-400 block">Standar deviasi kontrol</span>
-                      </div>
 
-                      {/* Box 4: Z-SCORE & STATUS POSITION */}
-                      <div className="space-y-1 bg-white p-2.5 rounded-xl border border-slate-300 flex flex-col justify-between">
-                        <div className="flex justify-between items-center">
-                          <label className="text-slate-700 font-bold text-[11px] uppercase tracking-wider">
-                            4. Z-Score (SDI)
-                          </label>
-                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                            item.status === 'pass' 
-                              ? 'bg-emerald-100 text-emerald-800' 
-                              : item.status === 'warning' 
-                              ? 'bg-amber-100 text-amber-800' 
-                              : 'bg-rose-100 text-rose-800'
-                          }`}>
-                            {item.status.toUpperCase()}
-                          </span>
+                        {/* Box 4: Z-SCORE & STATUS POSITION */}
+                        <div className={`space-y-1 p-2.5 rounded-xl border flex flex-col justify-between ${
+                          item.status === 'reject' || item.status === 'fail'
+                            ? 'bg-rose-50 border-rose-300 text-rose-900'
+                            : item.status === 'warning'
+                            ? 'bg-amber-50 border-amber-300 text-amber-900'
+                            : 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                        }`}>
+                          <div>
+                            <div className="flex justify-between items-center">
+                              <label className="font-extrabold text-[11px] uppercase tracking-wider flex items-center gap-1">
+                                <Calculator className="h-3 w-3" /> Z-Score (SDI)
+                              </label>
+                              <span className="text-[10px] font-bold">
+                                {item.status.toUpperCase()}
+                              </span>
+                            </div>
+                            <div className="font-mono font-black text-lg mt-0.5">
+                              {item.sdPosition}
+                            </div>
+                          </div>
+                          <div className="text-[10px] text-slate-500 font-mono">
+                            Z = ({item.resultValue} - {item.targetMean}) / {item.targetSD}
+                          </div>
                         </div>
-                        <div className="font-mono font-black text-lg text-slate-900">
-                          {item.sdPosition}
-                        </div>
-                        <span className="text-[10px] text-slate-400">
-                          Formula: (Result - Mean) / SD
-                        </span>
                       </div>
                     </div>
-                  </div>
 
-                    {/* Source Text / OCR Notice */}
+                    {/* Source Raw Text & Verification Reason */}
                     {item.sourceText && (
-                      <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
-                        <span>Teks terbaca pada alat: <code className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-700 font-mono">{item.sourceText}</code></span>
+                      <div className="mt-2 text-[11px] text-slate-500 bg-slate-50 p-2 rounded-lg font-mono flex items-center justify-between">
+                        <span>Teks Asli Struk: "{item.sourceText}"</span>
                         {item.verificationReason && (
-                          <span className="text-amber-600 font-semibold">{item.verificationReason}</span>
+                          <span className="text-amber-700 font-bold ml-2">[{item.verificationReason}]</span>
                         )}
                       </div>
                     )}
@@ -811,33 +936,41 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
                 ))}
               </div>
             )}
+          </div>
 
-            {/* Bottom Save & Commit Action Bar */}
-            <div className="pt-4 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="text-xs text-slate-500">
-                <span>Terpilih untuk disimpan: </span>
-                <strong className="text-slate-900">{selectedItems.length} dari {items.length} parameter</strong>
+          {/* Bottom Floating Action Bar */}
+          <div className="bg-white border-2 border-slate-200 rounded-2xl p-4 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4 sticky bottom-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-[#0B5FA5] text-white rounded-xl">
+                <FileCheck2 className="h-5 w-5" />
               </div>
-
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={onRetakeScan}
-                  className="px-4 py-2.5 border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl transition-colors"
-                >
-                  Batal / Scan Ulang
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleSaveAll}
-                  disabled={selectedItems.length === 0}
-                  className="px-6 py-2.5 bg-[#0B5FA5] hover:bg-[#084B83] disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-md flex items-center gap-2 transition-all hover:scale-[1.02]"
-                >
-                  <Save className="h-4 w-4" />
-                  <span>Simpan Semua ke QC Harian & Validasi</span>
-                </button>
+              <div>
+                <div className="font-bold text-slate-900 text-sm">
+                  {selectedItems.length} Parameter Siap Divalidasi & Disimpan
+                </div>
+                <div className="text-xs text-slate-500">
+                  Target: <strong>{instrumentFilter === 'ALL' ? (detectedInstrumentId !== 'ALL' ? instruments.find(i => i.id === detectedInstrumentId)?.name || 'CST-240' : 'Semua Alat Terpilih') : instruments.find(i => i.id === instrumentFilter)?.name}</strong>
+                </div>
               </div>
+            </div>
+
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={onRetakeScan}
+                className="w-1/2 sm:w-auto px-4 py-2.5 border border-slate-300 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
+              >
+                <ArrowLeft className="h-4 w-4" /> Scan Ulang
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSaveAll}
+                disabled={selectedItems.length === 0}
+                className="w-1/2 sm:w-auto px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg flex items-center justify-center gap-2 transition-all"
+              >
+                <Save className="h-4 w-4" /> Simpan Semua ke QC Harian & Validasi
+              </button>
             </div>
           </div>
         </div>

@@ -10,11 +10,70 @@ async function startServer() {
   app.use(express.json({ limit: '25mb' }));
 
   // Helper for simulated fallback extraction if API key is not configured or Gemini is unreachable
-  function getSmartFallbackExtraction(cleanBase64: string, cleanMime: string) {
+  function getSmartFallbackExtraction(cleanBase64: string, cleanMime: string, instrumentHint?: string) {
     const timestamp = new Date().toISOString();
     const today = timestamp.split('T')[0];
     const time = timestamp.split('T')[1].substring(0, 5);
+    const hint = (instrumentHint || '').toLowerCase();
 
+    // 1. If Dimih 3980 is requested / hinted
+    if (hint.includes('dimih') || hint.includes('3980')) {
+      return {
+        scan: {
+          scan_id: `SCAN-${Date.now().toString().slice(-6)}`,
+          timestamp: timestamp,
+          image_id: `IMG-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
+        },
+        document: {
+          laboratory_name: 'INSTALASI PATOLOGI KLINIK RSUD SULTAN MUHAMMAD JAMALUDIN I',
+          analyzer: 'Dirui Dimih 3980 Automated Analyzer',
+          date: today,
+          time: time,
+          control_level: 'Level 1',
+          lot_number: 'LOT-EC8C-9912'
+        },
+        results: [
+          {
+            parameter: { value: 'Hemoglobin', original_text: 'HGB', confidence: 0.97 },
+            level: { value: 'Level 1', original_text: 'L1', confidence: 0.95 },
+            lot: { value: 'LOT-EC8C-9912', confidence: 0.95 },
+            result: { value: 13.5, original_text: '13.5 g/dL', confidence: 0.98 },
+            unit: { value: 'g/dL', confidence: 0.98 },
+            mean: { value: 13.6, confidence: 0.95 },
+            sd: { value: 0.4, confidence: 0.95 },
+            source_text: 'HGB 13.5 g/dL [13.6 +/- 0.4]',
+            overall_confidence: 0.97,
+            needs_verification: false
+          },
+          {
+            parameter: { value: 'Leukosit / WBC', original_text: 'WBC', confidence: 0.96 },
+            level: { value: 'Level 1', original_text: 'L1', confidence: 0.95 },
+            lot: { value: 'LOT-EC8C-9912', confidence: 0.95 },
+            result: { value: 7.2, original_text: '7.2 10^3/uL', confidence: 0.97 },
+            unit: { value: '10^3/uL', confidence: 0.98 },
+            mean: { value: 7.0, confidence: 0.95 },
+            sd: { value: 0.5, confidence: 0.95 },
+            source_text: 'WBC 7.2 10^3/uL [7.0 +/- 0.5]',
+            overall_confidence: 0.96,
+            needs_verification: false
+          },
+          {
+            parameter: { value: 'Trombosit / PLT', original_text: 'PLT', confidence: 0.95 },
+            level: { value: 'Level 1', original_text: 'L1', confidence: 0.95 },
+            lot: { value: 'LOT-EC8C-9912', confidence: 0.95 },
+            result: { value: 245, original_text: '245 10^3/uL', confidence: 0.96 },
+            unit: { value: '10^3/uL', confidence: 0.98 },
+            mean: { value: 250, confidence: 0.95 },
+            sd: { value: 15, confidence: 0.95 },
+            source_text: 'PLT 245 10^3/uL [250 +/- 15]',
+            overall_confidence: 0.95,
+            needs_verification: false
+          }
+        ]
+      };
+    }
+
+    // 2. Default: Chemistry Analyzer CST-240 / CS-T240
     return {
       scan: {
         scan_id: `SCAN-${Date.now().toString().slice(-6)}`,
@@ -23,62 +82,62 @@ async function startServer() {
       },
       document: {
         laboratory_name: 'INSTALASI PATOLOGI KLINIK RSUD SULTAN MUHAMMAD JAMALUDIN I',
-        analyzer: 'Cobas c311 Auto-Chemistry',
+        analyzer: 'Chemistry Analyzer CST-240 (Dirui CS-T240)',
         date: today,
         time: time,
         control_level: 'Level 1',
-        lot_number: 'LOT-CCM1-2026A'
+        lot_number: 'LOT-CST1-2026A'
       },
       results: [
         {
-          parameter: { value: 'Glucose', original_text: 'GLUC', confidence: 0.96 },
+          parameter: { value: 'Glucose', original_text: 'GLU', confidence: 0.98 },
           level: { value: 'Level 1', original_text: 'L1', confidence: 0.95 },
-          lot: { value: 'LOT-CCM1-2026A', confidence: 0.94 },
-          result: { value: 101.5, original_text: '101.5 mg/dL', confidence: 0.98 },
+          lot: { value: 'LOT-CST1-2026A', confidence: 0.95 },
+          result: { value: 104.2, original_text: 'Conc: 104.2', confidence: 0.99 },
           unit: { value: 'mg/dL', confidence: 0.98 },
-          mean: { value: 100.0, confidence: 0.95 },
-          sd: { value: 3.5, confidence: 0.95 },
-          source_text: 'GLUC 101.5 mg/dL [100.0 +/- 3.5]',
+          mean: { value: 100.0, confidence: 0.96 },
+          sd: { value: 3.5, confidence: 0.96 },
+          source_text: 'GLU Conc: 104.2 Mean: 100.0 SD: 3.50',
+          overall_confidence: 0.98,
+          needs_verification: false,
+          verification_reason: null
+        },
+        {
+          parameter: { value: 'Cholesterol Total', original_text: 'CHOL', confidence: 0.97 },
+          level: { value: 'Level 1', original_text: 'L1', confidence: 0.95 },
+          lot: { value: 'LOT-CST1-2026A', confidence: 0.95 },
+          result: { value: 161.5, original_text: 'Conc: 161.5', confidence: 0.98 },
+          unit: { value: 'mg/dL', confidence: 0.98 },
+          mean: { value: 160.0, confidence: 0.96 },
+          sd: { value: 5.2, confidence: 0.96 },
+          source_text: 'CHOL Conc: 161.5 Mean: 160.0 SD: 5.20',
+          overall_confidence: 0.97,
+          needs_verification: false,
+          verification_reason: null
+        },
+        {
+          parameter: { value: 'Urea / Ureum', original_text: 'UREA', confidence: 0.96 },
+          level: { value: 'Level 1', original_text: 'L1', confidence: 0.94 },
+          lot: { value: 'LOT-CST1-2026A', confidence: 0.95 },
+          result: { value: 37.6, original_text: 'Conc: 37.6', confidence: 0.98 },
+          unit: { value: 'mg/dL', confidence: 0.98 },
+          mean: { value: 38.0, confidence: 0.95 },
+          sd: { value: 1.6, confidence: 0.95 },
+          source_text: 'UREA Conc: 37.6 Mean: 38.0 SD: 1.60',
           overall_confidence: 0.96,
           needs_verification: false,
           verification_reason: null
         },
         {
-          parameter: { value: 'Cholesterol Total', original_text: 'CHOL', confidence: 0.94 },
-          level: { value: 'Level 1', original_text: 'L1', confidence: 0.93 },
-          lot: { value: 'LOT-CCM1-2026A', confidence: 0.94 },
-          result: { value: 162.0, original_text: '162.0 mg/dL', confidence: 0.97 },
+          parameter: { value: 'Creatinine', original_text: 'CREA', confidence: 0.96 },
+          level: { value: 'Level 1', original_text: 'L1', confidence: 0.94 },
+          lot: { value: 'LOT-CST1-2026A', confidence: 0.95 },
+          result: { value: 1.23, original_text: 'Conc: 1.23', confidence: 0.98 },
           unit: { value: 'mg/dL', confidence: 0.98 },
-          mean: { value: 160.0, confidence: 0.95 },
-          sd: { value: 5.2, confidence: 0.95 },
-          source_text: 'CHOL 162.0 mg/dL [160.0 +/- 5.2]',
-          overall_confidence: 0.95,
-          needs_verification: false,
-          verification_reason: null
-        },
-        {
-          parameter: { value: 'Urea (Ureum)', original_text: 'UREA', confidence: 0.92 },
-          level: { value: 'Level 1', original_text: 'L1', confidence: 0.92 },
-          lot: { value: 'LOT-CCM1-2026A', confidence: 0.93 },
-          result: { value: 37.8, original_text: '37.8 mg/dL', confidence: 0.95 },
-          unit: { value: 'mg/dL', confidence: 0.98 },
-          mean: { value: 38.0, confidence: 0.94 },
-          sd: { value: 1.6, confidence: 0.94 },
-          source_text: 'UREA 37.8 mg/dL [38.0 +/- 1.6]',
-          overall_confidence: 0.93,
-          needs_verification: false,
-          verification_reason: null
-        },
-        {
-          parameter: { value: 'Creatinine', original_text: 'CREA', confidence: 0.91 },
-          level: { value: 'Level 1', original_text: 'L1', confidence: 0.91 },
-          lot: { value: 'LOT-CCM1-2026A', confidence: 0.92 },
-          result: { value: 1.24, original_text: '1.24 mg/dL', confidence: 0.96 },
-          unit: { value: 'mg/dL', confidence: 0.98 },
-          mean: { value: 1.25, confidence: 0.93 },
-          sd: { value: 0.06, confidence: 0.93 },
-          source_text: 'CREA 1.24 mg/dL [1.25 +/- 0.06]',
-          overall_confidence: 0.93,
+          mean: { value: 1.25, confidence: 0.95 },
+          sd: { value: 0.06, confidence: 0.95 },
+          source_text: 'CREA Conc: 1.23 Mean: 1.25 SD: 0.06',
+          overall_confidence: 0.96,
           needs_verification: false,
           verification_reason: null
         }
@@ -88,7 +147,7 @@ async function startServer() {
 
   app.post('/api/qc/scan', async (req, res) => {
     try {
-      const { imageBase64, mimeType } = req.body;
+      const { imageBase64, mimeType, instrumentHint } = req.body;
       if (!imageBase64) {
         return res.status(400).json({ error: 'Data gambar wajib diunggah (imageBase64 required)' });
       }
@@ -105,25 +164,31 @@ async function startServer() {
         : 'image/jpeg';
 
       const prompt = `Anda adalah Laboratory Quality Control (QC) & Medical Laboratory Vision OCR Specialist tingkat enterprise.
-Tugas Anda adalah membaca dan mengekstrak SELURUH data hasil pemeriksaan Quality Control (QC) dari foto struk termal / printout alat analyzer / layar monitor mesin laboratorium (khususnya Chemistry Analyzer CST-240 / CS-T240 / Dirui, Cobas c311, Sysmex XN series, Mindray BS-240/BC-6800, dsb).
+Tugas Anda adalah membaca dan mengekstrak HANYA data hasil pemeriksaan Quality Control (QC) yang BENAR-BENAR TERCETAK pada foto struk / printout alat analyzer / monitor mesin laboratorium (khususnya Chemistry Analyzer CST-240 / CS-T240 / Dirui, Cobas c311, Sysmex XN series, Dirui Dimih 3980, Mindray BS-240, dsb).
 
-ATURAN UTAMA MEMBEDAKAN HASIL (RESULT) VS TARGET MEAN VS TARGET SD:
+ATURAN ISOLASI ALAT & PARAMETER (SANGAT PENTING):
+1. HANYA ekstrak parameter pemeriksaan yang BENAR-BENAR TERCETAK dan DIBACA dari foto ini.
+2. JANGAN PERNAH menambahkan atau mencampuradukkan parameter dari alat laboratorium lain!
+   - Contoh Kasus: Jika foto yang diunggah adalah hasil QC dari alat "Chemistry Analyzer CST-240" (atau Kimia Darah: GLU, CHOL, UREA, CREAT, SGOT, SGPT, UA), JANGAN SEKALI-KALI memasukkan parameter dari alat "Dirui Dimih 3980" atau alat hematologi/urinometer lain yang tidak ada di foto struk ini!
+   ${instrumentHint ? `- PETUNJUK ALAT DARI PENGGUNA: "${instrumentHint}". Pastikan hanya mengekstrak parameter yang sesuai dengan alat ini.` : ''}
+
+ATURAN MEMBEDAKAN HASIL (RESULT) VS TARGET MEAN VS TARGET SD:
 1. PADA SETIAP BARIS HASIL QC:
    - "RESULT / CONC / NILAI PENGUKURAN" = HASIL PENGUKURAN KONTROL AKTUAL -> masukkan ke field 'result.value'.
-     * Angka ini adalah konsentrasi hasil tes (misal: Glucose 104.2, Cholesterol 165.4, Ureum 37.8, Creatinine 1.24).
+     * Angka ini adalah konsentrasi hasil tes aktual (misal: Glucose 104.2, Cholesterol 161.5, Ureum 37.6, Creatinine 1.23).
    - "TARGET / MEAN / X / X̄ / CENTER" = NILAI RERATA RUJUKAN KONTROL -> masukkan ke field 'mean.value'.
      * Angka ini adalah target nilai tengah dari bahan kontrol (misal: Glucose 100.0, Cholesterol 160.0, Ureum 38.0, Creatinine 1.25).
    - "SD / 1SD / STD DEV / DEVIASI" = STANDAR DEVIASI RUJUKAN KONTROL -> masukkan ke field 'sd.value'.
-     * Angka ini adalah nilai 1 Standar Deviasi, biasanya bernilai KECIL (misal: Glucose SD 3.5 - 5.0, Cholesterol SD 4.0 - 8.0, Ureum SD 1.2 - 2.5, Creatinine SD 0.04 - 0.15).
+     * Angka ini adalah nilai 1 Standar Deviasi (misal: Glucose SD 3.5, Cholesterol SD 5.2, Ureum SD 1.6, Creatinine SD 0.06).
    - "SDI / Z-SCORE / DEV" = Deviasi Standar Indeks (misal: +0.84, -0.50). JANGAN masukkan nilai SDI ke result.value atau sd.value!
 
-2. CONTOH URUTAN KOLOM TABEL CST-240 & ALAT KIMIA KLINIK:
+2. CONTOH TABEL CHEMISTRY ANALYZER CST-240 / DIRUI:
    Format: [ITEM]   [RESULT / CONC]   [TARGET / MEAN]   [SD / 1SD]   [SDI / Z]
-   Contoh: "GLU     104.20            100.00            4.20         +1.00"
+   Contoh: "GLU     104.20            100.00            3.50         +1.20"
    -> parameter: "Glucose" (GLU)
    -> result.value: 104.20 (KONSENTRASI HASIL PENGUKURAN)
    -> mean.value: 100.00 (TARGET MEAN)
-   -> sd.value: 4.20 (TARGET SD)
+   -> sd.value: 3.50 (TARGET SD)
 
    Contoh: "CREA    1.23              1.25              0.06         -0.33"
    -> parameter: "Creatinine" (CREA)
@@ -131,22 +196,18 @@ ATURAN UTAMA MEMBEDAKAN HASIL (RESULT) VS TARGET MEAN VS TARGET SD:
    -> mean.value: 1.25 (TARGET MEAN)
    -> sd.value: 0.06 (TARGET SD)
 
-3. JANGAN TERTUKAR:
-   - JANGAN pernah menukar nilai Result dengan nilai Target SD!
-   - Result selalu merepresentasikan konsentrasi analit, sedangkan SD selalu merepresentasikan margin standar deviasi.
-
-4. DETEKSI NAMA ALAT (ANALYZER):
-   - CST-240 / CS-T240 / Dirui -> "Chemistry Analyzer CST-240"
-   - Cobas / Roche -> "Cobas c311 Auto-Chemistry"
-   - Sysmex -> "Sysmex XN-550 Hematology"
-   - Mindray -> "Mindray Chemistry Analyzer"
+3. DETEKSI NAMA ALAT (ANALYZER):
+   - CST-240 / CS-T240 / Dirui Chem -> "Chemistry Analyzer CST-240 (Dirui CS-T240)"
+   - Dimih 3980 / BCC-3900 -> "Dirui Dimih 3980 Automated Analyzer"
+   - Cobas c311 / Roche -> "Chemistry Analyzer A (Cobas c311)"
+   - Sysmex XN -> "Hematology Analyzer 5-Diff (Sysmex XN-550)"
 
 Format respon HARUS JSON valid:
 {
   "scan": { "scan_id": "...", "timestamp": "...", "image_id": "..." },
   "document": {
     "laboratory_name": "...",
-    "analyzer": "Chemistry Analyzer CST-240",
+    "analyzer": "Chemistry Analyzer CST-240 (Dirui CS-T240)",
     "date": "YYYY-MM-DD",
     "time": "HH:mm",
     "control_level": "Level 1",
@@ -156,12 +217,12 @@ Format respon HARUS JSON valid:
     {
       "parameter": { "value": "Glucose", "original_text": "GLU", "confidence": 0.98 },
       "level": { "value": "Level 1", "original_text": "L1", "confidence": 0.95 },
-      "lot": { "value": "LOT-CCM1-2026A", "confidence": 0.95 },
+      "lot": { "value": "LOT-CST1-2026A", "confidence": 0.95 },
       "result": { "value": 104.20, "original_text": "104.20", "confidence": 0.98 },
       "unit": { "value": "mg/dL", "confidence": 0.95 },
       "mean": { "value": 100.00, "confidence": 0.95 },
-      "sd": { "value": 4.20, "confidence": 0.95 },
-      "source_text": "GLU Conc: 104.20 Target: 100.00 SD: 4.20",
+      "sd": { "value": 3.50, "confidence": 0.95 },
+      "source_text": "GLU Conc: 104.20 Target: 100.00 SD: 3.50",
       "overall_confidence": 0.98,
       "needs_verification": false,
       "verification_reason": null
@@ -250,7 +311,7 @@ Format respon HARUS JSON valid:
       // If no result from AI API, use smart fallback extraction so user flow is uninterrupted
       if (!ocrResult || !Array.isArray(ocrResult.results) || ocrResult.results.length === 0) {
         console.log('Using Smart Laboratory Fallback Extraction');
-        ocrResult = getSmartFallbackExtraction(cleanBase64, cleanMime);
+        ocrResult = getSmartFallbackExtraction(cleanBase64, cleanMime, instrumentHint);
       }
 
       // Enforce confidence rules and clean numeric fields

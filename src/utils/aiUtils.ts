@@ -52,63 +52,88 @@ export interface VerifiedQCItem {
 
 // Parameter alias dictionaries for common clinical laboratory tests (including CST-240 & Dirui codes)
 const PARAM_ALIASES: Record<string, string[]> = {
-  'param-glu': ['glucose', 'glu', 'gluc', 'glu-g', 'gds', 'gdp', 'glukosa', 'blood sugar', 'gula darah'],
-  'param-chol': ['cholesterol', 'chol', 'cho', 't-cho', 'tc', 'kolesterol', 'chol total', 'cholesterol total'],
-  'param-urea': ['urea', 'ureum', 'bun', 'blood urea nitrogen', 'ure'],
-  'param-creat': ['creatinine', 'crea', 'cre', 'creat', 'kreatinin', 'cr'],
-  'param-trig': ['triglyceride', 'trig', 'tg', 'trigliserida'],
-  'param-sgot': ['sgot', 'ast', 'got', 'aspartate aminotransferase'],
-  'param-sgpt': ['sgpt', 'alt', 'gpt', 'alanine aminotransferase'],
-  'param-ua': ['uric acid', 'ua', 'uric', 'asam urat', 'urate'],
-  'param-alb': ['albumin', 'alb'],
-  'param-tp': ['total protein', 'tp', 'protein total'],
-  'param-tbil': ['total bilirubin', 'tbil', 't-bil', 'bilirubin total', 'bili total'],
-  'param-dbil': ['direct bilirubin', 'dbil', 'd-bil', 'bilirubin direk'],
-  'param-hgb': ['hemoglobin', 'hgb', 'hb', 'haemoglobin'],
-  'param-wbc': ['white blood cell', 'wbc', 'leukosit', 'leuko'],
-  'param-plt': ['platelet', 'plt', 'trombosit', 'thrombocyte'],
-  'param-rbc': ['red blood cell', 'rbc', 'eritrosit', 'erythrocyte'],
-  'param-hct': ['hematocrit', 'hct', 'hematokrit', 'pcv'],
+  'glu': ['glucose', 'glu', 'gluc', 'glu-g', 'gds', 'gdp', 'glukosa', 'blood sugar', 'gula darah'],
+  'chol': ['cholesterol', 'chol', 'cho', 't-cho', 'tc', 'kolesterol', 'chol total', 'cholesterol total'],
+  'urea': ['urea', 'ureum', 'bun', 'blood urea nitrogen', 'ure'],
+  'creat': ['creatinine', 'crea', 'cre', 'creat', 'kreatinin', 'cr'],
+  'trig': ['triglyceride', 'trig', 'tg', 'trigliserida'],
+  'sgot': ['sgot', 'ast', 'got', 'aspartate aminotransferase'],
+  'sgpt': ['sgpt', 'alt', 'gpt', 'alanine aminotransferase'],
+  'ua': ['uric acid', 'ua', 'uric', 'asam urat', 'urate'],
+  'alb': ['albumin', 'alb'],
+  'tp': ['total protein', 'tp', 'protein total'],
+  'tbil': ['total bilirubin', 'tbil', 't-bil', 'bilirubin total', 'bili total'],
+  'dbil': ['direct bilirubin', 'dbil', 'd-bil', 'bilirubin direk'],
+  'hgb': ['hemoglobin', 'hgb', 'hb', 'haemoglobin'],
+  'wbc': ['white blood cell', 'wbc', 'leukosit', 'leuko'],
+  'plt': ['platelet', 'plt', 'trombosit', 'thrombocyte'],
+  'rbc': ['red blood cell', 'rbc', 'eritrosit', 'erythrocyte'],
+  'hct': ['hematocrit', 'hct', 'hematokrit', 'pcv'],
 };
 
 export function matchParameter(
   rawName: string | undefined, 
   rawCode: string | undefined, 
-  parameters: Parameter[]
+  parameters: Parameter[],
+  targetInstrumentId?: string
 ): Parameter | null {
-  if (!rawName && !rawCode) return parameters[0] || null;
+  if (parameters.length === 0) return null;
+  if (!rawName && !rawCode) {
+    const instParams = targetInstrumentId ? parameters.filter(p => p.instrumentId === targetInstrumentId) : parameters;
+    return instParams[0] || parameters[0] || null;
+  }
+  
   const searchStr = `${rawName || ''} ${rawCode || ''}`.toLowerCase().trim();
 
-  // 1. Direct code or name match
-  for (const p of parameters) {
-    if (p.code.toLowerCase() === searchStr || p.name.toLowerCase() === searchStr) {
-      return p;
+  // If instrument is specified, prioritize parameters attached to this instrument
+  const primaryPool = targetInstrumentId 
+    ? parameters.filter(p => p.instrumentId === targetInstrumentId)
+    : parameters;
+
+  const fallbackPool = parameters;
+
+  // Search in prioritized pool first, then fallback pool
+  for (const pool of [primaryPool, fallbackPool]) {
+    // 1. Direct code or name match
+    for (const p of pool) {
+      if (p.code.toLowerCase() === searchStr || p.name.toLowerCase() === searchStr) {
+        return p;
+      }
+    }
+
+    // 2. Exact word / code match in string
+    for (const p of pool) {
+      const pCode = p.code.toLowerCase();
+      if (searchStr.split(/[\s,/_.-]+/).includes(pCode)) {
+        return p;
+      }
+    }
+
+    // 3. Contains match
+    for (const p of pool) {
+      if (searchStr.includes(p.code.toLowerCase()) || p.name.toLowerCase().includes(searchStr)) {
+        return p;
+      }
+    }
+
+    // 4. Alias match
+    for (const [key, aliases] of Object.entries(PARAM_ALIASES)) {
+      if (aliases.some(alias => searchStr.includes(alias) || searchStr.split(/[\s,/_.-]+/).includes(alias))) {
+        const match = pool.find(p => p.id.toLowerCase().includes(key) || p.code.toLowerCase().includes(key));
+        if (match) return match;
+      }
     }
   }
 
-  // 2. Contains match
-  for (const p of parameters) {
-    if (searchStr.includes(p.code.toLowerCase()) || p.name.toLowerCase().includes(searchStr)) {
-      return p;
-    }
-  }
-
-  // 3. Alias match
-  for (const [key, aliases] of Object.entries(PARAM_ALIASES)) {
-    if (aliases.some(alias => searchStr.includes(alias) || alias === searchStr)) {
-      const match = parameters.find(p => p.id === key || p.code.toLowerCase() === key.replace('param-', ''));
-      if (match) return match;
-    }
-  }
-
-  return parameters[0] || null;
+  return primaryPool[0] || parameters[0] || null;
 }
 
 export function matchInstrument(
   rawName: string | undefined, 
   instruments: Instrument[]
 ): Instrument | null {
-  if (!rawName || instruments.length === 0) return instruments[0] || null;
+  if (instruments.length === 0) return null;
+  if (!rawName) return instruments[0] || null;
   const searchStr = rawName.toLowerCase().trim();
 
   for (const inst of instruments) {
@@ -123,18 +148,34 @@ export function matchInstrument(
     }
   }
 
-  // Analyzer keywords fallback
-  if (searchStr.includes('cst-240') || searchStr.includes('cs-t240') || searchStr.includes('cst240') || searchStr.includes('dirui')) {
-    const cst = instruments.find(i => i.name.toLowerCase().includes('cst') || i.model.toLowerCase().includes('cst') || i.name.toLowerCase().includes('chem'));
+  // CST-240 / CS-T240 Analyzer keywords
+  if (searchStr.includes('cst-240') || searchStr.includes('cs-t240') || searchStr.includes('cst240') || searchStr.includes('cst 240')) {
+    const cst = instruments.find(i => i.id === 'inst-cst240' || i.name.toLowerCase().includes('cst') || i.model.toLowerCase().includes('cst'));
     if (cst) return cst;
   }
+
+  // Dirui Dimih 3980 keywords
+  if (searchStr.includes('dimih') || searchStr.includes('3980') || searchStr.includes('dimih 3980')) {
+    const dimih = instruments.find(i => i.id === 'inst-dirui-3980' || i.name.toLowerCase().includes('3980') || i.model.toLowerCase().includes('3980'));
+    if (dimih) return dimih;
+  }
+
+  // Cobas c311 keywords
   if (searchStr.includes('cobas') || searchStr.includes('roche') || searchStr.includes('c311')) {
     const cobas = instruments.find(i => i.name.toLowerCase().includes('cobas') || i.model.toLowerCase().includes('cobas'));
     if (cobas) return cobas;
   }
+
+  // Sysmex keywords
   if (searchStr.includes('sysmex') || searchStr.includes('xn')) {
     const sysmex = instruments.find(i => i.name.toLowerCase().includes('sysmex'));
     if (sysmex) return sysmex;
+  }
+
+  // Dirui generic chemistry fallback
+  if (searchStr.includes('dirui')) {
+    const dirui = instruments.find(i => i.name.toLowerCase().includes('cst') || i.name.toLowerCase().includes('dirui'));
+    if (dirui) return dirui;
   }
 
   return instruments[0] || null;
@@ -155,24 +196,41 @@ export function matchControlLevel(rawLevel: string | undefined): 'Level 1' | 'Le
 /**
  * Transforms raw AI OCR extraction output into fully matched, verified QC rows
  * Distinguishes clearly between Result (Conc), Target Mean, and Target SD
+ * Strictly isolates parameters to the detected / selected instrument
  */
 export function buildVerifiedItemsFromAI(
   extractedResults: ExtractedAIItem[],
   documentMeta: any,
   parameters: Parameter[],
   instruments: Instrument[],
-  existingResults: QCResult[] = []
+  existingResults: QCResult[] = [],
+  filterInstrumentId?: string
 ): VerifiedQCItem[] {
   const today = documentMeta?.date || new Date().toISOString().split('T')[0];
   const time = documentMeta?.time || new Date().toTimeString().split(' ')[0].substring(0, 5);
   const docAnalyzer = documentMeta?.analyzer;
   const controlLevel = matchControlLevel(documentMeta?.control_level);
-  const lotNumber = documentMeta?.lot_number || (controlLevel === 'Level 2' ? 'LOT-CCM2-2026B' : 'LOT-CCM1-2026A');
+  const lotNumber = documentMeta?.lot_number || (controlLevel === 'Level 2' ? 'LOT-CCM2-2026B' : 'LOT-CST1-2026A');
 
-  // Fallback: If AI returned 0 items, generate rows from active master parameters so user never sees empty state
+  // Determine the target instrument for this document
+  const defaultInst = (filterInstrumentId ? instruments.find(i => i.id === filterInstrumentId) : null) 
+    || matchInstrument(docAnalyzer, instruments) 
+    || instruments[0];
+
+  // Fallback: If AI returned 0 items, generate rows ONLY from the detected instrument's parameters
   if (!extractedResults || !Array.isArray(extractedResults) || extractedResults.length === 0) {
-    const defaultInst = matchInstrument(docAnalyzer, instruments) || instruments[0];
-    const targetParams = parameters.length > 0 ? parameters : [];
+    let targetParams = parameters.filter(p => p.instrumentId === defaultInst?.id);
+    
+    // If no parameters explicitly assigned to defaultInst, find chemistry or appropriate params
+    if (targetParams.length === 0) {
+      if (defaultInst?.id === 'inst-cst240' || defaultInst?.name?.toLowerCase().includes('cst') || defaultInst?.name?.toLowerCase().includes('chem')) {
+        targetParams = parameters.filter(p => !p.id.includes('dimih') && !p.id.includes('hema') && !p.name.toLowerCase().includes('dimih'));
+      } else if (defaultInst?.id === 'inst-dirui-3980' || defaultInst?.name?.toLowerCase().includes('3980')) {
+        targetParams = parameters.filter(p => p.id.includes('dimih') || p.name.toLowerCase().includes('dimih'));
+      } else {
+        targetParams = parameters.slice(0, 4);
+      }
+    }
 
     return targetParams.map((param, index) => {
       const targetMean = param.targetMean || 100;
@@ -191,12 +249,12 @@ export function buildVerifiedItemsFromAI(
 
       return {
         id: `VERIFY-${Date.now()}-${index}`,
-        sourceText: `Master Data Auto-Populated: ${param.name}`,
+        sourceText: `Master Data (${defaultInst?.name || 'CST-240'}): ${param.name}`,
         confidence: 0.90,
         needsVerification: true,
         verificationReason: 'Periksa & sesuaikan angka hasil dengan foto struk',
-        instrumentId: defaultInst?.id || param.instrumentId || 'inst-chem-a',
-        instrumentName: defaultInst?.name || 'Chemistry Analyzer A (Cobas c311)',
+        instrumentId: defaultInst?.id || param.instrumentId || 'inst-cst240',
+        instrumentName: defaultInst?.name || 'Chemistry Analyzer CST-240 (Dirui CS-T240)',
         parameterId: param.id,
         parameterName: param.name,
         parameterCode: param.code,
@@ -217,113 +275,132 @@ export function buildVerifiedItemsFromAI(
     });
   }
 
-  return extractedResults.map((item, index) => {
-    const paramName = item.parameter?.value || item.parameter?.original_text || '';
-    const matchedParam = matchParameter(paramName, item.parameter?.original_text, parameters);
-    const matchedInst = matchInstrument(item.analyzer || docAnalyzer, instruments);
-    const itemLevel = matchControlLevel(item.level?.value || documentMeta?.control_level);
-    
-    const itemLot = item.lot?.value || documentMeta?.lot_number || (itemLevel === 'Level 2' ? 'LOT-CCM2-2026B' : 'LOT-CCM1-2026A');
-    
-    // Result value: The actual measured QC concentration read from photo/struk (CST-240 / Cobas / Sysmex)
-    let resultValue: number;
-    if (typeof item.result?.value === 'number' && !isNaN(item.result.value)) {
-      resultValue = item.result.value;
-    } else {
-      const parsed = parseFloat(String(item.result?.original_text || '0').replace(/,/g, '.').replace(/[^0-9.-]/g, ''));
-      resultValue = !isNaN(parsed) && parsed > 0 ? parsed : (matchedParam?.targetMean || 100);
-    }
+  // Filter out any AI OCR results that belong to other instruments if instrument is CST-240
+  const isCST240Doc = (defaultInst?.id === 'inst-cst240' || docAnalyzer?.toLowerCase().includes('cst'));
+  const isDimihDoc = (defaultInst?.id === 'inst-dirui-3980' || docAnalyzer?.toLowerCase().includes('3980'));
 
-    // Target SD: Prioritize the OCR extracted SD value from the photo, fallback to Master Data
-    let targetSD: number;
-    if (typeof item.sd?.value === 'number' && !isNaN(item.sd.value) && item.sd.value > 0) {
-      targetSD = item.sd.value;
-    } else {
-      const parsedSD = parseFloat(String(item.sd?.original_text || '0').replace(/,/g, '.').replace(/[^0-9.-]/g, ''));
-      targetSD = !isNaN(parsedSD) && parsedSD > 0 ? parsedSD : (matchedParam?.targetSD || 3.5);
-    }
+  return extractedResults
+    .filter(item => {
+      const pName = (item.parameter?.value || item.parameter?.original_text || '').toLowerCase();
+      // If document is CST-240 chemistry analyzer, exclude hematology/dimih parameters that might have been hallucinated
+      if (isCST240Doc && (pName.includes('dimih') || pName.includes('3980') || pName.includes('eightcheck'))) {
+        return false;
+      }
+      // If document is Dimih 3980, exclude pure chemistry parameters if inapplicable
+      if (isDimihDoc && (pName.includes('cst-240') || pName.includes('c311'))) {
+        return false;
+      }
+      return true;
+    })
+    .map((item, index) => {
+      const paramName = item.parameter?.value || item.parameter?.original_text || '';
+      const matchedInst = (filterInstrumentId ? instruments.find(i => i.id === filterInstrumentId) : null) 
+        || matchInstrument(item.analyzer || docAnalyzer, instruments) 
+        || defaultInst;
 
-    // Target Mean: Prioritize the OCR extracted Mean value from the photo if available, fallback to Master Data
-    let targetMean: number;
-    if (typeof item.mean?.value === 'number' && !isNaN(item.mean.value) && item.mean.value > 0) {
-      targetMean = item.mean.value;
-    } else {
-      const parsedMean = parseFloat(String(item.mean?.original_text || '0').replace(/,/g, '.').replace(/[^0-9.-]/g, ''));
-      targetMean = !isNaN(parsedMean) && parsedMean > 0 ? parsedMean : (matchedParam?.targetMean || 100);
-    }
-
-    // Intelligent Auto-Detection & Fix for Inverted Result vs Target SD:
-    // (e.g., if OCR or printer placed SD in result column and result in SD column)
-    const code = (matchedParam?.code || paramName).toUpperCase();
-    if (
-      (code.includes('GLU') || code.includes('CHOL') || code.includes('TRIG')) &&
-      resultValue <= 15 && targetSD >= 40
-    ) {
-      const temp = resultValue;
-      resultValue = targetSD;
-      targetSD = temp;
-    } else if (
-      (code.includes('UREA') || code.includes('BUN') || code.includes('AST') || code.includes('ALT') || code.includes('SGOT') || code.includes('SGPT')) &&
-      resultValue <= 8 && targetSD >= 20
-    ) {
-      const temp = resultValue;
-      resultValue = targetSD;
-      targetSD = temp;
-    } else if (
-      (code.includes('CREA') || code.includes('TBIL') || code.includes('DBIL')) &&
-      resultValue < 0.25 && targetSD >= 0.5
-    ) {
-      const temp = resultValue;
-      resultValue = targetSD;
-      targetSD = temp;
-    }
-
-    const unit = item.unit?.value || matchedParam?.unit || 'mg/dL';
-    
-    // Calculate Z-Score = (Result - Mean) / SD
-    const zScore = calculateZScore(resultValue, targetMean, targetSD);
-    const sdPosition = formatSDPosition(zScore);
-
-    // Evaluate Westgard rules
-    const history = existingResults.filter(r => r.parameterId === (matchedParam?.id || 'param-glu'));
-    const tempId = `QC-SCAN-TEMP-${index}`;
-    const { status, violations } = evaluateWestgardRules(
-      { id: tempId, value: resultValue, mean: targetMean, sd: targetSD, zScore },
-      history,
-      DEFAULT_WESTGARD_RULES
-    );
-
-    const confidence = item.overall_confidence ?? item.result?.confidence ?? 0.9;
-    const needsVerification = item.needs_verification ?? (confidence < 0.8 || status !== 'pass');
-
-    return {
-      id: `VERIFY-${Date.now()}-${index}`,
-      sourceText: item.source_text || item.result?.original_text || `Hasil QC: ${resultValue} ${unit}`,
-      confidence,
-      needsVerification,
-      verificationReason: item.verification_reason || (status !== 'pass' ? `Status QC: ${status.toUpperCase()}` : null),
+      const matchedParam = matchParameter(paramName, item.parameter?.original_text, parameters, matchedInst?.id);
+      const itemLevel = matchControlLevel(item.level?.value || documentMeta?.control_level);
       
-      instrumentId: matchedInst?.id || 'inst-chem-a',
-      instrumentName: matchedInst?.name || 'Chemistry Analyzer A (Cobas c311)',
-      parameterId: matchedParam?.id || 'param-glu',
-      parameterName: matchedParam?.name || 'Glucose (Glukosa Darah Sewaktu/Puasa)',
-      parameterCode: matchedParam?.code || 'GLU',
-      controlLevel: itemLevel,
-      lotNumber: itemLot,
+      const itemLot = item.lot?.value || documentMeta?.lot_number || (itemLevel === 'Level 2' ? 'LOT-CCM2-2026B' : 'LOT-CST1-2026A');
       
-      resultValue,
-      unit,
-      targetMean,
-      targetSD,
+      // Result value: The actual measured QC concentration read from photo/struk
+      let resultValue: number;
+      if (typeof item.result?.value === 'number' && !isNaN(item.result.value)) {
+        resultValue = item.result.value;
+      } else {
+        const parsed = parseFloat(String(item.result?.original_text || '0').replace(/,/g, '.').replace(/[^0-9.-]/g, ''));
+        resultValue = !isNaN(parsed) && parsed > 0 ? parsed : (matchedParam?.targetMean || 100);
+      }
+
+      // Target SD: Prioritize the OCR extracted SD value from the photo, fallback to Master Data
+      let targetSD: number;
+      if (typeof item.sd?.value === 'number' && !isNaN(item.sd.value) && item.sd.value > 0) {
+        targetSD = item.sd.value;
+      } else {
+        const parsedSD = parseFloat(String(item.sd?.original_text || '0').replace(/,/g, '.').replace(/[^0-9.-]/g, ''));
+        targetSD = !isNaN(parsedSD) && parsedSD > 0 ? parsedSD : (matchedParam?.targetSD || 3.5);
+      }
+
+      // Target Mean: Prioritize the OCR extracted Mean value from the photo if available, fallback to Master Data
+      let targetMean: number;
+      if (typeof item.mean?.value === 'number' && !isNaN(item.mean.value) && item.mean.value > 0) {
+        targetMean = item.mean.value;
+      } else {
+        const parsedMean = parseFloat(String(item.mean?.original_text || '0').replace(/,/g, '.').replace(/[^0-9.-]/g, ''));
+        targetMean = !isNaN(parsedMean) && parsedMean > 0 ? parsedMean : (matchedParam?.targetMean || 100);
+      }
+
+      // Intelligent Auto-Detection & Fix for Inverted Result vs Target SD:
+      const code = (matchedParam?.code || paramName).toUpperCase();
+      if (
+        (code.includes('GLU') || code.includes('CHOL') || code.includes('TRIG')) &&
+        resultValue <= 15 && targetSD >= 40
+      ) {
+        const temp = resultValue;
+        resultValue = targetSD;
+        targetSD = temp;
+      } else if (
+        (code.includes('UREA') || code.includes('BUN') || code.includes('AST') || code.includes('ALT') || code.includes('SGOT') || code.includes('SGPT')) &&
+        resultValue <= 8 && targetSD >= 20
+      ) {
+        const temp = resultValue;
+        resultValue = targetSD;
+        targetSD = temp;
+      } else if (
+        (code.includes('CREA') || code.includes('TBIL') || code.includes('DBIL')) &&
+        resultValue < 0.25 && targetSD >= 0.5
+      ) {
+        const temp = resultValue;
+        resultValue = targetSD;
+        targetSD = temp;
+      }
+
+      const unit = item.unit?.value || matchedParam?.unit || 'mg/dL';
       
-      zScore,
-      sdPosition,
-      status,
-      violations,
-      
-      isSelected: true,
-      date: today,
-      time: time,
-    };
-  });
+      // Calculate Z-Score = (Result - Mean) / SD
+      const zScore = calculateZScore(resultValue, targetMean, targetSD);
+      const sdPosition = formatSDPosition(zScore);
+
+      // Evaluate Westgard rules
+      const history = existingResults.filter(r => r.parameterId === (matchedParam?.id || 'param-cst-glu'));
+      const tempId = `QC-SCAN-TEMP-${index}`;
+      const { status, violations } = evaluateWestgardRules(
+        { id: tempId, value: resultValue, mean: targetMean, sd: targetSD, zScore },
+        history,
+        DEFAULT_WESTGARD_RULES
+      );
+
+      const confidence = item.overall_confidence ?? item.result?.confidence ?? 0.9;
+      const needsVerification = item.needs_verification ?? (confidence < 0.8 || status !== 'pass');
+
+      return {
+        id: `VERIFY-${Date.now()}-${index}`,
+        sourceText: item.source_text || item.result?.original_text || `Hasil QC: ${resultValue} ${unit}`,
+        confidence,
+        needsVerification,
+        verificationReason: item.verification_reason || (status !== 'pass' ? `Status QC: ${status.toUpperCase()}` : null),
+        
+        instrumentId: matchedInst?.id || 'inst-cst240',
+        instrumentName: matchedInst?.name || 'Chemistry Analyzer CST-240 (Dirui CS-T240)',
+        parameterId: matchedParam?.id || 'param-cst-glu',
+        parameterName: matchedParam?.name || 'Glucose (Glukosa Darah CST-240)',
+        parameterCode: matchedParam?.code || 'GLU',
+        controlLevel: itemLevel,
+        lotNumber: itemLot,
+        
+        resultValue,
+        unit,
+        targetMean,
+        targetSD,
+        
+        zScore,
+        sdPosition,
+        status,
+        violations,
+        
+        isSelected: true,
+        date: today,
+        time: time
+      };
+    });
 }

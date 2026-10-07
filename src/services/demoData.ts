@@ -125,6 +125,36 @@ export const INITIAL_USERS: User[] = [
 
 export const INITIAL_INSTRUMENTS: Instrument[] = [
   {
+    id: 'inst-cst240',
+    name: 'Chemistry Analyzer CST-240 (Dirui CS-T240)',
+    code: 'CST-240',
+    brand: 'Dirui Industrial',
+    model: 'CS-T240 Auto-Chemistry Analyzer',
+    serialNumber: 'SN-DIRUI-CST240-8819',
+    unit: 'Patologi Klinik - Kimia Klinik',
+    location: 'Meja Kimia Darah CST-240',
+    status: 'active',
+    lastCalibrationDate: '2026-09-01',
+    nextCalibrationDate: '2027-03-01',
+    lastMaintenanceDate: '2026-09-25',
+    nextMaintenanceDate: '2026-10-25'
+  },
+  {
+    id: 'inst-dirui-3980',
+    name: 'Dirui Dimih 3980 Automated Analyzer',
+    code: 'DIMIH-3980',
+    brand: 'Dirui Industrial',
+    model: 'Dimih 3980 Series',
+    serialNumber: 'SN-DIRUI-3980-4512',
+    unit: 'Patologi Klinik - Laboratorium Khusus',
+    location: 'Meja Analisis Dimih 3980',
+    status: 'active',
+    lastCalibrationDate: '2026-08-20',
+    nextCalibrationDate: '2027-02-20',
+    lastMaintenanceDate: '2026-09-18',
+    nextMaintenanceDate: '2026-10-18'
+  },
+  {
     id: 'inst-chem-a',
     name: 'Chemistry Analyzer A (Cobas c311)',
     code: 'CHEM-A',
@@ -173,6 +203,16 @@ export const INITIAL_INSTRUMENTS: Instrument[] = [
 
 export const INITIAL_CONTROL_MATERIALS: ControlMaterial[] = [
   {
+    id: 'ctrl-cst-1',
+    name: 'Dirui Chemistry Control Normal (Level 1)',
+    manufacturer: 'Dirui Industrial',
+    level: 'Level 1',
+    lotNumber: 'LOT-CST1-2026A',
+    expirationDate: '2027-08-31',
+    storageCondition: '2°C - 8°C (Lyophilized)',
+    status: 'active'
+  },
+  {
     id: 'ctrl-pnu-1',
     name: 'PreciControl ClinChem Multi 1 (Normal)',
     manufacturer: 'Roche Diagnostics',
@@ -205,10 +245,165 @@ export const INITIAL_CONTROL_MATERIALS: ControlMaterial[] = [
 ];
 
 export const INITIAL_PARAMETERS: Parameter[] = [
+  // CST-240 Chemistry Parameters
+  {
+    id: 'param-cst-glu',
+    code: 'GLU',
+    name: 'Glucose (Glukosa Darah CST-240)',
+    unit: 'mg/dL',
+    method: 'Hexokinase / GOD-PAP',
+    instrumentId: 'inst-cst240',
+    controlMaterialId: 'ctrl-cst-1',
+    targetMean: 100.0,
+    targetSD: 3.5,
+    targetCV: 3.5,
+    minAcceptable: 89.5,
+    maxAcceptable: 110.5,
+    decimalPlaces: 1
+  },
+  {
+    id: 'param-cst-chol',
+    code: 'CHOL',
+    name: 'Cholesterol Total (CST-240)',
+    unit: 'mg/dL',
+    method: 'CHOD-PAP Enzymatic',
+    instrumentId: 'inst-cst240',
+    controlMaterialId: 'ctrl-cst-1',
+    targetMean: 160.0,
+    targetSD: 5.2,
+    targetCV: 3.25,
+    minAcceptable: 144.4,
+    maxAcceptable: 175.6,
+    decimalPlaces: 1
+  },
+  {
+    id: 'param-cst-urea',
+    code: 'UREA',
+    name: 'Urea / Ureum (CST-240)',
+    unit: 'mg/dL',
+    method: 'Urease GLDH Kinetic',
+    instrumentId: 'inst-cst240',
+    controlMaterialId: 'ctrl-cst-1',
+    targetMean: 38.0,
+    targetSD: 1.6,
+    targetCV: 4.21,
+    minAcceptable: 33.2,
+    maxAcceptable: 42.8,
+    decimalPlaces: 1
+  },
+  {
+    id: 'param-cst-creat',
+    code: 'CREAT',
+    name: 'Creatinine (CST-240)',
+    unit: 'mg/dL',
+    method: 'Jaffe Modified Kinetic',
+    instrumentId: 'inst-cst240',
+    controlMaterialId: 'ctrl-cst-1',
+    targetMean: 1.25,
+    targetSD: 0.06,
+    targetCV: 4.8,
+    minAcceptable: 1.07,
+    maxAcceptable: 1.43,
+    decimalPlaces: 2
+  },
+  {
+    id: 'param-cst-sgot',
+    code: 'SGOT',
+    name: 'SGOT / AST (CST-240)',
+    unit: 'U/L',
+    method: 'IFCC UV with Pyridoxal Phosphate',
+    instrumentId: 'inst-cst240',
+    controlMaterialId: 'ctrl-cst-1',
+    targetMean: 35.0,
+    targetSD: 1.8,
+    targetCV: 5.14,
+    minAcceptable: 29.6,
+    maxAcceptable: 40.4,
+    decimalPlaces: 1
+  },
+  {
+    id: 'param-cst-sgpt',
+    code: 'SGPT',
+    name: 'SGPT / ALT (CST-240)',
+    unit: 'U/L',
+    method: 'IFCC UV without Pyridoxal Phosphate',
+    instrumentId: 'inst-cst240',
+    controlMaterialId: 'ctrl-cst-1',
+    targetMean: 32.0,
+    targetSD: 1.7,
+    targetCV: 5.31,
+    minAcceptable: 26.9,
+    maxAcceptable: 37.1,
+    decimalPlaces: 1
+  },
+  {
+    id: 'param-cst-ua',
+    code: 'UA',
+    name: 'Uric Acid / Asam Urat (CST-240)',
+    unit: 'mg/dL',
+    method: 'Uricase PAP',
+    instrumentId: 'inst-cst240',
+    controlMaterialId: 'ctrl-cst-1',
+    targetMean: 5.2,
+    targetSD: 0.25,
+    targetCV: 4.8,
+    minAcceptable: 4.45,
+    maxAcceptable: 5.95,
+    decimalPlaces: 2
+  },
+
+  // Dirui Dimih 3980 Specific Parameters
+  {
+    id: 'param-dimih-hgb',
+    code: 'HGB-DIMIH',
+    name: 'Hemoglobin (Dirui Dimih 3980)',
+    unit: 'g/dL',
+    method: 'Photometric SLS Cyanide-Free',
+    instrumentId: 'inst-dirui-3980',
+    controlMaterialId: 'ctrl-hema-8c',
+    targetMean: 13.5,
+    targetSD: 0.4,
+    targetCV: 2.96,
+    minAcceptable: 12.3,
+    maxAcceptable: 14.7,
+    decimalPlaces: 1
+  },
+  {
+    id: 'param-dimih-wbc',
+    code: 'WBC-DIMIH',
+    name: 'Leukosit / WBC (Dirui Dimih 3980)',
+    unit: '10^3/uL',
+    method: 'Electrical Impedance',
+    instrumentId: 'inst-dirui-3980',
+    controlMaterialId: 'ctrl-hema-8c',
+    targetMean: 7.2,
+    targetSD: 0.5,
+    targetCV: 6.94,
+    minAcceptable: 5.7,
+    maxAcceptable: 8.7,
+    decimalPlaces: 1
+  },
+  {
+    id: 'param-dimih-plt',
+    code: 'PLT-DIMIH',
+    name: 'Trombosit / PLT (Dirui Dimih 3980)',
+    unit: '10^3/uL',
+    method: 'Electrical Impedance Focus Flow',
+    instrumentId: 'inst-dirui-3980',
+    controlMaterialId: 'ctrl-hema-8c',
+    targetMean: 245,
+    targetSD: 15,
+    targetCV: 6.12,
+    minAcceptable: 200,
+    maxAcceptable: 290,
+    decimalPlaces: 0
+  },
+
+  // Cobas c311 Parameters
   {
     id: 'param-glu',
     code: 'GLU',
-    name: 'Glucose (Glukosa Darah Sewaktu/Puasa)',
+    name: 'Glucose (Glukosa Darah Cobas c311)',
     unit: 'mg/dL',
     method: 'Heksokinase / UV enzymatic',
     instrumentId: 'inst-chem-a',
@@ -223,7 +418,7 @@ export const INITIAL_PARAMETERS: Parameter[] = [
   {
     id: 'param-chol',
     code: 'CHOL',
-    name: 'Cholesterol Total',
+    name: 'Cholesterol Total (Cobas c311)',
     unit: 'mg/dL',
     method: 'CHOD-PAP Enzymatic Colorimetric',
     instrumentId: 'inst-chem-a',
@@ -238,7 +433,7 @@ export const INITIAL_PARAMETERS: Parameter[] = [
   {
     id: 'param-urea',
     code: 'UREA',
-    name: 'Urea (Ureum Darah)',
+    name: 'Urea / Ureum Darah (Cobas c311)',
     unit: 'mg/dL',
     method: 'Urease / GLDH Kinetic UV',
     instrumentId: 'inst-chem-a',
@@ -253,7 +448,7 @@ export const INITIAL_PARAMETERS: Parameter[] = [
   {
     id: 'param-creat',
     code: 'CREAT',
-    name: 'Creatinine (Kreatinin Serum)',
+    name: 'Creatinine / Kreatinin Serum (Cobas c311)',
     unit: 'mg/dL',
     method: 'Jaffe rate-blanked compensated',
     instrumentId: 'inst-chem-a',
