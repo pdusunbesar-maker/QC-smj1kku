@@ -1250,21 +1250,21 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         {/* OFFICIAL SIGNATURE FOOTER */}
         <div className="mt-10 grid grid-cols-2 text-center text-xs pt-6 border-t-2 border-slate-900 signature-block print-avoid-break">
           <div>
-            <p className="text-slate-600">Mengetahui & Menyetujui,</p>
-            <p className="font-bold text-slate-900 mt-1">Penanggung Jawab Laboratorium</p>
+            <p className="text-slate-600 whitespace-nowrap">Mengetahui & Menyetujui,</p>
+            <p className="font-bold text-slate-900 mt-1 whitespace-nowrap">Penanggung Jawab Laboratorium</p>
             <div className="h-20" />
-            <p className="font-bold underline text-slate-900">{labInfo.headOfLab}</p>
-            <p className="text-[11px] font-mono text-slate-500">NIP: {labInfo.headNip}</p>
+            <p className="font-bold underline text-slate-900 whitespace-nowrap">{labInfo.headOfLab}</p>
+            <p className="text-[11px] font-mono text-slate-500 whitespace-nowrap">NIP: {labInfo.headNip}</p>
           </div>
 
           <div className="relative group">
-            <p className="text-slate-600">Sukadana, {new Date().toISOString().split('T')[0]}</p>
-            <p className="font-bold text-slate-900 mt-1">Penanggung Jawab Mutu</p>
+            <p className="text-slate-600 whitespace-nowrap">Sukadana, {new Date().toISOString().split('T')[0]}</p>
+            <p className="font-bold text-slate-900 mt-1 whitespace-nowrap">Penanggung Jawab Mutu</p>
             <div className="h-20" />
-            <p className="font-bold underline text-slate-900">
+            <p className="font-bold underline text-slate-900 whitespace-nowrap">
               {labInfo.headOfQuality || 'Siti Rahmawati, S.Tr.Kes'}
             </p>
-            <p className="text-[11px] font-mono text-slate-500">
+            <p className="text-[11px] font-mono text-slate-500 whitespace-nowrap">
               NIP: {labInfo.qualityNip || '19850914 201001 2 015'}
             </p>
             

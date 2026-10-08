@@ -31,6 +31,7 @@ import {
 import { QCResult, CAPA, NonConformity, Instrument, Parameter, AuditLog } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { StorageService } from '../../services/storage';
+import { DailySummaryWidget } from './panels/DailySummaryWidget';
 import { SummaryCardsPanel } from './panels/SummaryCardsPanel';
 import { CriticalAlertsPanel } from './panels/CriticalAlertsPanel';
 import { MonthlyQCVolumeChartPanel } from './panels/MonthlyQCVolumeChartPanel';
@@ -111,11 +112,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     y: number;
   } | null>(null);
 
+  // Daily Summary Stats
+  const todayStr = new Date().toISOString().split('T')[0];
+  const dailyStats = useMemo(() => {
+    const todayResults = qcResults.filter(r => r.date === todayStr);
+    return {
+      totalTests: todayResults.length,
+      activeViolations: todayResults.filter(r => r.status === 'reject').length,
+      pendingReviews: todayResults.filter(r => r.reviewStatus === 'pending').length,
+    };
+  }, [qcResults, todayStr]);
+
   // Retrieve actual audit logs
   const logs = propAuditLogs || StorageService.getAuditLogs();
 
   // Helper date calculations
-  const todayStr = new Date().toISOString().split('T')[0];
+  // const todayStr = new Date().toISOString().split('T')[0]; // Removed: now declared in dailyStats calculation
   const todayMs = new Date().getTime();
 
   // Compute coverage metrics for print preview
@@ -588,6 +600,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
       </div>
+      
+      {/* Daily Summary Widget */}
+      <DailySummaryWidget
+        totalTests={dailyStats.totalTests}
+        activeViolations={dailyStats.activeViolations}
+        pendingReviews={dailyStats.pendingReviews}
+      />
 
       {/* ========================================================================= */}
       {/* 2. ROW 1: 4 CORE KPI CARDS (Real Data Only)                               */}

@@ -482,7 +482,7 @@ export const QCReviewView: React.FC<QCReviewViewProps> = ({
                                     : 'bg-amber-100 text-amber-800 border border-amber-200'
                                 }`}
                               >
-                                {v.ruleName}
+                                {v.rule.replace('_', '-')}
                               </span>
                             ))}
                           </div>
