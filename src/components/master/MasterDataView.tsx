@@ -49,7 +49,7 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
   const { user, can } = useAuth();
   const canEdit = can('manage_master');
 
-  const [activeTab, setActiveTab] = useState<'lab' | 'instruments' | 'parameters' | 'controls' | 'lots'>('lab');
+  const [activeTab, setActiveTab] = useState<'lab' | 'instruments' | 'parameters' | 'controls'>('lab');
 
   // Lab Edit state
   const [labForm, setLabForm] = useState<LaboratoryInfo>(labInfo);
@@ -82,6 +82,7 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
   const [showParameterModal, setShowParameterModal] = useState(false);
   const [showCsvImportModal, setShowCsvImportModal] = useState(false);
   const [importNotice, setImportNotice] = useState<string | null>(null);
+  const [selectedInstrumentFilter, setSelectedInstrumentFilter] = useState<string | 'all'>('all');
   const [editingParameter, setEditingParameter] = useState<Parameter | null>(null);
   const [paramForm, setParamForm] = useState<Partial<Parameter>>({
     name: '',
@@ -219,7 +220,6 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
             { id: 'instruments', label: `Instrumen (${instruments.length})`, icon: Wrench },
             { id: 'parameters', label: `Parameter (${parameters.length})`, icon: FlaskConical },
             { id: 'controls', label: `Bahan Kontrol (${controls.length})`, icon: Layers },
-            { id: 'lots', label: `Lot QC (${qcLots.length})`, icon: FileSpreadsheet },
           ].map((tab) => {
             const Icon = tab.icon;
             return (
@@ -563,6 +563,25 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
                 </div>
               )}
             </div>
+            
+            {/* Instrument Filters */}
+            <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border-b border-slate-100 overflow-x-auto">
+              <button
+                onClick={() => setSelectedInstrumentFilter('all')}
+                className={`px-3 py-1 text-[11px] font-semibold rounded-md transition-colors ${selectedInstrumentFilter === 'all' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'}`}
+              >
+                Semua
+              </button>
+              {instruments.map(inst => (
+                <button
+                  key={inst.id}
+                  onClick={() => setSelectedInstrumentFilter(inst.id)}
+                  className={`px-3 py-1 text-[11px] font-semibold rounded-md whitespace-nowrap transition-colors ${selectedInstrumentFilter === inst.id ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'}`}
+                >
+                  {inst.name}
+                </button>
+              ))}
+            </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
@@ -580,78 +599,92 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-sans">
-                {parameters.map(p => {
-                  const inst = instruments.find(i => i.id === p.instrumentId);
-                  const lclVal = p.minAcceptable !== undefined && p.minAcceptable !== null
-                    ? Number(p.minAcceptable).toFixed(p.decimalPlaces)
-                    : (p.targetMean - 3 * p.targetSD).toFixed(p.decimalPlaces);
-                  const uclVal = p.maxAcceptable !== undefined && p.maxAcceptable !== null
-                    ? Number(p.maxAcceptable).toFixed(p.decimalPlaces)
-                    : (p.targetMean + 3 * p.targetSD).toFixed(p.decimalPlaces);
+                {instruments
+                  .filter(inst => selectedInstrumentFilter === 'all' || inst.id === selectedInstrumentFilter)
+                  .map(inst => {
+                    const instParams = parameters.filter(p => p.instrumentId === inst.id);
+                    if (instParams.length === 0) return null;
+                    return (
+                      <React.Fragment key={inst.id}>
+                        <tr className="bg-slate-50 font-semibold text-slate-700">
+                          <td colSpan={canEdit ? 9 : 8} className="px-4 py-2 text-xs">
+                            {inst.name}
+                          </td>
+                        </tr>
+                        {instParams.map(p => {
+                          const lclVal = p.minAcceptable !== undefined && p.minAcceptable !== null
+                            ? Number(p.minAcceptable).toFixed(p.decimalPlaces)
+                            : (p.targetMean - 3 * p.targetSD).toFixed(p.decimalPlaces);
+                          const uclVal = p.maxAcceptable !== undefined && p.maxAcceptable !== null
+                            ? Number(p.maxAcceptable).toFixed(p.decimalPlaces)
+                            : (p.targetMean + 3 * p.targetSD).toFixed(p.decimalPlaces);
 
-                  return (
-                    <tr key={p.id} className="hover:bg-slate-50/60 transition-colors">
-                      <td className="px-4 py-3 font-bold text-slate-900">
-                        <div>{p.name}</div>
-                        <span className="font-mono text-[10px] bg-slate-100 text-slate-700 px-1 rounded">
-                          {p.code} ({p.unit})
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">{p.method}</td>
-                      <td className="px-4 py-3 text-slate-600 text-[11px]">{inst?.name || '-'}</td>
-                      <td className="px-4 py-3 text-right font-mono font-bold text-slate-900">{p.targetMean}</td>
-                      <td className="px-4 py-3 text-right font-mono font-bold text-slate-900">{p.targetSD}</td>
-                      <td className="px-4 py-3 text-right font-mono text-emerald-700 font-semibold">{p.targetCV}%</td>
-                      <td className="px-4 py-3 font-mono text-slate-600 text-[11px]">
-                        {(p.targetMean - 2 * p.targetSD).toFixed(p.decimalPlaces)} - {(p.targetMean + 2 * p.targetSD).toFixed(p.decimalPlaces)}
-                      </td>
-                      <td className="px-4 py-3 font-mono">
-                        <div className="flex items-center gap-1 font-bold text-xs whitespace-nowrap">
-                          <span className="text-[#0B5FA5]">{lclVal}</span>
-                          <span className="text-slate-400 font-normal">s/d</span>
-                          <span className="text-[#0B5FA5]">{uclVal}</span>
-                          <span className="text-[10px] text-slate-500 font-normal">{p.unit}</span>
-                        </div>
-                        <div className="text-[10px] text-slate-500 font-mono mt-0.5 whitespace-nowrap">
-                          LCL: {lclVal} · UCL: {uclVal}
-                        </div>
-                      </td>
-                      {canEdit && (
-                        <td className="px-4 py-3 text-right whitespace-nowrap">
-                          <div className="flex items-center justify-end gap-1">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingParameter(p);
-                                setParamForm(p);
-                                setShowParameterModal(true);
-                              }}
-                              className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
-                              title="Edit Data Parameter"
-                            >
-                              <Edit3 className="h-4 w-4" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setItemToDelete({
-                                  type: 'parameter',
-                                  id: p.id,
-                                  name: `${p.name} [${p.code}]`,
-                                  warning: 'Menghapus parameter ini akan menghilangkannya dari daftar penginputan QC harian.'
-                                });
-                              }}
-                              className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-md transition-colors"
-                              title="Hapus Parameter"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </td>
-                      )}
-                    </tr>
-                  );
-                })}
+                          return (
+                            <tr key={p.id} className="hover:bg-slate-50/60 transition-colors">
+                              <td className="px-4 py-3 font-bold text-slate-900">
+                                <div>{p.name}</div>
+                                <span className="font-mono text-[10px] bg-slate-100 text-slate-700 px-1 rounded">
+                                  {p.code} ({p.unit})
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-slate-600">{p.method}</td>
+                              <td className="px-4 py-3 text-slate-600 text-[11px]">{inst?.name || '-'}</td>
+                              <td className="px-4 py-3 text-right font-mono font-bold text-slate-900">{p.targetMean}</td>
+                              <td className="px-4 py-3 text-right font-mono font-bold text-slate-900">{p.targetSD}</td>
+                              <td className="px-4 py-3 text-right font-mono text-emerald-700 font-semibold">{p.targetCV}%</td>
+                              <td className="px-4 py-3 font-mono text-slate-600 text-[11px]">
+                                {(p.targetMean - 2 * p.targetSD).toFixed(p.decimalPlaces)} - {(p.targetMean + 2 * p.targetSD).toFixed(p.decimalPlaces)}
+                              </td>
+                              <td className="px-4 py-3 font-mono">
+                                <div className="flex items-center gap-1 font-bold text-xs whitespace-nowrap">
+                                  <span className="text-[#0B5FA5]">{lclVal}</span>
+                                  <span className="text-slate-400 font-normal">s/d</span>
+                                  <span className="text-[#0B5FA5]">{uclVal}</span>
+                                  <span className="text-[10px] text-slate-500 font-normal">{p.unit}</span>
+                                </div>
+                                <div className="text-[10px] text-slate-500 font-mono mt-0.5 whitespace-nowrap">
+                                  LCL: {lclVal} · UCL: {uclVal}
+                                </div>
+                              </td>
+                              {canEdit && (
+                                <td className="px-4 py-3 text-right whitespace-nowrap">
+                                  <div className="flex items-center justify-end gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setEditingParameter(p);
+                                        setParamForm(p);
+                                        setShowParameterModal(true);
+                                      }}
+                                      className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
+                                      title="Edit Data Parameter"
+                                    >
+                                      <Edit3 className="h-4 w-4" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setItemToDelete({
+                                          type: 'parameter',
+                                          id: p.id,
+                                          name: `${p.name} [${p.code}]`,
+                                          warning: 'Menghapus parameter ini akan menghilangkannya dari daftar penginputan QC harian.'
+                                        });
+                                      }}
+                                      className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-md transition-colors"
+                                      title="Hapus Parameter"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
+                                  </div>
+                                </td>
+                              )}
+                            </tr>
+                          );
+                        })}
+                      </React.Fragment>
+                    );
+                  })}
               </tbody>
             </table>
           </div>
@@ -764,47 +797,6 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
         </div>
       )}
 
-      {/* Tab 5: Lots QC Table */}
-      {activeTab === 'lots' && (
-        <div className="rounded-xl border border-slate-200 bg-white shadow-xs overflow-hidden">
-          <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-            <span className="font-semibold text-xs text-slate-900">
-              Daftar Lot QC
-            </span>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50/80 border-b border-slate-200 font-semibold text-slate-600">
-                <tr>
-                  <th className="px-4 py-3">Nomor Lot</th>
-                  <th className="px-4 py-3">Material ID</th>
-                  <th className="px-4 py-3">Level ID</th>
-                  <th className="px-4 py-3">Produsen</th>
-                  <th className="px-4 py-3 font-mono">Kedaluwarsa</th>
-                  <th className="px-4 py-3">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 font-sans">
-                {qcLots.map(l => (
-                  <tr key={l.id} className="hover:bg-slate-50/60 transition-colors">
-                    <td className="px-4 py-3 font-bold text-slate-900">{l.number}</td>
-                    <td className="px-4 py-3">{l.materialId}</td>
-                    <td className="px-4 py-3">{l.levelId}</td>
-                    <td className="px-4 py-3">{l.manufacturer}</td>
-                    <td className="px-4 py-3 font-mono text-slate-700">{l.expirationDate}</td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${l.status === 'active' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'}`}>
-                        {l.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
 
       {/* Instrument Edit Modal */}
       {showInstrumentModal && (
@@ -1002,23 +994,25 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Lot QC (Otomatis Level Kontrol)</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Bahan Kontrol & Lot *</label>
                   <select
-                    value={paramForm.qcLotId || ''}
+                    value={paramForm.controlMaterialId || ''}
                     onChange={(e) => {
-                      const lotId = e.target.value;
-                      const lot = qcLots.find(l => l.id === lotId);
+                      const materialId = e.target.value;
+                      const material = controls.find(c => c.id === materialId);
                       setParamForm({ 
                         ...paramForm, 
-                        qcLotId: lotId,
-                        controlMaterialId: lot ? lot.materialId : paramForm.controlMaterialId 
+                        controlMaterialId: materialId,
+                        // If we had Lot ID we could set it, but user wants integration
                       });
                     }}
                     className="w-full rounded-lg border border-slate-200 px-3 py-2 bg-white"
                   >
-                    <option value="">Pilih Lot QC...</option>
-                    {qcLots.map(l => (
-                      <option key={l.id} value={l.id}>{l.number} ({l.manufacturer})</option>
+                    <option value="">Pilih Bahan Kontrol...</option>
+                    {controls.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} - Lot: {c.lotNumber} ({c.level})
+                      </option>
                     ))}
                   </select>
                 </div>

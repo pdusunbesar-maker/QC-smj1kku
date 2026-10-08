@@ -1599,8 +1599,8 @@ export const QCScanView: React.FC<QCScanViewProps> = ({
               <div 
                 className={`relative transition-all duration-300 flex flex-col justify-between ${
                   cameraTargetMode === 'receipt'
-                    ? 'w-[75%] sm:w-[50%] max-w-[360px] h-[90%] rounded-2xl'
-                    : 'w-[90%] sm:w-[82%] max-w-[580px] h-[78%] rounded-2xl'
+                    ? 'w-[80%] sm:w-[60%] h-[80%] rounded-2xl'
+                    : 'w-[90%] sm:w-[80%] h-[70%] rounded-2xl'
                 }`}
               >
                 {/* Glowing Outer Bounding Box Border */}
