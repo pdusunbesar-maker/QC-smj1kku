@@ -32,6 +32,7 @@ interface QCInputViewProps {
   existingResults: QCResult[];
   onResultAdded: (newResult: QCResult) => void;
   onNavigateToTab: (tab: string, itemData?: any) => void;
+  initialData?: any;
 }
 
 export const QCInputView: React.FC<QCInputViewProps> = ({
@@ -41,6 +42,7 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
   existingResults,
   onResultAdded,
   onNavigateToTab,
+  initialData,
 }) => {
   const { user } = useAuth();
   const [inputMode, setInputMode] = useState<'manual' | 'batch'>('manual');
@@ -50,8 +52,20 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
 
   const [date, setDate] = useState(today);
   const [time, setTime] = useState(currentTime);
-  const [selectedInstrumentId, setSelectedInstrumentId] = useState(instruments[0]?.id || '');
-  const [selectedParameterId, setSelectedParameterId] = useState(parameters[0]?.id || '');
+  
+  // Use initialData for pre-selection
+  const [selectedInstrumentId, setSelectedInstrumentId] = useState(initialData?.instrumentId || instruments[0]?.id || '');
+  const [selectedParameterId, setSelectedParameterId] = useState(initialData?.parameterId || parameters[0]?.id || '');
+  
+  // Sync state if initialData changes (or on mount)
+  useEffect(() => {
+    if (initialData?.parameterId) {
+      setSelectedParameterId(initialData.parameterId);
+      const param = parameters.find(p => p.id === initialData.parameterId);
+      if (param) setSelectedInstrumentId(param.instrumentId);
+    }
+  }, [initialData, parameters]);
+
   const [selectedLevel, setSelectedLevel] = useState<'Level 1' | 'Level 2' | 'Level 3'>('Level 1');
   const [lotNumber, setLotNumber] = useState(controls[0]?.lotNumber || 'LOT-CST1-2026A');
   const [inputValue, setInputValue] = useState<string>('');
@@ -207,24 +221,14 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
     // Reset input fields immediately to prevent double submissions
     setInputValue('');
     setNotes('');
+    setIsSaved(true);
 
-    // Otomatis diarahkan kembali ke Menu Awal (Dashboard)
+    // Otomatis diarahkan kembali ke Formulir QC Input
+    // (Jika ingin tetap di halaman input, tidak perlu pindah ke dashboard)
     setTimeout(() => {
-      onNavigateToTab('dashboard', {
-        qcSaved: true,
-        source: 'manual',
-        parameterId: currentParam.id,
-        parameterName: currentParam.name,
-        parameterCode: currentParam.code,
-        value: newResult.value,
-        unit: newResult.unit,
-        status: newResult.status,
-        sdPosition: newResult.sdPosition,
-        date: newResult.date,
-        time: newResult.time,
-        message: `Hasil QC ${newResult.parameterCode} (${newResult.value} ${newResult.unit}) berhasil disimpan ke database. Otomatis kembali ke Menu Awal.`
-      });
-    }, 400);
+      setIsSaved(false); // Reset saved state for next input
+      setIsSubmitting(false);
+    }, 2000);
   };
 
   const handleResetForm = () => {

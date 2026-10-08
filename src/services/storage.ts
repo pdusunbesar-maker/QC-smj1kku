@@ -11,6 +11,7 @@ import {
   WestgardRuleConfig,
   User,
   RoleDefinition,
+  QCLot,
 } from '../types';
 import {
   INITIAL_LAB_INFO,

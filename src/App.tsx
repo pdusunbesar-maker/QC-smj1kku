@@ -11,7 +11,8 @@ import {
   NonConformity, 
   CAPA, 
   AuditLog, 
-  AppNotification 
+  AppNotification,
+  QCLot
 } from './types';
 import { Navbar } from './components/layout/Navbar';
 import { Sidebar } from './components/layout/Sidebar';
@@ -212,6 +213,7 @@ function AppContent() {
                   setAuditLogs(StorageService.getAuditLogs());
                 }}
                 onNavigateToTab={handleNavigateToTab}
+                initialData={navigationPayload}
               />
             )}
 

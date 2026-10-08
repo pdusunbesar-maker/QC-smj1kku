@@ -49,7 +49,7 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
   const { user, can } = useAuth();
   const canEdit = can('manage_master');
 
-  const [activeTab, setActiveTab] = useState<'lab' | 'instruments' | 'parameters' | 'controls'>('lab');
+  const [activeTab, setActiveTab] = useState<'lab' | 'instruments' | 'parameters' | 'controls' | 'lots'>('lab');
 
   // Lab Edit state
   const [labForm, setLabForm] = useState<LaboratoryInfo>(labInfo);
@@ -764,6 +764,48 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
         </div>
       )}
 
+      {/* Tab 5: Lots QC Table */}
+      {activeTab === 'lots' && (
+        <div className="rounded-xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+          <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+            <span className="font-semibold text-xs text-slate-900">
+              Daftar Lot QC
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50/80 border-b border-slate-200 font-semibold text-slate-600">
+                <tr>
+                  <th className="px-4 py-3">Nomor Lot</th>
+                  <th className="px-4 py-3">Material ID</th>
+                  <th className="px-4 py-3">Level ID</th>
+                  <th className="px-4 py-3">Produsen</th>
+                  <th className="px-4 py-3 font-mono">Kedaluwarsa</th>
+                  <th className="px-4 py-3">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-sans">
+                {qcLots.map(l => (
+                  <tr key={l.id} className="hover:bg-slate-50/60 transition-colors">
+                    <td className="px-4 py-3 font-bold text-slate-900">{l.number}</td>
+                    <td className="px-4 py-3">{l.materialId}</td>
+                    <td className="px-4 py-3">{l.levelId}</td>
+                    <td className="px-4 py-3">{l.manufacturer}</td>
+                    <td className="px-4 py-3 font-mono text-slate-700">{l.expirationDate}</td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${l.status === 'active' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'}`}>
+                        {l.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* Instrument Edit Modal */}
       {showInstrumentModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
@@ -956,6 +998,27 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
                   >
                     {instruments.map(i => (
                       <option key={i.id} value={i.id}>{i.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Lot QC (Otomatis Level Kontrol)</label>
+                  <select
+                    value={paramForm.qcLotId || ''}
+                    onChange={(e) => {
+                      const lotId = e.target.value;
+                      const lot = qcLots.find(l => l.id === lotId);
+                      setParamForm({ 
+                        ...paramForm, 
+                        qcLotId: lotId,
+                        controlMaterialId: lot ? lot.materialId : paramForm.controlMaterialId 
+                      });
+                    }}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 bg-white"
+                  >
+                    <option value="">Pilih Lot QC...</option>
+                    {qcLots.map(l => (
+                      <option key={l.id} value={l.id}>{l.number} ({l.manufacturer})</option>
                     ))}
                   </select>
                 </div>
