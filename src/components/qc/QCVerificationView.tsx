@@ -83,6 +83,7 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
   const detectedInstrumentId = useMemo(() => {
     if (documentMeta?.instrument_id) return documentMeta.instrument_id;
     const docName = (documentMeta?.analyzer || '').toLowerCase();
+    if (docName.includes('dimih') || docName.includes('3980')) return 'inst-dirui-3980';
     if (docName.includes('cst') || docName.includes('cs-t240') || docName.includes('cobas') || docName.includes('c311')) return 'inst-cst240';
     if (docName.includes('sysmex') || docName.includes('xn')) return 'inst-hema-a';
     return 'ALL';

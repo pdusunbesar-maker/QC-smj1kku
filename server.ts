@@ -16,8 +16,8 @@ async function startServer() {
     const time = timestamp.split('T')[1].substring(0, 5);
     const hint = (instrumentHint || '').toLowerCase();
 
-    // 1. If Dimih 3980 is explicitly requested / hinted (hematology ONLY)
-    if ((hint.includes('dimih') || hint.includes('3980') || hint.includes('hema') || hint.includes('cbc') || hint.includes('bcc')) && !hint.includes('cst') && !hint.includes('chem')) {
+    // 1. If Dimih 3980 is requested / hinted or contains hematology keywords
+    if (hint.includes('dimih') || hint.includes('3980') || hint.includes('hema') || hint.includes('cbc') || hint.includes('bcc') || hint.includes('wbc') || hint.includes('hgb')) {
       return {
         scan: {
           scan_id: `SCAN-${Date.now().toString().slice(-6)}`,
@@ -34,62 +34,62 @@ async function startServer() {
         },
         results: [
           {
-            parameter: { value: 'Leukosit / WBC', original_text: 'WBC', confidence: 0.98 },
+            parameter: { value: 'Leukosit / WBC (Dirui Dimih 3980)', original_text: 'WBC', confidence: 0.98 },
             level: { value: 'Level 1', original_text: 'L1', confidence: 0.95 },
             lot: { value: 'LOT-EC8C-9912', confidence: 0.95 },
-            result: { value: 7.2, original_text: '7.2 10^3/uL', confidence: 0.98 },
+            result: { value: 7.2, original_text: '7.2', confidence: 0.98 },
             unit: { value: '10^3/uL', confidence: 0.98 },
             mean: { value: 7.0, confidence: 0.95 },
             sd: { value: 0.5, confidence: 0.95 },
-            source_text: 'WBC 7.2 10^3/uL [7.0 +/- 0.5]',
+            source_text: 'WBC 7.2 10^3/uL',
             overall_confidence: 0.98,
             needs_verification: false
           },
           {
-            parameter: { value: 'Eritrosit / RBC', original_text: 'RBC', confidence: 0.97 },
+            parameter: { value: 'Eritrosit / RBC (Dirui Dimih 3980)', original_text: 'RBC', confidence: 0.97 },
             level: { value: 'Level 1', original_text: 'L1', confidence: 0.95 },
             lot: { value: 'LOT-EC8C-9912', confidence: 0.95 },
-            result: { value: 4.52, original_text: '4.52 10^6/uL', confidence: 0.98 },
+            result: { value: 4.52, original_text: '4.52', confidence: 0.98 },
             unit: { value: '10^6/uL', confidence: 0.98 },
             mean: { value: 4.50, confidence: 0.95 },
             sd: { value: 0.20, confidence: 0.95 },
-            source_text: 'RBC 4.52 10^6/uL [4.50 +/- 0.20]',
+            source_text: 'RBC 4.52 10^6/uL',
             overall_confidence: 0.97,
             needs_verification: false
           },
           {
-            parameter: { value: 'Hemoglobin / HGB', original_text: 'HGB', confidence: 0.98 },
+            parameter: { value: 'Hemoglobin / HGB (Dirui Dimih 3980)', original_text: 'HGB', confidence: 0.98 },
             level: { value: 'Level 1', original_text: 'L1', confidence: 0.95 },
             lot: { value: 'LOT-EC8C-9912', confidence: 0.95 },
-            result: { value: 13.5, original_text: '13.5 g/dL', confidence: 0.99 },
+            result: { value: 12.6, original_text: '12.6', confidence: 0.99 },
             unit: { value: 'g/dL', confidence: 0.98 },
-            mean: { value: 13.6, confidence: 0.95 },
+            mean: { value: 13.5, confidence: 0.95 },
             sd: { value: 0.4, confidence: 0.95 },
-            source_text: 'HGB 13.5 g/dL [13.6 +/- 0.4]',
+            source_text: 'HGB 12.6 g/dL',
             overall_confidence: 0.98,
             needs_verification: false
           },
           {
-            parameter: { value: 'Hematokrit / HCT', original_text: 'HCT', confidence: 0.96 },
+            parameter: { value: 'Hematokrit / HCT (Dirui Dimih 3980)', original_text: 'HCT', confidence: 0.96 },
             level: { value: 'Level 1', original_text: 'L1', confidence: 0.95 },
             lot: { value: 'LOT-EC8C-9912', confidence: 0.95 },
-            result: { value: 40.8, original_text: '40.8 %', confidence: 0.97 },
+            result: { value: 40.8, original_text: '40.8', confidence: 0.97 },
             unit: { value: '%', confidence: 0.98 },
             mean: { value: 40.5, confidence: 0.95 },
             sd: { value: 1.8, confidence: 0.95 },
-            source_text: 'HCT 40.8 % [40.5 +/- 1.8]',
+            source_text: 'HCT 40.8 %',
             overall_confidence: 0.96,
             needs_verification: false
           },
           {
-            parameter: { value: 'Trombosit / PLT', original_text: 'PLT', confidence: 0.97 },
+            parameter: { value: 'Trombosit / PLT (Dirui Dimih 3980)', original_text: 'PLT', confidence: 0.97 },
             level: { value: 'Level 1', original_text: 'L1', confidence: 0.95 },
             lot: { value: 'LOT-EC8C-9912', confidence: 0.95 },
-            result: { value: 245, original_text: '245 10^3/uL', confidence: 0.98 },
+            result: { value: 245, original_text: '245', confidence: 0.98 },
             unit: { value: '10^3/uL', confidence: 0.98 },
             mean: { value: 250, confidence: 0.95 },
             sd: { value: 15, confidence: 0.95 },
-            source_text: 'PLT 245 10^3/uL [250 +/- 15]',
+            source_text: 'PLT 245 10^3/uL',
             overall_confidence: 0.97,
             needs_verification: false
           }

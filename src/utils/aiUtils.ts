@@ -178,49 +178,50 @@ export function matchInstrument(
   if (!rawName) return instruments[0] || null;
   const searchStr = rawName.toLowerCase().trim();
 
-  // CST-240 / CS-T240 / Chemistry Analyzer keywords & parameter codes (High Priority)
+  // 1. High Priority: Explicit Dirui Dimih 3980 / Hematology check
+  if (
+    searchStr.includes('dimih') || 
+    searchStr.includes('3980') || 
+    searchStr.includes('bcc-3900') ||
+    searchStr.includes('cbc') ||
+    searchStr.includes('hematology') ||
+    searchStr.includes('hematologi') ||
+    /\b(wbc|rbc|hgb|hct|plt|mcv|mch|mchc|lym|gran|mid|rdw|mpv)\b/i.test(searchStr)
+  ) {
+    if (!searchStr.includes('cst') && !searchStr.includes('cs-t240') && !searchStr.includes('kimia') && !searchStr.includes('chemistry')) {
+      const dimih = instruments.find(i => i.id === 'inst-dirui-3980' || i.name.toLowerCase().includes('3980') || i.model.toLowerCase().includes('3980') || i.code.toLowerCase().includes('3980'));
+      if (dimih) return dimih;
+    }
+  }
+
+  // 2. High Priority: CST-240 / CS-T240 / Chemistry Analyzer check
   if (
     searchStr.includes('cst-240') || 
     searchStr.includes('cs-t240') || 
     searchStr.includes('cst240') || 
     searchStr.includes('cst 240') ||
     searchStr.includes('cst') ||
-    searchStr.includes('glu-hk') ||
-    searchStr.includes('cre-e') ||
-    searchStr.includes('tbil') ||
-    searchStr.includes('dbil') ||
-    searchStr.includes('alb') ||
-    searchStr.includes('alt') ||
-    searchStr.includes('ast') ||
-    searchStr.includes('au') ||
-    searchStr.includes('bun') ||
-    searchStr.includes('tg') ||
-    searchStr.includes('tc') ||
-    searchStr.includes('sgot') ||
-    searchStr.includes('sgpt') ||
     searchStr.includes('kimia') ||
     searchStr.includes('chemistry') ||
-    (searchStr.includes('dirui') && !searchStr.includes('3980') && !searchStr.includes('dimih') && !searchStr.includes('bcc') && !searchStr.includes('cbc'))
+    /\b(glu-hk|cre-e|tbil|dbil|alb|alt|ast|au|bun|tg|tc|sgot|sgpt)\b/i.test(searchStr)
   ) {
     const cst = instruments.find(i => i.id === 'inst-cst240' || i.name.toLowerCase().includes('cst') || i.model.toLowerCase().includes('cst') || i.name.toLowerCase().includes('chemistry'));
     if (cst) return cst;
   }
 
-  // Dirui Dimih 3980 keywords (ONLY for hematology)
-  if (
-    searchStr.includes('dimih') || 
-    searchStr.includes('3980') || 
-    searchStr.includes('dimih 3980') ||
-    searchStr.includes('bcc-3900') ||
-    searchStr.includes('cbc') ||
-    searchStr.includes('hematology') ||
-    searchStr.includes('hematologi')
-  ) {
-    const dimih = instruments.find(i => i.id === 'inst-dirui-3980' || i.name.toLowerCase().includes('3980') || i.model.toLowerCase().includes('3980'));
-    if (dimih) return dimih;
+  // 3. Cobas c311 keywords
+  if (searchStr.includes('cobas') || searchStr.includes('roche') || searchStr.includes('c311')) {
+    const cobas = instruments.find(i => i.name.toLowerCase().includes('cobas') || i.model.toLowerCase().includes('cobas'));
+    if (cobas) return cobas;
   }
 
-  // General check across all instruments
+  // 4. Sysmex keywords
+  if (searchStr.includes('sysmex') || searchStr.includes('xn')) {
+    const sysmex = instruments.find(i => i.name.toLowerCase().includes('sysmex'));
+    if (sysmex) return sysmex;
+  }
+
+  // 5. General check across all instruments
   for (const inst of instruments) {
     if (
       inst.name.toLowerCase().includes(searchStr) ||
@@ -231,18 +232,6 @@ export function matchInstrument(
     ) {
       return inst;
     }
-  }
-
-  // Cobas c311 keywords
-  if (searchStr.includes('cobas') || searchStr.includes('roche') || searchStr.includes('c311')) {
-    const cobas = instruments.find(i => i.name.toLowerCase().includes('cobas') || i.model.toLowerCase().includes('cobas'));
-    if (cobas) return cobas;
-  }
-
-  // Sysmex keywords
-  if (searchStr.includes('sysmex') || searchStr.includes('xn')) {
-    const sysmex = instruments.find(i => i.name.toLowerCase().includes('sysmex'));
-    if (sysmex) return sysmex;
   }
 
   return instruments[0] || null;
@@ -286,21 +275,28 @@ export function buildVerifiedItemsFromAI(
     || matchInstrument(docAnalyzer, instruments) 
     || instruments[0];
 
-  // High-Sensitivity Safeguard: Check if extracted items contain Clinical Chemistry codes
   const rawTextCombined = (extractedResults || []).map(r => 
     `${r.parameter?.value || ''} ${r.parameter?.original_text || ''} ${r.source_text || ''}`
   ).join(' ').toUpperCase();
+
+  const hasHematologyCodes = ['WBC', 'RBC', 'HGB', 'HB', 'HCT', 'PLT', 'MCV', 'MCH', 'MCHC', 'LYM', 'GRAN', 'MID', 'RDW', 'MPV'].some(code => {
+    const regex = new RegExp(`\\b${code}\\b`, 'i');
+    return regex.test(rawTextCombined);
+  });
 
   const hasChemistryCodes = ['ALB', 'ALT', 'AST', 'GLU-HK', 'GLU', 'AU', 'BUN', 'CRE-E', 'CREA', 'CREAT', 'TG', 'TC', 'TBIL', 'DBIL', 'TP', 'SGOT', 'SGPT', 'UREA', 'CHOL', 'UA'].some(code => {
     const regex = new RegExp(`\\b${code.replace('-', '[-_]?')}\\b`, 'i');
     return regex.test(rawTextCombined);
   });
 
-  // If chemistry codes are detected in extracted text, FORCE target instrument to CST-240
-  if (hasChemistryCodes && (defaultInst?.id === 'inst-dirui-3980' || defaultInst?.id?.includes('hema'))) {
-    const cst = instruments.find(i => i.id === 'inst-cst240' || i.name.toLowerCase().includes('cst') || i.name.toLowerCase().includes('chem'));
-    if (cst) {
-      defaultInst = cst;
+  // Force defaultInst according to detected codes if not explicitly filtered
+  if (!filterInstrumentId) {
+    if (hasHematologyCodes && !hasChemistryCodes) {
+      const dimih = instruments.find(i => i.id === 'inst-dirui-3980' || i.name.toLowerCase().includes('3980') || i.model.toLowerCase().includes('3980'));
+      if (dimih) defaultInst = dimih;
+    } else if (hasChemistryCodes && !hasHematologyCodes) {
+      const cst = instruments.find(i => i.id === 'inst-cst240' || i.name.toLowerCase().includes('cst') || i.name.toLowerCase().includes('chem'));
+      if (cst) defaultInst = cst;
     }
   }
 
