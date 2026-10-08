@@ -42,6 +42,7 @@ const KEYS = {
   CAPA: 'lqcms_capa_v1',
   AUDIT_LOGS: 'lqcms_audit_logs_v1',
   NOTIFICATIONS: 'lqcms_notifications_v1',
+  DELETED_QC_IDS: 'lqcms_deleted_qc_ids_v1',
 };
 
 // Generic safe storage helper
@@ -541,7 +542,8 @@ export class StorageService {
       // 1. Fetch QC Results
       const { data: qcData, error: qcErr } = await sb.from('qc_results').select('*').order('date', { ascending: false });
       if (!qcErr && qcData && qcData.length > 0) {
-        const mapped = qcData.map(mapDbToQCResult);
+        const deletedIds = new Set(this.getDeletedQCIds());
+        const mapped = qcData.map(mapDbToQCResult).filter(r => !deletedIds.has(r.id));
         setStored(KEYS.QC_RESULTS, mapped);
       }
 
@@ -691,11 +693,14 @@ export class StorageService {
                 setStored(KEYS.QC_RESULTS, list);
               } else if (payload.new) {
                 const item = mapDbToQCResult(payload.new);
-                const list = getStored<QCResult[]>(KEYS.QC_RESULTS, []);
-                const idx = list.findIndex(r => r.id === item.id);
-                if (idx >= 0) list[idx] = item;
-                else list.unshift(item);
-                setStored(KEYS.QC_RESULTS, list);
+                const deletedIds = new Set(StorageService.getDeletedQCIds());
+                if (!deletedIds.has(item.id)) {
+                  const list = getStored<QCResult[]>(KEYS.QC_RESULTS, []);
+                  const idx = list.findIndex(r => r.id === item.id);
+                  if (idx >= 0) list[idx] = item;
+                  else list.unshift(item);
+                  setStored(KEYS.QC_RESULTS, list);
+                }
               }
             } else if (table === 'instruments') {
               if (eventType === 'DELETE' && payload.old?.id) {
@@ -1165,10 +1170,23 @@ export class StorageService {
     setStored(KEYS.WESTGARD_RULES, rules);
   }
 
+  static getDeletedQCIds(): string[] {
+    return getStored<string[]>(KEYS.DELETED_QC_IDS, []);
+  }
+
+  static trackDeletedQCId(id: string): void {
+    const list = this.getDeletedQCIds();
+    if (!list.includes(id)) {
+      list.push(id);
+      setStored(KEYS.DELETED_QC_IDS, list);
+    }
+  }
+
   // --- QC Results ---
   static getQCResults(): QCResult[] {
+    const deletedIds = new Set(this.getDeletedQCIds());
     const rawList = getStored<QCResult[]>(KEYS.QC_RESULTS, []);
-    let list = rawList.filter(r => r.instrumentId !== 'inst-chem-a' && !r.instrumentName?.toLowerCase().includes('cobas c311'));
+    let list = rawList.filter(r => r.instrumentId !== 'inst-chem-a' && !r.instrumentName?.toLowerCase().includes('cobas c311') && !deletedIds.has(r.id));
     if (list.length !== rawList.length) {
       setStored(KEYS.QC_RESULTS, list);
       const sb = getSupabase();
@@ -1179,13 +1197,19 @@ export class StorageService {
 
     if (list.length === 0) {
       const demo = generateDemoQCResults();
-      setStored(KEYS.QC_RESULTS, demo);
-      return demo;
+      const activeDemo = demo.filter(d => !deletedIds.has(d.id));
+      if (activeDemo.length > 0) {
+        setStored(KEYS.QC_RESULTS, activeDemo);
+        return activeDemo;
+      }
+      return [];
     }
+
+    const existingIds = new Set([...list.map(r => r.id), ...Array.from(deletedIds)]);
+
     // If existing local dataset only contains legacy 45 demo records without multi-month history, backfill
     if (list.length < 60 && list.some(r => r.id.startsWith('QC-DEMO-'))) {
       const demo = generateDemoQCResults();
-      const existingIds = new Set(list.map(r => r.id));
       const additions = demo.filter(d => !existingIds.has(d.id));
       if (additions.length > 0) {
         const merged = [...list, ...additions].sort((a, b) => b.timestamp - a.timestamp);
@@ -1199,7 +1223,6 @@ export class StorageService {
       const demo = generateDemoQCResults();
       const shiftItems = demo.filter(d => d.id.startsWith('QC-SHIFT-ALT-'));
       if (shiftItems.length > 0) {
-        const existingIds = new Set(list.map(r => r.id));
         const needed = shiftItems.filter(s => !existingIds.has(s.id));
         if (needed.length > 0) {
           const merged = [...list, ...needed].sort((a, b) => b.timestamp - a.timestamp);
@@ -1253,6 +1276,7 @@ export class StorageService {
 
   static deleteQCResult(id: string): void {
     const target = this.getQCResults().find(r => r.id === id);
+    this.trackDeletedQCId(id);
     const list = this.getQCResults().filter(r => r.id !== id);
     setStored(KEYS.QC_RESULTS, list);
 
@@ -1269,6 +1293,8 @@ export class StorageService {
     if (target) {
       this.logAudit('DELETE_QC_RESULT', `Menghapus data hasil QC ${target.parameterName} (${target.value} ${target.unit}) tanggal ${target.date}`, null, target);
     }
+
+    this.notifyDataChanged('qc_results');
   }
 
   // --- Non-Conformities ---
