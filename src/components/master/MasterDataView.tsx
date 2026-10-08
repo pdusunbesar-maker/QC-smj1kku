@@ -12,11 +12,14 @@ import {
   X,
   Shield,
   HelpCircle,
-  AlertTriangle
+  AlertTriangle,
+  Upload,
+  FileSpreadsheet
 } from 'lucide-react';
 import { LaboratoryInfo, Instrument, Parameter, ControlMaterial } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { StorageService } from '../../services/storage';
+import { ParameterCsvImportModal } from './ParameterCsvImportModal';
 
 interface MasterDataViewProps {
   labInfo: LaboratoryInfo;
@@ -73,6 +76,8 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
 
   // Parameter Modal
   const [showParameterModal, setShowParameterModal] = useState(false);
+  const [showCsvImportModal, setShowCsvImportModal] = useState(false);
+  const [importNotice, setImportNotice] = useState<string | null>(null);
   const [editingParameter, setEditingParameter] = useState<Parameter | null>(null);
   const [paramForm, setParamForm] = useState<Partial<Parameter>>({
     name: '',
@@ -486,39 +491,73 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
 
       {/* Tab 3: Parameters Table */}
       {activeTab === 'parameters' && (
-        <div className="rounded-xl border border-slate-200 bg-white shadow-xs overflow-hidden">
-          <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-            <span className="font-semibold text-xs text-slate-900">
-              Daftar Parameter Pemeriksaan & Target Kontrol
-            </span>
-            {canEdit && (
+        <div className="space-y-3">
+          {importNotice && (
+            <div className="rounded-xl bg-purple-50 border border-purple-200 p-3 text-xs text-purple-900 flex items-center justify-between animate-in fade-in">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-purple-600 shrink-0" />
+                <span className="font-medium">{importNotice}</span>
+              </div>
               <button
                 type="button"
-                onClick={() => {
-                  setEditingParameter(null);
-                  setParamForm({
-                    name: '',
-                    code: '',
-                    unit: 'mg/dL',
-                    method: '',
-                    instrumentId: instruments[0]?.id || '',
-                    controlMaterialId: controls[0]?.id || '',
-                    targetMean: 100,
-                    targetSD: 3.5,
-                    targetCV: 3.5,
-                    minAcceptable: 89.5,
-                    maxAcceptable: 110.5,
-                    decimalPlaces: 1,
-                  });
-                  setShowParameterModal(true);
-                }}
-                className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition-colors"
+                onClick={() => setImportNotice(null)}
+                className="text-purple-600 hover:text-purple-900 p-1 rounded-md"
               >
-                <Plus className="h-3.5 w-3.5" />
-                <span>Tambah Parameter</span>
+                <X className="h-3.5 w-3.5" />
               </button>
-            )}
-          </div>
+            </div>
+          )}
+
+          <div className="rounded-xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+            <div className="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <span className="font-semibold text-xs text-slate-900 block">
+                  Daftar Parameter Pemeriksaan & Target Kontrol
+                </span>
+                <span className="text-[11px] text-slate-500">
+                  Target Mean, SD, LCL (Min Acceptable), UCL (Max Acceptable), dan desimal per parameter.
+                </span>
+              </div>
+
+              {canEdit && (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowCsvImportModal(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-purple-700 bg-purple-50 border border-purple-200 hover:bg-purple-100 rounded-lg transition-colors"
+                  >
+                    <FileSpreadsheet className="h-3.5 w-3.5" />
+                    <span>Import Data CSV</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingParameter(null);
+                      setParamForm({
+                        name: '',
+                        code: '',
+                        unit: 'mg/dL',
+                        method: '',
+                        instrumentId: instruments[0]?.id || '',
+                        controlMaterialId: controls[0]?.id || '',
+                        targetMean: 100,
+                        targetSD: 3.5,
+                        targetCV: 3.5,
+                        minAcceptable: 89.5,
+                        maxAcceptable: 110.5,
+                        decimalPlaces: 1,
+                      });
+                      setShowParameterModal(true);
+                    }}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition-colors"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>Tambah Parameter</span>
+                  </button>
+                </div>
+              )}
+            </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
@@ -612,6 +651,7 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
             </table>
           </div>
         </div>
+      </div>
       )}
 
       {/* Tab 4: Control Materials Table */}
@@ -1213,6 +1253,20 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* CSV Import Modal */}
+      <ParameterCsvImportModal
+        isOpen={showCsvImportModal}
+        onClose={() => setShowCsvImportModal(false)}
+        instruments={instruments}
+        controls={controls}
+        existingParameters={parameters}
+        onImportSuccess={(importedCount) => {
+          onParametersUpdated(StorageService.getParameters());
+          setImportNotice(`Berhasil mengimpor ${importedCount} parameter QC ke Master Data!`);
+          setTimeout(() => setImportNotice(null), 8000);
+        }}
+      />
     </div>
   );
 };

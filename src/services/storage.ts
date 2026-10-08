@@ -1101,6 +1101,41 @@ export class StorageService {
     }
   }
 
+  static saveParameters(params: Parameter[]): { updatedCount: number; createdCount: number } {
+    const list = [...this.getParameters()];
+    let updatedCount = 0;
+    let createdCount = 0;
+
+    params.forEach(param => {
+      const idx = list.findIndex(
+        p => p.id === param.id || (p.code.toLowerCase() === param.code.toLowerCase() && p.instrumentId === param.instrumentId)
+      );
+      if (idx >= 0) {
+        list[idx] = { ...list[idx], ...param, id: list[idx].id };
+        updatedCount++;
+      } else {
+        list.push(param);
+        createdCount++;
+      }
+    });
+
+    setStored(KEYS.PARAMETERS, list);
+
+    const sb = getSupabase();
+    if (sb) {
+      const dbParams = list.map(mapParamToDb);
+      sb.from('test_parameters')
+        .upsert(dbParams)
+        .then(({ error }) => {
+          if (error) console.error('Supabase saveParameters bulk error:', error);
+        });
+    }
+
+    this.logAudit('UPDATE_MASTER_DATA', `Mengimpor ${params.length} data parameter QC via CSV (${createdCount} baru, ${updatedCount} diperbarui).`);
+
+    return { updatedCount, createdCount };
+  }
+
   static deleteParameter(id: string): void {
     const target = this.getParameters().find(p => p.id === id);
     const list = this.getParameters().filter(p => p.id !== id);

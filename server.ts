@@ -281,57 +281,50 @@ async function startServer() {
       const prompt = `Anda adalah Laboratory Quality Control (QC) & Medical Laboratory Vision OCR Specialist tingkat enterprise.
 Tugas Anda adalah membaca dan mengekstrak SELURUH data hasil pemeriksaan Quality Control (QC) dari foto struk termal / printout / layar monitor mesin laboratorium yang diunggah secara akurat.
 
-ATURAN PENGENALAN ALAT & ANALISIS GAMBAR (SANGAT PENTING & KRUSIAL):
-1. ATURAN MEMBEDAKAN ALAT KIMIA KLINIK (DIRUI CS-T240) VS HEMATOLOGI (DIRUI DIMIH 3980):
-   A. JIKA PADA FOTO TERDAPAT SALAH SATU KODE PARAMETER KIMIA KLINIK BERIKUT:
-      - ALB (Albumin)
-      - ALT / GPT (Alanine Aminotransferase / SGPT)
-      - AST / GOT (Aspartate Aminotransferase / SGOT)
-      - GLU-HK / GLU / GLUC (Glucose Hexokinase / Glukosa Darah)
-      - AU / UA (Uric Acid / Asam Urat)
-      - BUN / UREA / URE (Blood Urea Nitrogen / Ureum)
-      - CRE-E / CREA / CRE / CREAT (Creatinine Enzymatic / Jaffe / Kreatinin)
-      - TG / TRIG (Triglyceride / Trigliserida)
-      - TC / CHOL / T-CHO (Total Cholesterol / Kolesterol Total)
-      - TBIL / T-BIL (Total Bilirubin / Bilirubin Total)
-      - DBIL / D-BIL (Direct Bilirubin / Bilirubin Direk)
-      - TP (Total Protein)
-      - GGT, ALP, LDH, CK-MB, AMY, LIP, CA, P, MG, NA, K, CL
+ATURAN PENGENALAN KODE PARAMETER & HASIL PEMERIKSAAN (SANGAT PENTING & KRUSIAL):
+1. PEMETAAN KODE SINGKAT PARAMETER PADA STRUK:
+   Ekstrak kode singkat yang tercetak di struk ke 'parameter.original_text' DAN sebutkan nama lengkap parameternya di 'parameter.value':
+   - ALB -> parameter.original_text: "ALB", parameter.value: "Albumin"
+   - ALT / SGPT / GPT -> parameter.original_text: "ALT", parameter.value: "SGPT / ALT"
+   - AST / SGOT / GOT -> parameter.original_text: "AST", parameter.value: "SGOT / AST"
+   - GLU-HK / GLU / GLUC -> parameter.original_text: "GLU-HK", parameter.value: "Glucose Hexokinase"
+   - AU / UA -> parameter.original_text: "AU", parameter.value: "Asam Urat / AU"
+   - BUN / UREA -> parameter.original_text: "BUN", parameter.value: "Blood Urea Nitrogen / BUN"
+   - CRE-E / CREA / CREAT -> parameter.original_text: "CRE-E", parameter.value: "Creatinine Enzymatic"
+   - TG / TRIG -> parameter.original_text: "TG", parameter.value: "Trigliserida / TG"
+   - TC / CHOL / T-CHO -> parameter.original_text: "TC", parameter.value: "Total Cholesterol / TC"
+   - TBIL / T-BIL -> parameter.original_text: "TBIL", parameter.value: "Total Bilirubin"
+   - DBIL / D-BIL -> parameter.original_text: "DBIL", parameter.value: "Direct Bilirubin"
+   - TP -> parameter.original_text: "TP", parameter.value: "Total Protein"
+   - WBC -> parameter.original_text: "WBC", parameter.value: "Leukosit / WBC"
+   - RBC -> parameter.original_text: "RBC", parameter.value: "Eritrosit / RBC"
+   - HGB / HB -> parameter.original_text: "HGB", parameter.value: "Hemoglobin / HGB"
+   - HCT -> parameter.original_text: "HCT", parameter.value: "Hematokrit / HCT"
+   - PLT -> parameter.original_text: "PLT", parameter.value: "Trombosit / PLT"
+
+2. PENANGANAN PEMBACAAN ANGKA HASIL & DESIMAL:
+   - Jika pada struk tertulis angka bulat untuk Albumin seperti "38" atau "382", atau tanpa koma desimal yang jelas:
+     BACA HASIL DENGAN PRESISI SENSITIF -> Albumin bernilai normal sekitar 3.8 g/dL (atau 3.82 g/dL).
+     Masukkan 'result.original_text': "38" (atau "3.82"), 'result.value': 3.8 (atau 3.82).
+   - Selalu ekstrak angka desimal dengan tanda titik '.' di 'result.value' angka numerik.
+
+3. ATURAN MEMBEDAKAN ALAT KIMIA KLINIK (DIRUI CS-T240) VS HEMATOLOGI (DIRUI DIMIH 3980):
+   A. JIKA PADA FOTO TERDAPAT SALAH SATU KODE PARAMETER KIMIA KLINIK (ALB, ALT, AST, GLU-HK, AU, BUN, CRE-E, TG, TC, TBIL, DBIL, TP):
       => MAKA NAMA ALAT DI "document.analyzer" HARUS MUTLAK: "Chemistry Analyzer CST-240 (Dirui CS-T240)"!
-      => JANGAN PERNAH MENYEBUTNYA SEBAGAI DIMIH 3980 ATAU HEMATOLOGI KARENA INI ADALAH TES KIMIA KLINIK CS-T240!
-
-   B. JIKA PADA FOTO ADALAH PARAMETER HEMATOLOGI (CBC):
-      - Parameter: WBC, RBC, HGB, HCT, MCV, MCH, MCHC, PLT, LYM%, GRAN%, MID%, RDW-CV, MPV
-      - Teks alat: DIMIH 3980, BCC-3900, DIRUI HEMATOLOGY
+   B. JIKA PADA FOTO ADALAH PARAMETER HEMATOLOGI (WBC, RBC, HGB, HCT, PLT, MCV, MCH, MCHC):
       => Set "analyzer": "Dirui Dimih 3980 Automated Analyzer"
-
    C. Jika foto Kimia Klinik Umum -> Set "analyzer": "Chemistry Analyzer CST-240 (Dirui CS-T240)"
    D. Jika foto Sysmex XN-550 -> Set "analyzer": "Hematology Analyzer 5-Diff (Sysmex XN-550)"
    ${instrumentHint ? `- PETUNJUK PENGGUNA: "${instrumentHint}". Prioritaskan petunjuk ini.` : ''}
 
-2. ATURAN MEMBEDAKAN HASIL (RESULT) VS TARGET MEAN VS TARGET SD:
-   - PADA PARAMETER KIMIA DIRUI CS-T240 (Multi-Kolom atau Single Item):
-     * "RESULT / CONC / NILAI PENGUKURAN" = HASIL PENGUKURAN KONTROL AKTUAL -> masukkan ke 'result.value' (desimal dengan titik) dan 'result.original_text'.
-       Contoh: ALB 3.82, ALT 31.8, AST 35.4, GLU-HK 104.2, AU 5.18, BUN 18.6, CRE-E 1.23, TG 124.5, TC 161.5, TBIL 1.12, DBIL 0.34.
-     * "TARGET / MEAN / X / X̄" = NILAI TARGET MEAN RUJUKAN -> masukkan ke 'mean.value'.
-     * "SD / 1SD / STD DEV" = NILAI TARGET SD RUJUKAN -> masukkan ke 'sd.value'.
-     * Jika kolom target tidak dicetak, set 'mean: null' dan 'sd: null'.
-   - PADA STRUK HEMATOLOGI DIRUI DIMIH 3980 (1 Angka per Baris):
-     * Angka yang tercetak di sebelah kode parameter (misal "HGB 12,6", "WBC 7,20", "PLT 245") ADALAH MUTLAK HASIL / RESULT DARI PEMERIKSAAN QC! Masukkan ke 'result.value' dan 'result.original_text'.
-
-3. CONTOH EKSTRAKSI SPESIFIK:
-   - Contoh Struk CST-240:
-     "ALB    3.82   3.85   0.12" -> parameter: "ALB", result: { value: 3.82, original_text: "3.82" }, mean: { value: 3.85 }, sd: { value: 0.12 }, unit: "g/dL"
-     "ALT    31.8   32.0   1.70" -> parameter: "ALT", result: { value: 31.8, original_text: "31.8" }, mean: { value: 32.0 }, sd: { value: 1.70 }, unit: "U/L"
-     "AST    35.4   35.0   1.80" -> parameter: "AST", result: { value: 35.4, original_text: "35.4" }, mean: { value: 35.0 }, sd: { value: 1.80 }, unit: "U/L"
-     "GLU-HK 104.2  104.0  3.50" -> parameter: "GLU-HK", result: { value: 104.2, original_text: "104.2" }, mean: { value: 104.0 }, sd: { value: 3.50 }, unit: "mg/dL"
-     "AU     5.18   5.20   0.25" -> parameter: "AU", result: { value: 5.18, original_text: "5.18" }, mean: { value: 5.20 }, sd: { value: 0.25 }, unit: "mg/dL"
-     "BUN    18.6   18.5   0.90" -> parameter: "BUN", result: { value: 18.6, original_text: "18.6" }, mean: { value: 18.5 }, sd: { value: 0.90 }, unit: "mg/dL"
-     "CRE-E  1.23   1.25   0.06" -> parameter: "CRE-E", result: { value: 1.23, original_text: "1.23" }, mean: { value: 1.25 }, sd: { value: 0.06 }, unit: "mg/dL"
-     "TG     124.5  125.0  5.00" -> parameter: "TG", result: { value: 124.5, original_text: "124.5" }, mean: { value: 125.0 }, sd: { value: 5.00 }, unit: "mg/dL"
-     "TC     161.5  160.0  5.20" -> parameter: "TC", result: { value: 161.5, original_text: "161.5" }, mean: { value: 160.0 }, sd: { value: 5.20 }, unit: "mg/dL"
-     "TBIL   1.12   1.15   0.08" -> parameter: "TBIL", result: { value: 1.12, original_text: "1.12" }, mean: { value: 1.15 }, sd: { value: 0.08 }, unit: "mg/dL"
-     "DBIL   0.34   0.35   0.04" -> parameter: "DBIL", result: { value: 0.34, original_text: "0.34" }, mean: { value: 0.35 }, sd: { value: 0.04 }, unit: "mg/dL"
+4. CONTOH EKSTRAKSI SPESIFIK:
+   - "ALB    3.82   3.85   0.12" -> parameter: { value: "Albumin", original_text: "ALB" }, result: { value: 3.82, original_text: "3.82" }, mean: { value: 3.85 }, sd: { value: 0.12 }, unit: "g/dL"
+   - "ALB    38"                  -> parameter: { value: "Albumin", original_text: "ALB" }, result: { value: 3.8, original_text: "38" }, mean: { value: 3.85 }, sd: { value: 0.12 }, unit: "g/dL"
+   - "ALT    31.8   32.0   1.70" -> parameter: { value: "SGPT / ALT", original_text: "ALT" }, result: { value: 31.8, original_text: "31.8" }, mean: { value: 32.0 }, sd: { value: 1.70 }, unit: "U/L"
+   - "AST    35.4   35.0   1.80" -> parameter: { value: "SGOT / AST", original_text: "AST" }, result: { value: 35.4, original_text: "35.4" }, mean: { value: 35.0 }, sd: { value: 1.80 }, unit: "U/L"
+   - "GLU-HK 104.2  104.0  3.50" -> parameter: { value: "Glucose Hexokinase", original_text: "GLU-HK" }, result: { value: 104.2, original_text: "104.2" }, mean: { value: 104.0 }, sd: { value: 3.50 }, unit: "mg/dL"
+   - "AU     5.18   5.20   0.25" -> parameter: { value: "Asam Urat / AU", original_text: "AU" }, result: { value: 5.18, original_text: "5.18" }, mean: { value: 5.20 }, sd: { value: 0.25 }, unit: "mg/dL"
+   - "CRE-E  1.23   1.25   0.06" -> parameter: { value: "Creatinine Enzymatic", original_text: "CRE-E" }, result: { value: 1.23, original_text: "1.23" }, mean: { value: 1.25 }, sd: { value: 0.06 }, unit: "mg/dL"
 
 Format respon HARUS JSON valid:
 {

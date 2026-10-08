@@ -107,6 +107,12 @@ export function matchParameter(
   const rawNameClean = (rawName || '').trim();
   const searchStr = `${rawNameClean} ${rawCodeClean}`.toLowerCase().trim();
 
+  // Extract clean code tokens (e.g. "ALB", "ALT", "AST", "GLU", "GLU-HK", "AU", "BUN", "CRE-E", "TG", "TC", "TBIL", "DBIL", "WBC", "PLT")
+  const extractedTokens = `${rawNameClean} ${rawCodeClean}`
+    .toUpperCase()
+    .split(/[\s,/_.:;()-]+/)
+    .filter(t => t.length >= 2 && !/^[0-9]+$/.test(t));
+
   // If instrument is specified, prioritize parameters attached to this instrument
   const primaryPool = targetInstrumentId 
     ? parameters.filter(p => p.instrumentId === targetInstrumentId)
@@ -116,15 +122,17 @@ export function matchParameter(
 
   // Search in prioritized pool first, then fallback pool
   for (const pool of [primaryPool, fallbackPool]) {
-    // 0. Exact Parameter Code match (High Sensitivity for ALB, ALT, AST, GLU-HK, AU, BUN, CRE-E, TG, TC, TBIL, DBIL)
-    if (rawCodeClean) {
-      const exactCodeMatch = pool.find(p => p.code.toUpperCase() === rawCodeClean);
-      if (exactCodeMatch) return exactCodeMatch;
-      
-      // Try stripping hyphens / suffixes (e.g. GLU-HK -> GLU, CRE-E -> CREAT)
-      const rootCode = rawCodeClean.split(/[-_]/)[0];
-      const rootMatch = pool.find(p => p.code.toUpperCase() === rootCode);
-      if (rootMatch) return rootMatch;
+    // 0. High Sensitivity: Token-level exact parameter code match (ALB, ALT, AST, GLU-HK, AU, BUN, CRE-E, TG, TC, TBIL, DBIL, WBC, PLT, etc.)
+    for (const token of extractedTokens) {
+      const tokenMatch = pool.find(p => p.code.toUpperCase() === token || p.code.toUpperCase().replace(/[-_]/g, '') === token);
+      if (tokenMatch) return tokenMatch;
+
+      // Try root prefix (e.g. GLU-HK -> GLU, CRE-E -> CREAT)
+      const rootToken = token.split(/[-_]/)[0];
+      if (rootToken && rootToken.length >= 2) {
+        const rootMatch = pool.find(p => p.code.toUpperCase().startsWith(rootToken));
+        if (rootMatch) return rootMatch;
+      }
     }
 
     // 1. Direct code or name match
@@ -152,8 +160,8 @@ export function matchParameter(
 
     // 4. Alias match
     for (const [key, aliases] of Object.entries(PARAM_ALIASES)) {
-      if (aliases.some(alias => searchStr === alias || tokens.includes(alias) || searchStr.includes(alias))) {
-        const match = pool.find(p => p.code.toLowerCase() === key || p.id.toLowerCase().includes(key));
+      if (aliases.some(alias => searchStr === alias || tokens.includes(alias) || searchStr.includes(alias) || extractedTokens.includes(alias.toUpperCase()))) {
+        const match = pool.find(p => p.code.toLowerCase() === key || p.code.toLowerCase().includes(key) || p.id.toLowerCase().includes(key));
         if (match) return match;
       }
     }

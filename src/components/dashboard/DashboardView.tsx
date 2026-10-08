@@ -33,6 +33,8 @@ import { SummaryCardsPanel } from './panels/SummaryCardsPanel';
 import { CriticalAlertsPanel } from './panels/CriticalAlertsPanel';
 import { MonthlyQCVolumeChartPanel } from './panels/MonthlyQCVolumeChartPanel';
 import { AutomatedRunningAverageAlertsPanel } from './panels/AutomatedRunningAverageAlertsPanel';
+import { MonthlyTrendAnalysisPanel } from './panels/MonthlyTrendAnalysisPanel';
+import { DailyQCCoveragePanel } from './panels/DailyQCCoveragePanel';
 import { RunningAverageAlertService } from '../../services/runningAverageAlertService';
 
 interface DashboardViewProps {
@@ -516,6 +518,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       />
 
       {/* ========================================================================= */}
+      {/* 2.2. CAKUPAN PENGUJIAN QC HARI INI (TESTED VS EXPECTED / MISSED TESTS)    */}
+      {/* ========================================================================= */}
+      <DailyQCCoveragePanel
+        qcResults={qcResults}
+        parameters={parameters}
+        instruments={instruments}
+        onNavigateToTab={onNavigateToTab}
+      />
+
+      {/* ========================================================================= */}
       {/* 2.5. SISTEM PERINGATAN OTOMATIS: 3-DAY RUNNING AVERAGE SHIFT ALERTS       */}
       {/* ========================================================================= */}
       <div id="automated-running-avg-panel" className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -713,7 +725,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </div>
 
       {/* ========================================================================= */}
-      {/* 3.5. ROW 2.5: VISUALISASI TREN PEMERIKSAAN QC BULANAN (GRAFIK BATANG)     */}
+      {/* 3.5. ROW 2.5: ANALISIS TREN STABILITAS KUALITAS (BULAN INI VS BULAN LALU) */}
+      {/* ========================================================================= */}
+      <MonthlyTrendAnalysisPanel
+        qcResults={qcResults}
+        instruments={instruments}
+        parameters={parameters}
+        onNavigateToTab={onNavigateToTab}
+      />
+
+      {/* ========================================================================= */}
+      {/* 3.6. VISUALISASI TREN PEMERIKSAAN QC BULANAN (GRAFIK BATANG)              */}
       {/* ========================================================================= */}
       <MonthlyQCVolumeChartPanel
         qcResults={qcResults}

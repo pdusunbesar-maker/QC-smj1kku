@@ -536,6 +536,29 @@ export function validateQCItemSchema(
       warnings.push(`Posisi Hasil (${val}) dan Standar Deviasi (${sd}) terdeteksi terbalik dan telah ditukar secara otomatis.`);
     }
 
+    // Smart Magnitude & Decimal Auto-Correction (e.g., receipt prints 38 or 382 for ALB where target mean is ~3.85, or 318 for ALT where target mean is ~32.0)
+    const expectedMean = masterParam?.targetMean || (schema ? (schema.typicalMeanRange[0] + schema.typicalMeanRange[1]) / 2 : 0);
+    if (expectedMean > 0 && val > 0 && schema.expectedType !== 'integer') {
+      if (val > expectedMean * 3.5 || val > schema.maxPhysiological) {
+        if (Math.abs((val / 10) - expectedMean) <= expectedMean * 0.75) {
+          const oldVal = val;
+          val = Number((val / 10).toFixed(schema.decimalPlaces));
+          autoCorrected = true;
+          warnings.push(`Nilai hasil (${oldVal}) dikoreksi desimalnya secara otomatis menjadi ${val} agar sesuai dengan target mean (${expectedMean} ${schema.unit}).`);
+        } else if (Math.abs((val / 100) - expectedMean) <= expectedMean * 0.75) {
+          const oldVal = val;
+          val = Number((val / 100).toFixed(schema.decimalPlaces));
+          autoCorrected = true;
+          warnings.push(`Nilai hasil (${oldVal}) dikoreksi desimalnya secara otomatis menjadi ${val} agar sesuai dengan target mean (${expectedMean} ${schema.unit}).`);
+        } else if (Math.abs((val / 1000) - expectedMean) <= expectedMean * 0.75) {
+          const oldVal = val;
+          val = Number((val / 1000).toFixed(schema.decimalPlaces));
+          autoCorrected = true;
+          warnings.push(`Nilai hasil (${oldVal}) dikoreksi desimalnya secara otomatis menjadi ${val} agar sesuai dengan target mean (${expectedMean} ${schema.unit}).`);
+        }
+      }
+    }
+
     // Check physiological bounds
     if (val < schema.minPhysiological || val > schema.maxPhysiological) {
       warnings.push(`Nilai hasil (${val} ${schema.unit}) berada di luar batas rentang fisiologis kontrol (${schema.minPhysiological} - ${schema.maxPhysiological} ${schema.unit}).`);
