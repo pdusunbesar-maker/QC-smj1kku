@@ -214,7 +214,6 @@ export const QCReviewView: React.FC<QCReviewViewProps> = ({
       'Waktu_Review',
       'Catatan_Review',
       'Operator_ATLM',
-      'Metode_Input',
       'Keterangan'
     ];
 
@@ -228,7 +227,6 @@ export const QCReviewView: React.FC<QCReviewViewProps> = ({
       };
 
       const violationsStr = (r.violations || []).map(v => `${v.rule} (${v.description})`).join('; ') || '-';
-      const sourceStr = r.source === 'AI_VISION' ? 'AI Vision Scan' : 'Manual Entry';
 
       const row = [
         idx + 1,
@@ -254,7 +252,6 @@ export const QCReviewView: React.FC<QCReviewViewProps> = ({
         escapeCsv(r.reviewedAt || '-'),
         escapeCsv(r.reviewComment || '-'),
         escapeCsv(r.operatorName || '-'),
-        escapeCsv(sourceStr),
         escapeCsv(r.notes || '-')
       ];
 
@@ -289,7 +286,6 @@ export const QCReviewView: React.FC<QCReviewViewProps> = ({
 
     const excelData = filteredResults.map((r, idx) => {
       const violationsStr = (r.violations || []).map(v => `${v.rule} (${v.description})`).join('; ') || '-';
-      const sourceStr = r.source === 'AI_VISION' ? 'AI Vision Scan' : 'Manual Entry';
 
       return {
         'No': idx + 1,
@@ -315,7 +311,6 @@ export const QCReviewView: React.FC<QCReviewViewProps> = ({
         'Waktu Review': r.reviewedAt || '-',
         'Catatan Review': r.reviewComment || '-',
         'Operator ATLM': r.operatorName || '-',
-        'Metode Input': sourceStr,
         'Keterangan': r.notes || '-'
       };
     });
