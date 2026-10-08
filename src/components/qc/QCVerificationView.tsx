@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   Save, 
   AlertTriangle, 
@@ -92,6 +92,10 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
   // Active filter for view (e.g. 'ALL', 'inst-cst240', 'inst-dirui-3980')
   const [instrumentFilter, setInstrumentFilter] = useState<string>('ALL');
 
+  // Track auto-save execution to prevent infinite loop (Maximum update depth exceeded)
+  const hasAutoSavedRef = useRef<boolean>(false);
+  const lastExtractedDataRef = useRef<any[] | null>(null);
+
   // Initialize verified items from AI extraction
   const [items, setItems] = useState<VerifiedQCItem[]>(() => {
     return buildVerifiedItemsFromAI(
@@ -104,8 +108,24 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
     );
   });
 
-  // Keep items synchronized whenever extractedData, documentMeta or parameters change
+  // Keep items synchronized whenever a new scan is loaded (requires user review/action to save)
   useEffect(() => {
+    if (!extractedData || extractedData.length === 0) {
+      return;
+    }
+
+    // Only reset the processed flag if we receive a brand new scanned data array
+    if (extractedData !== lastExtractedDataRef.current) {
+      hasAutoSavedRef.current = false;
+      lastExtractedDataRef.current = extractedData;
+    }
+
+    // If we already processed this scan, return early to prevent infinite loops 
+    // and protect any manual edits/adjustments made by the user in the form.
+    if (hasAutoSavedRef.current) {
+      return;
+    }
+
     const newItems = buildVerifiedItemsFromAI(
       extractedData,
       documentMeta,
@@ -116,7 +136,8 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
     );
     setItems(newItems);
     setInstrumentFilter('ALL');
-  }, [extractedData, documentMeta, parameters, instruments]);
+    hasAutoSavedRef.current = true; // Block subsequent redundant runs
+  }, [extractedData, documentMeta, parameters, instruments, existingResults]);
 
   // Re-calculate row when any field changes
   const updateItemField = (id: string, field: keyof VerifiedQCItem, value: any) => {
@@ -490,6 +511,43 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
+      {/* Peninjauan Hasil Bacaan OCR Banner */}
+      {items.length > 0 && !isSavedSuccess && (
+        <div className="bg-blue-50 border border-blue-300 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs text-blue-950 animate-in fade-in">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="font-bold text-sm text-blue-950 flex items-center gap-2">
+                Sistem OCR AI Profesional: Hasil Pembacaan Siap Ditinjau
+                <span className="px-2 py-0.5 rounded-full text-[11px] bg-blue-200 text-blue-900 font-semibold">
+                  {items.length} Parameter Terdeteksi
+                </span>
+              </p>
+              <p className="text-xs text-blue-800 mt-0.5">
+                Silakan lakukan peninjauan dan verifikasi hasil pembacaan parameter di bawah ini. Anda dapat mengedit nilai, menyesuaikan parameter rujukan, atau membatalkan baris tertentu sebelum menekan tombol <strong>Simpan Semua ke QC Harian & Validasi</strong>. Klik <strong>Scan Ulang</strong> jika ingin mengganti gambar.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={onRetakeScan}
+              className="px-3.5 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-xl transition-colors flex items-center gap-1.5"
+            >
+              Ganti Gambar
+            </button>
+            <button
+              onClick={handleSaveAll}
+              className="px-3.5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-colors flex items-center gap-1.5 shadow-sm"
+            >
+              <Save className="w-3.5 h-3.5" />
+              Lanjut Simpan
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Success Modal / Banner */}
       {isSavedSuccess && (
         <div className="bg-emerald-50 border-2 border-emerald-500 rounded-2xl p-6 text-emerald-900 shadow-md animate-in fade-in duration-300">

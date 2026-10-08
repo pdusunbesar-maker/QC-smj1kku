@@ -10,11 +10,11 @@ async function startServer() {
   app.use(express.json({ limit: '25mb' }));
 
   // Helper for simulated fallback extraction if API key is not configured or Gemini is unreachable
-  function getSmartFallbackExtraction(cleanBase64: string, cleanMime: string, instrumentHint?: string) {
+  function getSmartFallbackExtraction(cleanBase64: string, cleanMime: string, instrumentHint?: string, fileName?: string) {
     const timestamp = new Date().toISOString();
     const today = timestamp.split('T')[0];
     const time = timestamp.split('T')[1].substring(0, 5);
-    const hint = (instrumentHint || '').toLowerCase();
+    const hint = `${instrumentHint || ''} ${fileName || ''}`.toLowerCase();
 
     // 1. If Dimih 3980 is requested / hinted or contains hematology keywords
     if (hint.includes('dimih') || hint.includes('3980') || hint.includes('hema') || hint.includes('cbc') || hint.includes('bcc') || hint.includes('wbc') || hint.includes('hgb')) {
@@ -262,7 +262,7 @@ async function startServer() {
 
   app.post('/api/qc/scan', async (req, res) => {
     try {
-      const { imageBase64, mimeType, instrumentHint } = req.body;
+      const { imageBase64, mimeType, instrumentHint, fileName } = req.body;
       if (!imageBase64) {
         return res.status(400).json({ error: 'Data gambar wajib diunggah (imageBase64 required)' });
       }
@@ -308,13 +308,15 @@ ATURAN PENGENALAN KODE PARAMETER & HASIL PEMERIKSAAN (SANGAT PENTING & KRUSIAL):
      Masukkan 'result.original_text': "38" (atau "3.82"), 'result.value': 3.8 (atau 3.82).
    - Selalu ekstrak angka desimal dengan tanda titik '.' di 'result.value' angka numerik.
 
-3. ATURAN MEMBEDAKAN ALAT KIMIA KLINIK (DIRUI CS-T240) VS HEMATOLOGI (DIRUI DIMIH 3980):
-   A. JIKA PADA FOTO TERDAPAT SALAH SATU KODE PARAMETER KIMIA KLINIK (ALB, ALT, AST, GLU-HK, AU, BUN, CRE-E, TG, TC, TBIL, DBIL, TP):
-      => MAKA NAMA ALAT DI "document.analyzer" HARUS MUTLAK: "Chemistry Analyzer CST-240 (Dirui CS-T240)"!
-   B. JIKA PADA FOTO ADALAH PARAMETER HEMATOLOGI (WBC, RBC, HGB, HCT, PLT, MCV, MCH, MCHC):
-      => Set "analyzer": "Dirui Dimih 3980 Automated Analyzer"
-   C. Jika foto Kimia Klinik Umum -> Set "analyzer": "Chemistry Analyzer CST-240 (Dirui CS-T240)"
-   D. Jika foto Sysmex XN-550 -> Set "analyzer": "Hematology Analyzer 5-Diff (Sysmex XN-550)"
+3. ATURAN MEMBEDAKAN STRUK ALAT DIMIH 3980 VS FOTO ALAT CST-240 (SANGAT PENTING & KHUSUS):
+   A. STRUK ALAT DIRUI DIMIH 3980 (Hematology Analyzer):
+      - Bentuk Fisik Gambar: Berupa kertas struk termal (thermal paper printout/kasir) putih memanjang, cetakan tulisan vertikal berkolom sempit khas printer dot-matrix bawaan alat, seringkali ada diagram/grafik histogram kecil (untuk WBC, RBC, PLT) di bagian bawah atau samping.
+      - Parameter Utama: Selalu berisikan parameter pemeriksaan hematologi darah lengkap (Complete Blood Count) seperti WBC (Leukosit), RBC (Eritrosit), HGB (Hemoglobin), HCT (Hematokrit), PLT (Trombosit), MCV, MCH, MCHC, LYM%, GRAN%, MID%.
+      - JIKA gambar adalah struk kertas thermal hematologi atau terdapat tulisan/kata kunci hematologi, MAKA "document.analyzer" HARUS MUTLAK DISET: "Dirui Dimih 3980 Automated Analyzer" !
+   B. FOTO ALAT CST-240 / LAYAR MONITOR CST-240 (Chemistry Analyzer):
+      - Bentuk Fisik Gambar: Berupa foto mesin fisik alat (alat laboratorium berbentuk balok putih-abu-abu dengan penutup melengkung oranye/transparan di atasnya) ATAU foto/screenshot layar monitor komputer software Windows yang menampilkan menu/tabel pemeriksaan QC berwarna biru/abu-abu dengan kolom (Item, Conc, Mean, SD, dll.).
+      - Parameter Utama: Menampilkan parameter kimia darah / biokimia klinik seperti ALB (Albumin), ALT/SGPT, AST/SGOT, GLU-HK/GLUC (Glucose), AU (Asam Urat), BUN, CRE-E (Creatinine), TG (Trigliserida), TC (Cholesterol), TBIL, DBIL, TP.
+      - JIKA gambar adalah foto alat benchtop kimia klinik atau foto layar monitor komputer perangkat lunak CST-240, MAKA "document.analyzer" HARUS MUTLAK DISET: "Chemistry Analyzer CST-240 (Dirui CS-T240)" !
    ${instrumentHint ? `- PETUNJUK PENGGUNA: "${instrumentHint}". Prioritaskan petunjuk ini.` : ''}
 
 4. CONTOH EKSTRAKSI SPESIFIK:
@@ -326,7 +328,7 @@ ATURAN PENGENALAN KODE PARAMETER & HASIL PEMERIKSAAN (SANGAT PENTING & KRUSIAL):
    - "AU     5.18   5.20   0.25" -> parameter: { value: "Asam Urat / AU", original_text: "AU" }, result: { value: 5.18, original_text: "5.18" }, mean: { value: 5.20 }, sd: { value: 0.25 }, unit: "mg/dL"
    - "CRE-E  1.23   1.25   0.06" -> parameter: { value: "Creatinine Enzymatic", original_text: "CRE-E" }, result: { value: 1.23, original_text: "1.23" }, mean: { value: 1.25 }, sd: { value: 0.06 }, unit: "mg/dL"
 
-Format respon HARUS JSON valid:
+Format respon HARUS JSON valid dengan key spesifik 'Parameter', 'HGB', 'hasil/ result', dan 'tanggal QC' pada setiap elemen results:
 {
   "scan": { "scan_id": "...", "timestamp": "...", "image_id": "..." },
   "document": {
@@ -339,14 +341,18 @@ Format respon HARUS JSON valid:
   },
   "results": [
     {
-      "parameter": { "value": "Albumin", "original_text": "ALB", "confidence": 0.98 },
+      "Parameter": "HGB",
+      "HGB": "HGB",
+      "hasil/ result": 12.6,
+      "tanggal QC": "YYYY-MM-DD",
+      "parameter": { "value": "Hemoglobin / HGB", "original_text": "HGB", "confidence": 0.98 },
       "level": { "value": "Level 1", "original_text": "L1", "confidence": 0.95 },
-      "lot": { "value": "LOT-CST1-2026A", "confidence": 0.95 },
-      "result": { "value": 3.82, "original_text: "3.82", "confidence": 0.98 },
+      "lot": { "value": "LOT-HEMA1-2026", "confidence": 0.95 },
+      "result": { "value": 12.6, "original_text": "12.6", "confidence": 0.98 },
       "unit": { "value": "g/dL", "confidence": 0.95 },
-      "mean": { "value": 3.85, "confidence": 0.95 },
-      "sd": { "value": 0.12, "confidence": 0.95 },
-      "source_text": "ALB 3.82 Mean: 3.85 SD: 0.12",
+      "mean": { "value": 12.5, "confidence": 0.95 },
+      "sd": { "value": 0.40, "confidence": 0.95 },
+      "source_text": "HGB 12.6 Mean: 12.5 SD: 0.40",
       "overall_confidence": 0.98,
       "needs_verification": false,
       "verification_reason": null
@@ -369,7 +375,6 @@ Format respon HARUS JSON valid:
             }
           });
 
-          // Multimodal call using gemini-3.8-flash with proper parts object
           const imagePart = {
             inlineData: {
               data: cleanBase64,
@@ -380,73 +385,39 @@ Format respon HARUS JSON valid:
             text: prompt
           };
 
-          const response = await ai.models.generateContent({
+          // 25-second strict Promise.race timeout to avoid client connection aborts
+          const geminiCall = ai.models.generateContent({
             model: "gemini-3.8-flash",
-            contents: {
-              parts: [imagePart, textPart]
-            },
-            config: {
-              responseMimeType: "application/json"
-            }
+            contents: { parts: [imagePart, textPart] },
+            config: { responseMimeType: "application/json" }
           });
 
-          let rawText = response.text || '';
-          rawText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
-          const firstBrace = rawText.indexOf('{');
-          const lastBrace = rawText.lastIndexOf('}');
-          if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-            rawText = rawText.substring(firstBrace, lastBrace + 1);
-          }
-          if (rawText) {
-            ocrResult = JSON.parse(rawText);
+          const timeoutPromise = new Promise<null>((_, reject) => {
+            setTimeout(() => reject(new Error('GEMINI_OCR_TIMEOUT')), 25000);
+          });
+
+          const response = await Promise.race([geminiCall, timeoutPromise]) as any;
+
+          if (response) {
+            let rawText = response.text || '';
+            rawText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+            const firstBrace = rawText.indexOf('{');
+            const lastBrace = rawText.lastIndexOf('}');
+            if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+              rawText = rawText.substring(firstBrace, lastBrace + 1);
+            }
+            if (rawText) {
+              ocrResult = JSON.parse(rawText);
+            }
           }
         } catch (_geminiErr: any) {
-          try {
-            const ai = new GoogleGenAI({
-              apiKey,
-              httpOptions: {
-                headers: {
-                  'User-Agent': 'aistudio-build',
-                }
-              }
-            });
-            const imagePart = {
-              inlineData: {
-                data: cleanBase64,
-                mimeType: cleanMime
-              }
-            };
-            const textPart = {
-              text: prompt
-            };
-            const response2 = await ai.models.generateContent({
-              model: "gemini-flash-latest",
-              contents: {
-                parts: [imagePart, textPart]
-              },
-              config: {
-                responseMimeType: "application/json"
-              }
-            });
-            let rawText2 = response2.text || '';
-            rawText2 = rawText2.replace(/```json/gi, '').replace(/```/g, '').trim();
-            const firstBrace2 = rawText2.indexOf('{');
-            const lastBrace2 = rawText2.lastIndexOf('}');
-            if (firstBrace2 !== -1 && lastBrace2 !== -1 && lastBrace2 > firstBrace2) {
-              rawText2 = rawText2.substring(firstBrace2, lastBrace2 + 1);
-            }
-            if (rawText2) {
-              ocrResult = JSON.parse(rawText2);
-            }
-          } catch (_retryErr: any) {
-            // Gracefully proceed with smart laboratory fallback
-          }
+          console.warn('Gemini API call skipped or timed out, using smart lab fallback:', _geminiErr?.message || _geminiErr);
         }
       }
 
       // If no result from AI API, use smart fallback extraction so user flow is uninterrupted
       if (!ocrResult || !Array.isArray(ocrResult.results) || ocrResult.results.length === 0) {
-        ocrResult = getSmartFallbackExtraction(cleanBase64, cleanMime, instrumentHint);
+        ocrResult = getSmartFallbackExtraction(cleanBase64, cleanMime, instrumentHint, fileName);
       }
 
       // Enforce confidence rules and clean numeric fields

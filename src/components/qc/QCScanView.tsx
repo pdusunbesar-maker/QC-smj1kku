@@ -415,6 +415,262 @@ async function cropAndOptimizeImage(
   });
 }
 
+/**
+ * Analyze an image using computer vision in JavaScript.
+ * Applies a Sobel filter to generate edge magnitude, detects the document margins,
+ * and returns the recommended CropRegion along with an edge-detected base64 preview (green neon on black background).
+ */
+async function detectDocumentEdgesAndCreateSobel(
+  sourceUrl: string,
+  instrumentTemplate: 'dimih3980' | 'cst240' | 'auto'
+): Promise<{ cropRegion: CropRegion; edgeDataUrl: string }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'Anonymous';
+
+    img.onload = () => {
+      try {
+        const fullW = img.naturalWidth || img.width;
+        const fullH = img.naturalHeight || img.height;
+
+        // Create small analytical canvas
+        const width = 300;
+        const height = Math.round((fullH * width) / fullW);
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('Canvas context not available');
+
+        ctx.drawImage(img, 0, 0, width, height);
+        const imgData = ctx.getImageData(0, 0, width, height);
+        const data = imgData.data;
+
+        // Grayscale conversion
+        const gray = new Uint8Array(width * height);
+        let totalLuma = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+          const luma = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+          gray[i / 4] = luma;
+          totalLuma += luma;
+        }
+        const avgLuma = totalLuma / (width * height);
+
+        // Edge detection canvas & Sobel magnitude calculation
+        const edgeCanvas = document.createElement('canvas');
+        edgeCanvas.width = width;
+        edgeCanvas.height = height;
+        const edgeCtx = edgeCanvas.getContext('2d');
+        if (!edgeCtx) throw new Error('Edge canvas context not available');
+        const edgeImgData = edgeCtx.createImageData(width, height);
+        const edgeData = edgeImgData.data;
+
+        const colEdges = new Float32Array(width);
+        const rowEdges = new Float32Array(height);
+
+        // Fill background black with alpha 255
+        for (let i = 0; i < edgeData.length; i += 4) {
+          edgeData[i] = 15;     // dark charcoal background
+          edgeData[i + 1] = 23;
+          edgeData[i + 2] = 42;
+          edgeData[i + 3] = 255;
+        }
+
+        const sobelThreshold = 35;
+
+        for (let y = 1; y < height - 1; y++) {
+          for (let x = 1; x < width - 1; x++) {
+            const idx = y * width + x;
+            
+            // Sobel kernels
+            const gx = 
+              -gray[(y-1)*width + (x-1)] + gray[(y-1)*width + (x+1)] +
+              -2 * gray[y*width + (x-1)] + 2 * gray[y*width + (x+1)] +
+              -gray[(y+1)*width + (x-1)] + gray[(y+1)*width + (x+1)];
+            
+            const gy = 
+              -gray[(y-1)*width + (x-1)] - 2 * gray[(y-1)*width + x] - gray[(y-1)*width + (x+1)] +
+              gray[(y+1)*width + (x-1)] + 2 * gray[(y+1)*width + x] + gray[(y+1)*width + (x+1)];
+            
+            const magnitude = Math.sqrt(gx * gx + gy * gy);
+            
+            if (magnitude > sobelThreshold) {
+              colEdges[x] += magnitude;
+              rowEdges[y] += magnitude;
+
+              // Write glowing green pixel for the edge visualization
+              const pIdx = idx * 4;
+              edgeData[pIdx] = 52;      // Emerald neon green
+              edgeData[pIdx + 1] = 211;  // #34d399
+              edgeData[pIdx + 2] = 153;
+              edgeData[pIdx + 3] = 255;
+            }
+          }
+        }
+
+        edgeCtx.putImageData(edgeImgData, 0, 0);
+
+        // Scan columns from outer bounds to find paper strip / document borders
+        let minX = 0;
+        let maxX = width - 1;
+        let minY = 0;
+        let maxY = height - 1;
+
+        if (instrumentTemplate === 'dimih3980') {
+          // DIMIH 3980: narrow, high vertical strip
+          // Scan row/col profiles
+          const colLuma = new Float32Array(width);
+          for (let x = 0; x < width; x++) {
+            let sum = 0;
+            for (let y = 0; y < height; y++) {
+              sum += gray[y * width + x];
+            }
+            colLuma[x] = sum / height;
+          }
+
+          // Search left transition edge
+          let foundLeft = false;
+          for (let x = 12; x < width * 0.45; x++) {
+            if (colLuma[x] > avgLuma * 0.9 && colEdges[x] > 40) {
+              minX = x;
+              foundLeft = true;
+              break;
+            }
+          }
+          if (!foundLeft) minX = Math.round(width * 0.15);
+
+          // Search right transition edge
+          let foundRight = false;
+          for (let x = width - 13; x > width * 0.55; x--) {
+            if (colLuma[x] > avgLuma * 0.9 && colEdges[x] > 40) {
+              maxX = x;
+              foundRight = true;
+              break;
+            }
+          }
+          if (!foundRight) maxX = Math.round(width * 0.85);
+
+          // Vertical content bounds
+          let foundTop = false;
+          for (let y = 15; y < height * 0.4; y++) {
+            if (rowEdges[y] > 50) {
+              minY = y;
+              foundTop = true;
+              break;
+            }
+          }
+          if (!foundTop) minY = Math.round(height * 0.05);
+
+          let foundBottom = false;
+          for (let y = height - 16; y > height * 0.6; y--) {
+            if (rowEdges[y] > 50) {
+              maxY = y;
+              foundBottom = true;
+              break;
+            }
+          }
+          if (!foundBottom) maxY = Math.round(height * 0.95);
+
+        } else {
+          // CS-T240 or general A4/Monitor document page layout
+          let foundLeft = false;
+          for (let x = 8; x < width * 0.45; x++) {
+            if (colEdges[x] > 35) {
+              minX = x;
+              foundLeft = true;
+              break;
+            }
+          }
+          if (!foundLeft) minX = Math.round(width * 0.04);
+
+          let foundRight = false;
+          for (let x = width - 9; x > width * 0.55; x--) {
+            if (colEdges[x] > 35) {
+              maxX = x;
+              foundRight = true;
+              break;
+            }
+          }
+          if (!foundRight) maxX = Math.round(width * 0.96);
+
+          let foundTop = false;
+          for (let y = 8; y < height * 0.4; y++) {
+            if (rowEdges[y] > 35) {
+              minY = y;
+              foundTop = true;
+              break;
+            }
+          }
+          if (!foundTop) minY = Math.round(height * 0.04);
+
+          let foundBottom = false;
+          for (let y = height - 9; y > height * 0.6; y--) {
+            if (rowEdges[y] > 35) {
+              maxY = y;
+              foundBottom = true;
+              break;
+            }
+          }
+          if (!foundBottom) maxY = Math.round(height * 0.96);
+        }
+
+        // Add padding / margin
+        const padX = Math.round(width * 0.015);
+        const padY = Math.round(height * 0.015);
+
+        minX = Math.max(0, minX - padX);
+        maxX = Math.min(width - 1, maxX + padX);
+        minY = Math.max(0, minY - padY);
+        maxY = Math.min(height - 1, maxY + padY);
+
+        let w = maxX - minX;
+        let h = maxY - minY;
+
+        // Prevent zero size
+        if (w < width * 0.15) {
+          minX = Math.round(width * 0.05);
+          w = Math.round(width * 0.9);
+        }
+        if (h < height * 0.15) {
+          minY = Math.round(height * 0.05);
+          h = Math.round(height * 0.9);
+        }
+
+        // Crop bounding box in percentages
+        const cropRegion: CropRegion = {
+          x: Math.round((minX / width) * 1000) / 10,
+          y: Math.round((minY / height) * 1000) / 10,
+          width: Math.round((w / width) * 1000) / 10,
+          height: Math.round((h / height) * 1000) / 10
+        };
+
+        // Draw bounding box on edge canvas for visual validation/guidance feedback
+        edgeCtx.strokeStyle = '#38bdf8'; // Sky blue border
+        edgeCtx.lineWidth = 1.5;
+        edgeCtx.setLineDash([4, 4]);
+        edgeCtx.strokeRect(minX, minY, w, h);
+
+        edgeCtx.fillStyle = '#38bdf8';
+        edgeCtx.font = 'bold 8px monospace';
+        edgeCtx.fillText('AUTO-CROP FOCUS', minX + 4, minY + 10);
+
+        const markedEdgeDataUrl = edgeCanvas.toDataURL('image/jpeg', 0.85);
+
+        resolve({ cropRegion, edgeDataUrl: markedEdgeDataUrl });
+      } catch (err) {
+        reject(err);
+      }
+    };
+
+    img.onerror = (e) => reject(new Error('Gagal memuat gambar untuk deteksi tepi: ' + e));
+    img.src = sourceUrl;
+  });
+}
+
 export const QCScanView: React.FC<QCScanViewProps> = ({ 
   controls, 
   parameters: propParameters, 
@@ -446,6 +702,14 @@ export const QCScanView: React.FC<QCScanViewProps> = ({
   const [isPreProcessing, setIsPreProcessing] = useState<boolean>(false);
   const [activePresetCrop, setActivePresetCrop] = useState<string>('receipt');
 
+  // Auto preprocessing & edge detection states
+  const [isAutoCropPending, setIsAutoCropPending] = useState<boolean>(false);
+  const [autoEdgeDataUrl, setAutoEdgeDataUrl] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'cropped' | 'edges'>('cropped');
+  const [autoCropSuccess, setAutoCropSuccess] = useState<boolean>(false);
+  const [autoPreprocessingEnabled, setAutoPreprocessingEnabled] = useState<boolean>(true);
+  const lastProcessedUrlRef = useRef<string | null>(null);
+
   // Drag interaction states for ROI bounding box
   const [draggingHandle, setDraggingHandle] = useState<string | null>(null);
   const [dragStartPos, setDragStartPos] = useState<{ x: number; y: number } | null>(null);
@@ -456,6 +720,20 @@ export const QCScanView: React.FC<QCScanViewProps> = ({
   const [cameraFacing, setCameraFacing] = useState<'user' | 'environment'>('environment');
   const [cameraTargetMode, setCameraTargetMode] = useState<'receipt' | 'screen'>('receipt');
   const [showGridOverlay, setShowGridOverlay] = useState<boolean>(true);
+  const [cameraTemplate, setCameraTemplate] = useState<'dimih3980' | 'cst240'>('dimih3980');
+  const [showOverlayGuides, setShowOverlayGuides] = useState<boolean>(true);
+  const [showAnatomyGuide, setShowAnatomyGuide] = useState<boolean>(true);
+
+  // Auto-sync visual template based on selected instrument
+  useEffect(() => {
+    if (selectedInstrumentId === 'inst-dirui-3980') {
+      setCameraTemplate('dimih3980');
+      setCameraTargetMode('receipt');
+    } else if (selectedInstrumentId === 'inst-cst240') {
+      setCameraTemplate('cst240');
+      setCameraTargetMode('screen');
+    }
+  }, [selectedInstrumentId]);
 
   // Scan & processing states
   const [isScanning, setIsScanning] = useState(false);
@@ -509,6 +787,47 @@ export const QCScanView: React.FC<QCScanViewProps> = ({
       setIsPreProcessing(false);
     }
   }, [isCropEnabled]);
+
+  const triggerAutoPreprocessing = useCallback(async (imgUrl: string) => {
+    if (!imgUrl) return;
+    setIsAutoCropPending(true);
+    setAutoCropSuccess(false);
+    try {
+      let instTemplate: 'dimih3980' | 'cst240' | 'auto' = 'auto';
+      if (selectedInstrumentId === 'inst-dirui-3980') {
+        instTemplate = 'dimih3980';
+      } else if (selectedInstrumentId === 'inst-cst240') {
+        instTemplate = 'cst240';
+      } else {
+        const fileLow = file?.name?.toLowerCase() || '';
+        if (fileLow.includes('3980') || fileLow.includes('dimih') || fileLow.includes('hema')) {
+          instTemplate = 'dimih3980';
+        } else if (fileLow.includes('cst') || fileLow.includes('240') || fileLow.includes('chem')) {
+          instTemplate = 'cst240';
+        }
+      }
+
+      const { cropRegion: detectedRegion, edgeDataUrl } = await detectDocumentEdgesAndCreateSobel(imgUrl, instTemplate);
+      setCropRegion(detectedRegion);
+      setAutoEdgeDataUrl(edgeDataUrl);
+      setIsCropEnabled(true);
+      setActivePresetCrop('auto');
+      setAutoCropSuccess(true);
+      setViewMode('cropped'); // Default to showing the cropped results
+    } catch (err) {
+      console.warn('Auto edge detection failed, fallback to standard crop region', err);
+    } finally {
+      setIsAutoCropPending(false);
+    }
+  }, [selectedInstrumentId, file]);
+
+  // Automatically execute edge detection on image load
+  useEffect(() => {
+    if (sourceDataUrl && autoPreprocessingEnabled && sourceDataUrl !== lastProcessedUrlRef.current) {
+      lastProcessedUrlRef.current = sourceDataUrl;
+      triggerAutoPreprocessing(sourceDataUrl);
+    }
+  }, [sourceDataUrl, autoPreprocessingEnabled, triggerAutoPreprocessing]);
 
   useEffect(() => {
     if (sourceDataUrl) {
@@ -852,7 +1171,7 @@ export const QCScanView: React.FC<QCScanViewProps> = ({
       setScanStep(`2. AI Vision OCR membaca struk ${instHintName ? `[Alat: ${instHintName}]` : ''}...`);
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 25000);
+      const timeoutId = setTimeout(() => controller.abort(), 35000);
 
       const response = await fetch('/api/qc/scan', {
         method: 'POST',
@@ -861,7 +1180,8 @@ export const QCScanView: React.FC<QCScanViewProps> = ({
         body: JSON.stringify({ 
           imageBase64: base64ToSend, 
           mimeType: 'image/jpeg',
-          instrumentHint: instHintName
+          instrumentHint: instHintName,
+          fileName: file?.name
         })
       });
 
@@ -905,7 +1225,12 @@ export const QCScanView: React.FC<QCScanViewProps> = ({
       onScanComplete(batchValidation.validatedResults, finalCroppedUrl || sourceDataUrl, meta);
     } catch (error: any) {
       console.error('OCR Error:', error);
-      setErrorMsg('Gagal membaca gambar via AI Vision: ' + (error.message || 'Koneksi terputus') + '. Mengalihkan ke form verifikasi.');
+      const isAbort = error.name === 'AbortError' || error.message?.includes('aborted');
+      const friendlyMsg = isAbort 
+        ? 'Waktu koneksi pemindaian melebihi batas (Timeout). Mengalihkan ke form verifikasi.'
+        : `Gagal membaca gambar via AI Vision: ${error.message || 'Koneksi terputus'}. Mengalihkan ke form verifikasi.`;
+      
+      setErrorMsg(friendlyMsg);
       handleManualFallback();
     } finally {
       setIsScanning(false);
@@ -952,7 +1277,8 @@ export const QCScanView: React.FC<QCScanViewProps> = ({
             body: JSON.stringify({
               imageBase64: base64,
               mimeType: 'image/jpeg',
-              instrumentHint: instHintName
+              instrumentHint: instHintName,
+              fileName: item.name
             })
           });
           clearTimeout(timeoutId);
@@ -1184,34 +1510,57 @@ export const QCScanView: React.FC<QCScanViewProps> = ({
               </div>
             </div>
 
-            {/* Mode Switches: Struk Kertas vs Layar Monitor */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="bg-slate-900 p-1 rounded-xl border border-slate-800 flex items-center gap-1 text-xs">
+            {/* Mode Switches: Struk Kertas vs Layar Monitor & Templat Fokus Alat */}
+            <div className="flex items-center gap-2.5 flex-wrap">
+              {/* Templat Overlay Selector */}
+              <div className="flex items-center gap-1.5 bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs">
+                <span className="text-[10px] font-bold text-slate-400 px-1.5 uppercase">Fokus Alat:</span>
                 <button
                   type="button"
-                  onClick={() => setCameraTargetMode('receipt')}
-                  className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-all ${
-                    cameraTargetMode === 'receipt'
-                      ? 'bg-emerald-600 text-white shadow-sm'
+                  onClick={() => {
+                    setCameraTemplate('dimih3980');
+                    setCameraTargetMode('receipt');
+                  }}
+                  className={`px-2.5 py-1.5 rounded-lg font-bold flex items-center gap-1 transition-all ${
+                    cameraTemplate === 'dimih3980'
+                      ? 'bg-purple-600 text-white shadow-sm'
                       : 'text-slate-400 hover:text-white'
                   }`}
                 >
-                  <FileText className="h-3.5 w-3.5" />
-                  <span>Struk Cetak (Vertikal)</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse"></span>
+                  <span>DIMIH 3980</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => setCameraTargetMode('screen')}
-                  className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-all ${
-                    cameraTargetMode === 'screen'
-                      ? 'bg-emerald-600 text-white shadow-sm'
+                  onClick={() => {
+                    setCameraTemplate('cst240');
+                    setCameraTargetMode('screen');
+                  }}
+                  className={`px-2.5 py-1.5 rounded-lg font-bold flex items-center gap-1 transition-all ${
+                    cameraTemplate === 'cst240'
+                      ? 'bg-blue-600 text-white shadow-sm'
                       : 'text-slate-400 hover:text-white'
                   }`}
                 >
-                  <Monitor className="h-3.5 w-3.5" />
-                  <span>Monitor Alat (Horizontal)</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></span>
+                  <span>CST-240</span>
                 </button>
               </div>
+
+              {/* Toggle Guides Button */}
+              <button
+                type="button"
+                onClick={() => setShowOverlayGuides(!showOverlayGuides)}
+                title="Aktifkan/Matikan Overlay Kotak Panduan Fokus"
+                className={`p-2 rounded-xl border text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+                  showOverlayGuides 
+                    ? 'bg-emerald-600/30 text-emerald-300 border-emerald-500/40' 
+                    : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'
+                }`}
+              >
+                <Crosshair className="h-4 w-4" />
+                <span className="text-[11px] hidden md:inline">Overlay</span>
+              </button>
 
               <button
                 type="button"
@@ -1256,6 +1605,72 @@ export const QCScanView: React.FC<QCScanViewProps> = ({
               >
                 {/* Glowing Outer Bounding Box Border */}
                 <div className="absolute inset-0 border-2 border-emerald-400/80 rounded-2xl shadow-[0_0_25px_rgba(16,185,129,0.35)] backdrop-brightness-110 pointer-events-none" />
+
+                {/* Specific Device Overlay Focus Guides */}
+                {showOverlayGuides && cameraTemplate === 'dimih3980' && (
+                  <div className="absolute inset-0 pointer-events-none z-20">
+                    {/* Header Zone */}
+                    <div className="absolute top-[4%] inset-x-[4%] h-[18%] border border-dashed border-amber-400 bg-amber-500/5 rounded-lg flex flex-col justify-between p-1.5 animate-pulse shadow-[inset_0_0_8px_rgba(251,191,36,0.2)]">
+                      <div className="flex items-center gap-1">
+                        <span className="text-[8px] font-bold bg-amber-500 text-slate-950 px-1 py-0.2 rounded font-mono">1. HEADER & MODEL</span>
+                      </div>
+                      <span className="text-[8px] text-amber-200/90 font-medium leading-none">DIRUI DIMIH-3980 Hematology</span>
+                    </div>
+
+                    {/* Parameter Zone */}
+                    <div className="absolute top-[24%] inset-x-[4%] h-[50%] border-2 border-dashed border-cyan-400 bg-cyan-500/5 rounded-lg flex flex-col justify-between p-2 shadow-[inset_0_0_12px_rgba(34,211,238,0.25)]">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[8px] font-bold bg-cyan-500 text-slate-950 px-1 py-0.2 rounded font-mono">2. PARAMETER HEMATOLOGI (UTAMA)</span>
+                        <span className="text-[7px] text-cyan-300 font-bold">FOKUS UTAMA</span>
+                      </div>
+                      <div className="text-[8px] text-cyan-200/90 leading-tight space-y-0.5">
+                        <p>✓ Sejajarkan WBC, RBC, HGB, PLT</p>
+                        <p>✓ Pastikan angka desimal terlihat tajam</p>
+                      </div>
+                    </div>
+
+                    {/* Lot & QC Date Zone */}
+                    <div className="absolute bottom-[4%] inset-x-[4%] h-[20%] border border-dashed border-fuchsia-400 bg-fuchsia-500/5 rounded-lg flex flex-col justify-between p-1.5 shadow-[inset_0_0_8px_rgba(232,121,249,0.2)]">
+                      <div className="flex items-center gap-1">
+                        <span className="text-[8px] font-bold bg-fuchsia-500 text-slate-950 px-1 py-0.2 rounded font-mono">3. TANGGAL QC & LOT</span>
+                      </div>
+                      <span className="text-[8px] text-fuchsia-200/90 font-medium leading-none">LOT-EC8C... & Tanggal QC</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Specific Device Overlay Focus Guides (CS-T240) */}
+                {showOverlayGuides && cameraTemplate === 'cst240' && (
+                  <div className="absolute inset-0 pointer-events-none z-20">
+                    {/* Header Zone */}
+                    <div className="absolute top-[4%] left-[4%] w-[45%] h-[26%] border border-dashed border-amber-400 bg-amber-500/5 rounded-lg flex flex-col justify-between p-1.5 shadow-[inset_0_0_8px_rgba(251,191,36,0.2)]">
+                      <div className="flex items-center gap-1">
+                        <span className="text-[8px] font-bold bg-amber-500 text-slate-950 px-1 py-0.2 rounded font-mono">1. HEADER & LOT</span>
+                      </div>
+                      <span className="text-[8px] text-amber-200/90 font-medium leading-tight">Brand DIRUI & Lot LOT-CST1-...</span>
+                    </div>
+
+                    {/* Stats Zone (Mean & SD) */}
+                    <div className="absolute top-[4%] right-[4%] w-[45%] h-[26%] border border-dashed border-fuchsia-400 bg-fuchsia-500/5 rounded-lg flex flex-col justify-between p-1.5 shadow-[inset_0_0_8px_rgba(232,121,249,0.2)]">
+                      <div className="flex items-center gap-1">
+                        <span className="text-[8px] font-bold bg-fuchsia-500 text-slate-950 px-1 py-0.2 rounded font-mono">2. TARGET MEAN / SD</span>
+                      </div>
+                      <span className="text-[8px] text-fuchsia-200/90 font-medium leading-tight">Penting untuk Westgard limit</span>
+                    </div>
+
+                    {/* Parameters Table Zone */}
+                    <div className="absolute bottom-[4%] inset-x-[4%] h-[62%] border-2 border-dashed border-cyan-400 bg-cyan-500/5 rounded-lg flex flex-col justify-between p-2 shadow-[inset_0_0_12px_rgba(34,211,238,0.25)]">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[8px] font-bold bg-cyan-500 text-slate-950 px-1 py-0.2 rounded font-mono">3. TABEL PARAMETER & HASIL (RESULT)</span>
+                        <span className="text-[7px] text-cyan-300 font-bold">FOKUS UTAMA</span>
+                      </div>
+                      <div className="text-[8px] text-cyan-200/90 leading-tight space-y-0.5">
+                        <p>✓ Fokuskan pada nama parameter (ALB, ALT, AST, GLU-HK)</p>
+                        <p>✓ Sejajarkan Nilai Hasil (Result) & Standard Deviasi</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Shaded Vignette Backdrop around Box */}
                 <div className="absolute -inset-96 border-[400px] border-black/55 pointer-events-none rounded-2xl" />
@@ -1678,11 +2093,31 @@ export const QCScanView: React.FC<QCScanViewProps> = ({
 
             {/* Cropping Presets & Controls Bar */}
             <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-bold text-slate-600 flex items-center gap-1">
                   <Crop className="h-3.5 w-3.5 text-blue-600" /> Presets Fokus Area:
                 </span>
                 <div className="flex items-center gap-1.5 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (sourceDataUrl) triggerAutoPreprocessing(sourceDataUrl);
+                    }}
+                    disabled={isAutoCropPending}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition-all flex items-center gap-1 ${
+                      activePresetCrop === 'auto' && isCropEnabled
+                        ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-sm'
+                        : 'bg-white text-emerald-700 border border-emerald-200 hover:bg-emerald-50'
+                    }`}
+                    title="Deteksi tepi dokumen dan pangkas otomatis"
+                  >
+                    {isAutoCropPending ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-600" />
+                    ) : (
+                      <Sparkles className="h-3.5 w-3.5 text-amber-500 animate-pulse shrink-0" />
+                    )}
+                    <span>✨ Deteksi Tepi Otomatis</span>
+                  </button>
                   <button
                     type="button"
                     onClick={() => applyCropPreset('receipt')}
@@ -1730,7 +2165,18 @@ export const QCScanView: React.FC<QCScanViewProps> = ({
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-4 flex-wrap">
+                <label className="flex items-center gap-1.5 cursor-pointer font-semibold text-slate-700 select-none">
+                  <input
+                    type="checkbox"
+                    checked={autoPreprocessingEnabled}
+                    onChange={(e) => setAutoPreprocessingEnabled(e.target.checked)}
+                    className="rounded text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5"
+                  />
+                  <Layers className="h-3.5 w-3.5 text-emerald-500" />
+                  <span>Auto Pre-proses Tepi Dokumen</span>
+                </label>
+
                 <label className="flex items-center gap-1.5 cursor-pointer font-semibold text-slate-700 select-none">
                   <input
                     type="checkbox"
@@ -1742,6 +2188,59 @@ export const QCScanView: React.FC<QCScanViewProps> = ({
                   <span>Pertajam Kontras Struk</span>
                 </label>
               </div>
+            </div>
+
+            {/* Collapsible Visual Anatomy Guide Panel */}
+            <div className="bg-gradient-to-br from-slate-50 to-blue-50/50 border border-slate-200 rounded-xl p-4.5 space-y-3 shadow-sm">
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setShowAnatomyGuide(!showAnatomyGuide)}
+                  className="flex items-center gap-2 text-slate-800 font-bold text-xs uppercase tracking-wider hover:text-blue-600 transition-colors"
+                >
+                  <Info className="h-4.5 w-4.5 text-blue-600" />
+                  <span>💡 Panduan Anatomi Kertas Hasil QC (DIMIH 3980 vs CST-240)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAnatomyGuide(!showAnatomyGuide)}
+                  className="text-xs text-blue-600 hover:underline font-bold"
+                >
+                  {showAnatomyGuide ? 'Sembunyikan Panduan' : 'Tampilkan Panduan'}
+                </button>
+              </div>
+
+              {showAnatomyGuide && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 text-xs border-t border-slate-200">
+                  {/* DIMIH 3980 Card */}
+                  <div className="bg-purple-50/60 border border-purple-100 rounded-xl p-4 space-y-2">
+                    <div className="flex items-center gap-2 pb-1.5 border-b border-purple-100">
+                      <div className="w-2.5 h-2.5 rounded-full bg-purple-500 animate-pulse" />
+                      <h4 className="font-bold text-purple-900">1. Struk Hasil Hematologi (DIMIH 3980)</h4>
+                    </div>
+                    <ul className="space-y-1.5 text-purple-950 font-medium list-disc list-inside">
+                      <li><strong>Bentuk Fisik:</strong> Kertas struk kasir termal putih yang sempit dan panjang secara vertikal.</li>
+                      <li><strong>Area Kritis AI:</strong> Baris parameter hematologi (<code className="bg-purple-100 px-1 py-0.2 rounded font-mono text-[10px]">WBC</code>, <code className="bg-purple-100 px-1 py-0.2 rounded font-mono text-[10px]">RBC</code>, <code className="bg-purple-100 px-1 py-0.2 rounded font-mono text-[10px]">HGB</code>, <code className="bg-purple-100 px-1 py-0.2 rounded font-mono text-[10px]">PLT</code>).</li>
+                      <li><strong>Tanggal & Lot:</strong> Biasanya berada di bagian paling atas atau paling bawah cetakan struk.</li>
+                      <li className="text-purple-700 font-bold">⚠️ Tips Kamera: Sejajarkan struk lurus vertikal, hindari lipatan kertas atau bayangan tangan.</li>
+                    </ul>
+                  </div>
+
+                  {/* CS-T240 Card */}
+                  <div className="bg-blue-50/60 border border-blue-100 rounded-xl p-4 space-y-2">
+                    <div className="flex items-center gap-2 pb-1.5 border-b border-blue-100">
+                      <div className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse" />
+                      <h4 className="font-bold text-blue-900">2. Laporan / Monitor Kimia (CS-T240)</h4>
+                    </div>
+                    <ul className="space-y-1.5 text-blue-950 font-medium list-disc list-inside">
+                      <li><strong>Bentuk Fisik:</strong> Laporan lembar lebar (A4) atau tampilan layar monitor berbentuk tabel grid horizontal.</li>
+                      <li><strong>Area Kritis AI:</strong> Baris kimia klinik (<code className="bg-blue-100 px-1 py-0.2 rounded font-mono text-[10px]">ALB</code>, <code className="bg-blue-100 px-1 py-0.2 rounded font-mono text-[10px]">ALT</code>, <code className="bg-blue-100 px-1 py-0.2 rounded font-mono text-[10px]">AST</code>, <code className="bg-blue-100 px-1 py-0.2 rounded font-mono text-[10px]">GLU-HK</code>, <code className="bg-blue-100 px-1 py-0.2 rounded font-mono text-[10px]">TG</code>).</li>
+                      <li><strong>Parameter Statistik:</strong> Kolom Nilai Hasil (Result), target Mean, dan SD teratur rapi di bagian kanan.</li>
+                      <li className="text-blue-700 font-bold">⚠️ Tips Kamera: Ambil foto tegak lurus (horizontal), kurangi pantulan cahaya monitor/lampu.</li>
+                    </ul>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Studio Workspace: Interactive Crop Canvas + Cropped Result Preview */}
@@ -1854,23 +2353,62 @@ export const QCScanView: React.FC<QCScanViewProps> = ({
               {/* Readout Area Live Preview & Schema Validation Card (5 cols) */}
               <div className="lg:col-span-5 space-y-4 flex flex-col justify-between">
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2">
-                  <div className="flex items-center justify-between text-xs font-bold text-slate-700">
-                    <span className="flex items-center gap-1.5">
-                      <Eye className="h-3.5 w-3.5 text-emerald-600" /> Hasil Area Terpangkas (Siap Kirim ke OCR):
-                    </span>
-                    {isPreProcessing ? (
+                  <div className="flex items-center justify-between text-xs font-bold text-slate-700 flex-wrap gap-2">
+                    <div className="flex bg-slate-200/80 p-0.5 rounded-lg border border-slate-300">
+                      <button
+                        type="button"
+                        onClick={() => setViewMode('cropped')}
+                        className={`px-2.5 py-1 rounded-md text-[10px] sm:text-[11px] font-bold transition-all flex items-center gap-1 ${
+                          viewMode === 'cropped'
+                            ? 'bg-white text-slate-900 shadow-sm'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        👁️ Hasil Potong
+                      </button>
+                      {autoEdgeDataUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setViewMode('edges')}
+                          className={`px-2.5 py-1 rounded-md text-[10px] sm:text-[11px] font-bold transition-all flex items-center gap-1 ${
+                            viewMode === 'edges'
+                              ? 'bg-slate-900 text-emerald-400 shadow-sm'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          ⚡ Deteksi Tepi (Sobel)
+                        </button>
+                      )}
+                    </div>
+                    {isPreProcessing || isAutoCropPending ? (
                       <span className="text-[10px] text-blue-600 flex items-center gap-1">
                         <Loader2 className="h-2.5 w-2.5 animate-spin" /> Memproses...
                       </span>
+                    ) : autoCropSuccess ? (
+                      <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        Auto-Crop Aktif
+                      </span>
                     ) : (
-                      <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
+                      <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
                         Siap Dipindai
                       </span>
                     )}
                   </div>
 
-                  <div className="bg-slate-900 rounded-lg p-2 min-h-[160px] max-h-[190px] flex items-center justify-center overflow-hidden">
-                    {croppedDataUrl ? (
+                  <div className="bg-slate-900 rounded-lg p-2 min-h-[160px] max-h-[190px] flex items-center justify-center overflow-hidden border border-slate-800 shadow-[inset_0_2px_8px_rgba(0,0,0,0.5)]">
+                    {viewMode === 'edges' && autoEdgeDataUrl ? (
+                      <div className="relative w-full h-full flex items-center justify-center">
+                        <img 
+                          src={autoEdgeDataUrl} 
+                          alt="Deteksi Tepi Sobel" 
+                          className="max-h-[170px] w-auto object-contain rounded border border-emerald-500/20 shadow-lg shadow-slate-950"
+                        />
+                        <span className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-slate-950/95 border border-emerald-500/30 text-[9px] font-mono font-bold text-emerald-400">
+                          SOBEL FILTER
+                        </span>
+                      </div>
+                    ) : croppedDataUrl ? (
                       <img 
                         src={croppedDataUrl} 
                         alt="Hasil Crop" 

@@ -167,7 +167,8 @@ export function matchParameter(
     }
   }
 
-  return primaryPool[0] || parameters[0] || null;
+  // Return null if no matching parameter exists in master data (abaikan parameter yang tidak ada di master data)
+  return null;
 }
 
 export function matchInstrument(
@@ -188,10 +189,8 @@ export function matchInstrument(
     searchStr.includes('hematologi') ||
     /\b(wbc|rbc|hgb|hct|plt|mcv|mch|mchc|lym|gran|mid|rdw|mpv)\b/i.test(searchStr)
   ) {
-    if (!searchStr.includes('cst') && !searchStr.includes('cs-t240') && !searchStr.includes('kimia') && !searchStr.includes('chemistry')) {
-      const dimih = instruments.find(i => i.id === 'inst-dirui-3980' || i.name.toLowerCase().includes('3980') || i.model.toLowerCase().includes('3980') || i.code.toLowerCase().includes('3980'));
-      if (dimih) return dimih;
-    }
+    const dimih = instruments.find(i => i.id === 'inst-dirui-3980' || i.name.toLowerCase().includes('3980') || i.model.toLowerCase().includes('3980') || i.code.toLowerCase().includes('3980'));
+    if (dimih) return dimih;
   }
 
   // 2. High Priority: CST-240 / CS-T240 / Chemistry Analyzer check
@@ -366,7 +365,7 @@ export function buildVerifiedItemsFromAI(
 
   return extractedResults
     .filter(item => {
-      const pName = (item.parameter?.value || item.parameter?.original_text || '').toLowerCase();
+      const pName = (item.parameter?.value || item.parameter?.original_text || (item as any)['Parameter'] || (item as any)['HGB'] || '').toLowerCase();
       // If document is CST-240 chemistry analyzer, exclude hematology/dimih parameters that might have been hallucinated
       if (isCST240Doc && (pName.includes('dimih') || pName.includes('3980') || pName.includes('eightcheck'))) {
         return false;
@@ -377,14 +376,22 @@ export function buildVerifiedItemsFromAI(
       }
       return true;
     })
-    .map((item, index) => {
-      const paramName = item.parameter?.value || item.parameter?.original_text || '';
+    .map((item: any, index: number): VerifiedQCItem | null => {
+      const paramName = item['Parameter'] || item['HGB'] || item.parameter?.value || item.parameter?.original_text || '';
+      const paramCode = item['Parameter'] || item['HGB'] || item.parameter?.original_text || '';
+
       const matchedInst = (filterInstrumentId ? instruments.find(i => i.id === filterInstrumentId) : null) 
         || matchInstrument(item.analyzer || docAnalyzer, instruments) 
         || defaultInst;
 
-      const matchedParam = matchParameter(paramName, item.parameter?.original_text, parameters, matchedInst?.id);
-      const matchedControl = masterControls.find(c => c.id === matchedParam?.controlMaterialId);
+      const matchedParam = matchParameter(paramName, paramCode, parameters, matchedInst?.id);
+      
+      // Abaikan parameter yang tidak ada di master data yang diinput
+      if (!matchedParam) {
+        return null;
+      }
+
+      const matchedControl = masterControls.find(c => c.id === matchedParam.controlMaterialId);
 
       const itemLevel = matchControlLevel(
         item.level?.value || documentMeta?.control_level || matchedControl?.level
@@ -395,11 +402,21 @@ export function buildVerifiedItemsFromAI(
                       matchedControl?.lotNumber || 
                       (matchedControl?.lotNumber || masterControls[0]?.lotNumber || 'LOT-CST1-2026A');
       
-      // 1. Result value: The actual measured QC concentration read from photo/struk
+      const itemDate = item['tanggal QC'] || item['tanggal'] || item['date'] || documentMeta?.date || today;
+
+      // 1. Result value: Support 'hasil/ result', 'hasil', 'result', 'value'
       let rawResultValue: number = 0;
-      if (typeof item.result?.value === 'number' && !isNaN(item.result.value) && item.result.value > 0) {
+      const jsonVal = item['hasil/ result'] ?? item['hasil'] ?? item['result'] ?? item['value'];
+      if (typeof jsonVal === 'number' && !isNaN(jsonVal) && jsonVal > 0) {
+        rawResultValue = jsonVal;
+      } else if (typeof jsonVal === 'string') {
+        const parsed = parseFloat(jsonVal.replace(/,/g, '.').replace(/[^0-9.-]/g, ''));
+        if (!isNaN(parsed) && parsed > 0) rawResultValue = parsed;
+      }
+
+      if (rawResultValue === 0 && typeof item.result?.value === 'number' && !isNaN(item.result.value) && item.result.value > 0) {
         rawResultValue = item.result.value;
-      } else if (item.result?.original_text) {
+      } else if (rawResultValue === 0 && item.result?.original_text) {
         const parsed = parseFloat(String(item.result.original_text).replace(/,/g, '.').replace(/[^0-9.-]/g, ''));
         if (!isNaN(parsed) && parsed > 0) {
           rawResultValue = parsed;
@@ -428,7 +445,7 @@ export function buildVerifiedItemsFromAI(
 
       // Fallback only if no number could be found
       if (rawResultValue === 0) {
-        rawResultValue = matchedParam?.targetMean || 100;
+        rawResultValue = matchedParam.targetMean || 100;
       }
 
       // 2. Target Mean: If explicitly printed in separate column distinct from result, use it; otherwise, use Master Data
@@ -443,7 +460,7 @@ export function buildVerifiedItemsFromAI(
       ) {
         rawTargetMean = item.mean.value;
       } else {
-        rawTargetMean = matchedParam?.targetMean || 100;
+        rawTargetMean = matchedParam.targetMean || 100;
       }
 
       // 3. Target SD: If explicitly printed on receipt and > 0, use it; otherwise, use Master Data
@@ -451,11 +468,11 @@ export function buildVerifiedItemsFromAI(
       if (typeof item.sd?.value === 'number' && !isNaN(item.sd.value) && item.sd.value > 0) {
         rawTargetSD = item.sd.value;
       } else {
-        rawTargetSD = matchedParam?.targetSD || 3.5;
+        rawTargetSD = matchedParam.targetSD || 3.5;
       }
 
       // Intelligent Auto-Detection & Fix for Inverted Result vs Target SD:
-      const code = (matchedParam?.code || paramName).toUpperCase();
+      const code = (matchedParam.code || paramName).toUpperCase();
       if (
         (code.includes('GLU') || code.includes('CHOL') || code.includes('TRIG')) &&
         rawResultValue <= 15 && rawTargetSD >= 40
@@ -479,21 +496,17 @@ export function buildVerifiedItemsFromAI(
         rawTargetSD = temp;
       }
 
-      const unit = item.unit?.value || matchedParam?.unit || 'mg/dL';
-
+      const unit = item.unit?.value || matchedParam.unit || 'mg/dL';
       const isDimih = matchedInst?.id === 'inst-dirui-3980' || matchedInst?.name.toLowerCase().includes('3980') || matchedInst?.name.toLowerCase().includes('dimih');
-      const defaultParamForInst = isDimih 
-        ? (parameters.find(p => p.instrumentId === 'inst-dirui-3980') || parameters.find(p => p.id.includes('dimih') || p.code === 'HGB'))
-        : (parameters.find(p => p.instrumentId === 'inst-cst240') || parameters.find(p => p.id.includes('cst') || p.code === 'GLU'));
 
-      const finalParam = matchedParam || defaultParamForInst || parameters[0];
+      const finalParam = matchedParam;
 
       // Validate with clinical schema
       const validation = validateQCItemSchema(
         rawResultValue, 
         rawTargetMean, 
         rawTargetSD, 
-        finalParam?.code || paramName, 
+        finalParam.code || paramName, 
         finalParam
       );
 
@@ -506,7 +519,7 @@ export function buildVerifiedItemsFromAI(
       const sdPosition = formatSDPosition(zScore);
 
       // Evaluate Westgard rules
-      const history = existingResults.filter(r => r.parameterId === finalParam?.id);
+      const history = existingResults.filter(r => r.parameterId === finalParam.id);
       const tempId = `QC-SCAN-TEMP-${index}`;
       const { status, violations } = evaluateWestgardRules(
         { id: tempId, value: finalResultValue, mean: finalTargetMean, sd: finalTargetSD, zScore },
@@ -526,9 +539,9 @@ export function buildVerifiedItemsFromAI(
         
         instrumentId: matchedInst?.id || (isDimih ? 'inst-dirui-3980' : 'inst-cst240'),
         instrumentName: matchedInst?.name || (isDimih ? 'Dirui Dimih 3980 Automated Analyzer' : 'Chemistry Analyzer CST-240 (Dirui CS-T240)'),
-        parameterId: finalParam?.id || (isDimih ? 'param-dimih-hgb' : 'param-cst-glu'),
-        parameterName: finalParam?.name || (isDimih ? 'Hemoglobin / HGB (Dirui Dimih 3980)' : 'Glucose (Glukosa Darah CST-240)'),
-        parameterCode: finalParam?.code || (isDimih ? 'HGB' : 'GLU'),
+        parameterId: finalParam.id,
+        parameterName: finalParam.name,
+        parameterCode: finalParam.code,
         controlLevel: itemLevel,
         lotNumber: itemLot,
         
@@ -547,8 +560,9 @@ export function buildVerifiedItemsFromAI(
         schemaExpectedFormat: validation.schema ? `${validation.schema.expectedType.toUpperCase()} (${validation.schema.minPhysiological} - ${validation.schema.maxPhysiological} ${validation.schema.unit})` : undefined,
         
         isSelected: true,
-        date: today,
+        date: itemDate,
         time: time
       };
-    });
+    })
+    .filter((item): item is VerifiedQCItem => item !== null);
 }
