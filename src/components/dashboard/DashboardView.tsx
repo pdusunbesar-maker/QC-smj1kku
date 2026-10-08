@@ -40,6 +40,7 @@ import { MonthlyTrendAnalysisPanel } from './panels/MonthlyTrendAnalysisPanel';
 import { DailyQCCoveragePanel } from './panels/DailyQCCoveragePanel';
 import { DynamicFishboneRCAPanel } from './panels/DynamicFishboneRCAPanel';
 import { ProactiveRecommendationsPanel } from './panels/ProactiveRecommendationsPanel';
+import { MultiInstrumentComparisonPanel } from './panels/MultiInstrumentComparisonPanel';
 import { RunningAverageAlertService } from '../../services/runningAverageAlertService';
 
 interface DashboardViewProps {
@@ -317,6 +318,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         payload: { resultId: p.id },
       });
     }
+
+    // 4. Expiring Control Materials (< 30 days)
+    const expiringThreshold = new Date();
+    expiringThreshold.setDate(expiringThreshold.getDate() + 30);
+    const expiringControls = StorageService.getControlMaterials().filter(m => 
+      m.status === 'active' && new Date(m.expirationDate) <= expiringThreshold
+    );
+    expiringControls.forEach(m => {
+      items.push({
+        id: `exp-${m.id}`,
+        type: 'reject', // Using reject style for visibility
+        title: `Reagen Segera Expired: ${m.name}`,
+        subtitle: `Lot: ${m.lotNumber} · Exp: ${m.expirationDate}`,
+        tag: 'Expiring Soon',
+        actionText: 'Reorder',
+        tab: 'master-data',
+        payload: { materialId: m.id },
+      });
+    });
 
     return items;
   }, [qcResults, capas, pendingReviews, todayMs]);
@@ -852,6 +872,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         nonConformities={nonConformities}
         capas={capas}
         onNavigateToTab={onNavigateToTab}
+      />
+
+      {/* ========================================================================= */}
+      {/* 3.6.5. MULTI-INSTRUMENT COMPARISON PANEL                                  */}
+      {/* ========================================================================= */}
+      <MultiInstrumentComparisonPanel
+        qcResults={qcResults}
+        parameters={parameters}
+        instruments={instruments}
       />
 
       {/* ========================================================================= */}

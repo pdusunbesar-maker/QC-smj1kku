@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import { 
   FileSpreadsheet, 
   Printer, 
@@ -1278,6 +1279,15 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
               <Edit3 className="h-3 w-3" />
               <span>Ubah</span>
             </button>
+
+            {/* QR Verification */}
+            <div className="mt-8 flex justify-center items-center gap-4 border-t pt-4">
+              <div className="flex flex-col items-center">
+                <QRCodeSVG value="https://ais-pre-tv2ntfrrt4gvnww665xiey-359317421290.asia-southeast1.run.app/verify" size={60} />
+                <p className="text-[9px] text-slate-500 mt-1 font-mono">Scan untuk Verifikasi</p>
+              </div>
+              <p className="text-[10px] text-slate-400 text-center italic">Data laporan ini dapat diverifikasi keasliannya melalui sistem L-QCMS.</p>
+            </div>
           </div>
         </div>
       </div>

@@ -20,6 +20,7 @@ import {
   Download,
   FileSpreadsheet
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { QCResult } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { StorageService } from '../../services/storage';
@@ -276,6 +277,60 @@ export const QCReviewView: React.FC<QCReviewViewProps> = ({
     }, 5000);
   };
 
+  // Export Filtered QC Results to Excel
+  const handleExportExcel = () => {
+    if (filteredResults.length === 0) {
+      alert('Tidak ada data QC yang dapat diekspor dengan filter saat ini.');
+      return;
+    }
+
+    const todayDate = new Date().toISOString().split('T')[0];
+    const filename = `Data_Hasil_QC_Review_${filterStatus.toUpperCase()}_${todayDate}.xlsx`;
+
+    const excelData = filteredResults.map((r, idx) => {
+      const violationsStr = (r.violations || []).map(v => `${v.rule} (${v.description})`).join('; ') || '-';
+      const sourceStr = r.source === 'AI_VISION' ? 'AI Vision Scan' : 'Manual Entry';
+
+      return {
+        'No': idx + 1,
+        'ID QC': r.id,
+        'Tanggal': r.date,
+        'Waktu': r.time,
+        'Nama Instrumen': r.instrumentName,
+        'ID Instrumen': r.instrumentId,
+        'Kode Parameter': r.parameterCode,
+        'Nama Parameter': r.parameterName,
+        'Level Kontrol': r.controlLevel,
+        'Nomor Lot': r.lotNumber,
+        'Nilai Hasil QC': r.value,
+        'Satuan': r.unit,
+        'Target Mean': r.mean,
+        'Target SD': r.sd,
+        'Z-Score (SDI)': r.zScore,
+        'Posisi SD': r.sdPosition,
+        'Status QC': r.status.toUpperCase(),
+        'Pelanggaran Westgard': violationsStr,
+        'Status Review': r.reviewStatus.toUpperCase(),
+        'Direview Oleh': r.reviewedByName || '-',
+        'Waktu Review': r.reviewedAt || '-',
+        'Catatan Review': r.reviewComment || '-',
+        'Operator ATLM': r.operatorName || '-',
+        'Metode Input': sourceStr,
+        'Keterangan': r.notes || '-'
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Data QC");
+    XLSX.writeFile(workbook, filename);
+
+    setExportFeedback(`File Excel berhasil diunduh (${filteredResults.length} data QC terarsip).`);
+    setTimeout(() => {
+      setExportFeedback(null);
+    }, 5000);
+  };
+
   return (
     <div className="space-y-6">
       {/* Export Success Notification Banner */}
@@ -317,6 +372,18 @@ export const QCReviewView: React.FC<QCReviewViewProps> = ({
           >
             <Download className="h-4 w-4 text-emerald-700" />
             <span>Ekspor CSV ({filteredResults.length})</span>
+          </button>
+
+          {/* Export to Excel Button */}
+          <button
+            type="button"
+            onClick={handleExportExcel}
+            disabled={filteredResults.length === 0}
+            className="flex items-center gap-1.5 min-h-[42px] px-4 py-2 text-xs sm:text-sm font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed border border-emerald-300 rounded-xl transition-all shadow-2xs active:scale-[0.98] cursor-pointer"
+            title="Unduh data tabel QC saat ini ke file Excel terstruktur untuk pengarsipan eksternal"
+          >
+            <FileSpreadsheet className="h-4 w-4 text-emerald-700" />
+            <span>Ekspor Excel ({filteredResults.length})</span>
           </button>
 
           <button
@@ -376,6 +443,17 @@ export const QCReviewView: React.FC<QCReviewViewProps> = ({
           >
             <Download className="h-3.5 w-3.5 text-emerald-700" />
             <span>CSV</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleExportExcel}
+            disabled={filteredResults.length === 0}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-40 disabled:cursor-not-allowed border border-emerald-300 rounded-lg transition-colors cursor-pointer shrink-0 shadow-2xs"
+            title="Unduh data tabel yang difilter ke format Excel"
+          >
+            <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-700" />
+            <span>Excel</span>
           </button>
         </div>
       </div>

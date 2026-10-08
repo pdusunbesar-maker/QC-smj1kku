@@ -26,7 +26,7 @@ import {
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas-pro';
 import { QCResult, Parameter, QCStatistics, LaboratoryInfo, QCStatus, WestgardViolation } from '../../types';
-import { calculateQCStatistics } from '../../utils/qcCalculations';
+import { calculateQCStatistics, calculateTrendline, detect6ConsecutiveTrends, calculateProcessCapability, calculateSigmaMetric } from '../../utils/qcCalculations';
 import { StorageService } from '../../services/storage';
 import { KopEditorModal } from '../common/KopEditorModal';
 
@@ -249,13 +249,46 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
       ? plottedPoints.map(p => p.rawResult)
       : filteredRawResults;
 
-    return calculateQCStatistics(
+    const calculatedStats = calculateQCStatistics(
       resultsForStats,
       parameter.targetMean,
       parameter.targetSD,
       parameter.targetCV
     );
+
+    const { cp, cpk } = calculateProcessCapability(
+      calculatedStats.mean,
+      calculatedStats.sd,
+      parameter.minAcceptable,
+      parameter.maxAcceptable
+    );
+
+    const tea = Math.abs(parameter.maxAcceptable - parameter.minAcceptable) / 2;
+    const sigma = calculateSigmaMetric(
+      calculatedStats.mean,
+      calculatedStats.sd,
+      parameter.targetMean,
+      tea
+    );
+
+    return {
+      ...calculatedStats,
+      cp,
+      cpk,
+      sigma
+    };
   }, [filteredRawResults, plottedPoints, plotMode, parameter]);
+
+  // Compute Trendline & Trends
+  const trendline = useMemo(() => {
+    const points = plottedPoints.map((p, i) => ({ x: i, y: p.value }));
+    return calculateTrendline(points);
+  }, [plottedPoints]);
+
+  const trends = useMemo(() => {
+    const values = plottedPoints.map(p => p.value);
+    return detect6ConsecutiveTrends(values);
+  }, [plottedPoints]);
 
   // Violations in current selection
   const violationsList = useMemo(() => {
@@ -429,7 +462,7 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Metode: <strong className="text-slate-700 font-semibold">{parameter.method}</strong> · Target X̄: <strong className="text-slate-700 font-semibold font-mono">{formatNumber(parameter.targetMean)} {parameter.unit}</strong> (SD: <span className="font-mono">{formatNumber(parameter.targetSD)}</span>, CV: <span className="font-mono">{parameter.targetCV}%</span>)
+                Metode: <strong className="text-slate-700 font-semibold">{parameter.method}</strong> · Target X̄: <strong className="text-slate-700 font-semibold font-mono">{formatNumber(parameter.targetMean)} {parameter.unit}</strong> (SD: <span className="font-mono">{formatNumber(parameter.targetSD)}</span>, CV: <span className="font-mono">{parameter.targetCV}%</span>) · Sigma: <strong className="text-emerald-700 font-semibold font-mono">{stats.sigma !== undefined ? stats.sigma : '-'}</strong>
               </p>
             </div>
           </div>
@@ -737,7 +770,7 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
         </div>
 
         {/* SUMMARY STATS STRIP WITH PROPORTIONAL TYPOGRAPHY */}
-        <div className="grid grid-cols-4 lg:grid-cols-8 gap-2 text-center text-xs print-avoid-break">
+        <div className="grid grid-cols-4 lg:grid-cols-11 gap-2 text-center text-xs print-avoid-break">
           <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
             <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Total Titik (N)</p>
             <p className="text-base font-black font-mono text-slate-900 mt-0.5">{stats.count}</p>
@@ -759,6 +792,18 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
           <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
             <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Target CV%</p>
             <p className="text-base font-black font-mono text-slate-600 mt-0.5">{parameter.targetCV}%</p>
+          </div>
+          <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+            <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Cp</p>
+            <p className="text-base font-black font-mono text-slate-900 mt-0.5">{stats.cp !== undefined ? stats.cp : '-'}</p>
+          </div>
+          <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+            <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Cpk</p>
+            <p className="text-base font-black font-mono text-slate-900 mt-0.5">{stats.cpk !== undefined ? stats.cpk : '-'}</p>
+          </div>
+          <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+            <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Sigma</p>
+            <p className={`text-base font-black font-mono mt-0.5 ${stats.sigma !== undefined && stats.sigma >= 6 ? 'text-emerald-700' : 'text-slate-900'}`}>{stats.sigma !== undefined ? stats.sigma : '-'}</p>
           </div>
           <div className="bg-emerald-50/70 p-2.5 rounded-lg border border-emerald-200">
             <p className="text-[10px] text-emerald-800 uppercase font-bold tracking-wider">Pass (&lt;±2SD)</p>
@@ -925,6 +970,45 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
                   strokeLinecap="round"
                 />
               )}
+
+              {/* Render Trendline */}
+              {trendline && (
+                <line
+                  x1={getX(0, plottedPoints.length)}
+                  y1={getY(trendline.m * 0 + trendline.c)}
+                  x2={getX(plottedPoints.length - 1, plottedPoints.length)}
+                  y2={getY(trendline.m * (plottedPoints.length - 1) + trendline.c)}
+                  stroke="#0ea5e9"
+                  strokeWidth="1.5"
+                  strokeDasharray="4,4"
+                />
+              )}
+
+              {/* Highlight 6-point trends */}
+              {trends.map((t, i) => (
+                 <g key={i}>
+                   <rect
+                     x={getX(t.start, plottedPoints.length) - 5}
+                     y={padding.top}
+                     width={getX(t.end, plottedPoints.length) - getX(t.start, plottedPoints.length) + 10}
+                     height={chartHeight}
+                     fill={t.type === 'up' ? '#10b981' : '#f43f5e'}
+                     fillOpacity="0.1"
+                     rx={4}
+                   />
+                   <text
+                     x={getX(t.start, plottedPoints.length) + (getX(t.end, plottedPoints.length) - getX(t.start, plottedPoints.length)) / 2}
+                     y={padding.top + 15}
+                     fill={t.type === 'up' ? '#065f46' : '#9f1239'}
+                     fontSize="10"
+                     fontWeight="700"
+                     textAnchor="middle"
+                     fontFamily="sans-serif"
+                   >
+                     {t.type === 'up' ? 'TREND NAIK' : 'TREND TURUN'}
+                   </text>
+                 </g>
+              ))}
 
               {/* QC Result Data Points (1 per date when in single_per_date mode) */}
               {plottedPoints.map((pt, idx) => {

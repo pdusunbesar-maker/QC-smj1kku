@@ -166,6 +166,9 @@ export interface QCStatistics {
   passCount: number;
   warningCount: number;
   rejectCount: number;
+  cp?: number;
+  cpk?: number;
+  sigma?: number;
 }
 
 export interface NonConformity {

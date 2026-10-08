@@ -293,3 +293,97 @@ export function evaluateWestgardRules(
 
   return { status, violations };
 }
+
+/**
+ * Calculate linear trendline (y = mx + c) for a set of points
+ */
+export function calculateTrendline(points: { x: number; y: number }[]) {
+  const n = points.length;
+  if (n < 2) return null;
+  let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+  for (const p of points) {
+    sumX += p.x;
+    sumY += p.y;
+    sumXY += p.x * p.y;
+    sumXX += p.x * p.x;
+  }
+  const m = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+  const c = (sumY - m * sumX) / n;
+  return { m, c };
+}
+
+/**
+ * Detect 6 consecutive increasing or decreasing data points
+ */
+export function detect6ConsecutiveTrends(values: number[]) {
+  const trends: { start: number; end: number; type: 'up' | 'down' }[] = [];
+  if (values.length < 6) return trends;
+
+  let upCount = 1;
+  let downCount = 1;
+
+  for (let i = 1; i < values.length; i++) {
+    if (values[i] > values[i - 1]) {
+      upCount++;
+      downCount = 1;
+    } else if (values[i] < values[i - 1]) {
+      downCount++;
+      upCount = 1;
+    } else {
+      upCount = 1;
+      downCount = 1;
+    }
+
+    if (upCount === 6) {
+      trends.push({ start: i - 5, end: i, type: 'up' });
+      upCount = 5;
+    } else if (downCount === 6) {
+      trends.push({ start: i - 5, end: i, type: 'down' });
+      downCount = 5;
+    }
+  }
+  return trends;
+}
+
+/**
+ * Calculate Cp and Cpk (Process Capability)
+ */
+export function calculateProcessCapability(
+  mean: number,
+  sd: number,
+  minAcceptable: number,
+  maxAcceptable: number
+) {
+  if (sd === 0) return { cp: 0, cpk: 0 };
+  
+  const cp = (maxAcceptable - minAcceptable) / (6 * sd);
+  const cpu = (maxAcceptable - mean) / (3 * sd);
+  const cpl = (mean - minAcceptable) / (3 * sd);
+  const cpk = Math.min(cpu, cpl);
+  
+  return { 
+    cp: Number(cp.toFixed(2)), 
+    cpk: Number(cpk.toFixed(2)) 
+  };
+}
+
+/**
+ * Calculate Sigma Metric
+ */
+export function calculateSigmaMetric(
+  mean: number,
+  sd: number,
+  targetMean: number,
+  tea: number
+): number {
+  if (sd === 0) return 0;
+  
+  const bias = Math.abs(mean - targetMean) / targetMean * 100;
+  const cv = (sd / mean) * 100;
+  
+  if (cv === 0) return 0;
+  
+  const sigma = (tea - bias) / cv;
+  return Number(sigma.toFixed(2));
+}
+
