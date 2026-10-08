@@ -25,7 +25,7 @@ import { StorageService } from '../../services/storage';
 
 interface CAPAViewProps {
   capas: CAPA[];
-  initialData?: { fromQc?: QCResult; fromNC?: NonConformity };
+  initialData?: { fromQc?: QCResult; fromNC?: NonConformity; prefill?: any };
   onCapaAdded: (newCapa: CAPA) => void;
   onCapaUpdated: (updated: CAPA) => void;
   onCapaDeleted?: (id: string) => void;
@@ -41,7 +41,7 @@ export const CAPAView: React.FC<CAPAViewProps> = ({
   onNavigateToTab,
 }) => {
   const { user, can } = useAuth();
-  const [showCreateModal, setShowCreateModal] = useState(!!initialData?.fromQc || !!initialData?.fromNC);
+  const [showCreateModal, setShowCreateModal] = useState(!!initialData?.fromQc || !!initialData?.fromNC || !!initialData?.prefill);
   const [selectedCapa, setSelectedCapa] = useState<CAPA | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -58,23 +58,25 @@ export const CAPAView: React.FC<CAPAViewProps> = ({
   const nextTwoWeeks = new Date(Date.now() + 14 * 24 * 3600 * 1000).toISOString().split('T')[0];
 
   const [source, setSource] = useState<CAPA['source']>(
-    initialData?.fromQc ? 'Pelanggaran Westgard' : initialData?.fromNC ? 'Non-Conformity' : 'QC Gagal'
+    initialData?.prefill?.source || (initialData?.fromQc ? 'Pelanggaran Westgard' : initialData?.fromNC ? 'Non-Conformity' : 'QC Gagal')
   );
-  const [department, setDepartment] = useState('Instalasi Patologi Klinik - Kimia Darah');
-  const [pic, setPic] = useState(user.name);
+  const [department, setDepartment] = useState(initialData?.prefill?.department || 'Instalasi Patologi Klinik - Kimia Darah');
+  const [pic, setPic] = useState(initialData?.prefill?.pic || user.name);
   const [problemStatement, setProblemStatement] = useState(
+    initialData?.prefill?.problemStatement || (
     initialData?.fromQc
       ? `Pelanggaran aturan QC pada ${initialData.fromQc.parameterName} (${initialData.fromQc.sdPosition})`
       : initialData?.fromNC
       ? `Ketidaksesuaian mutu #${initialData.fromNC.id}: ${initialData.fromNC.description}`
-      : ''
+      : '')
   );
   const [nonConformityDescription, setNonConformityDescription] = useState(
+    initialData?.prefill?.nonConformityDescription || (
     initialData?.fromQc
       ? `Terjadi pelanggaran aturan Westgard: ${initialData.fromQc.violations?.map(v => v.ruleName).join(', ')}. Target: ${initialData.fromQc.mean}, Hasil terukur: ${initialData.fromQc.value} ${initialData.fromQc.unit}.`
       : initialData?.fromNC
       ? initialData.fromNC.description
-      : ''
+      : '')
   );
   const [supportingEvidence, setSupportingEvidence] = useState('Grafik Levey-Jennings dan rekam suhu instrumen');
   const [overallDueDate, setOverallDueDate] = useState(nextTwoWeeks);
@@ -116,7 +118,7 @@ export const CAPAView: React.FC<CAPAViewProps> = ({
       nonConformityDescription,
       supportingEvidence,
       rcaMethod: 'Kombinasi 5 Why & Fishbone',
-      fishbone: {
+      fishbone: initialData?.prefill?.fishbone || {
         man: [],
         machine: [],
         method: [],
@@ -155,7 +157,7 @@ export const CAPAView: React.FC<CAPAViewProps> = ({
       effectiveness: 'pending',
       overallDueDate,
       linkedQcResultId: initialData?.fromQc?.id,
-      linkedNonConformityId: initialData?.fromNC?.id,
+      linkedNonConformityId: initialData?.prefill?.linkedNonConformityId || initialData?.fromNC?.id,
     };
 
     StorageService.saveCAPA(newCapa);

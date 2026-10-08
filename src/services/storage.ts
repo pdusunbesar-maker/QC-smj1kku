@@ -43,6 +43,7 @@ const KEYS = {
   AUDIT_LOGS: 'lqcms_audit_logs_v1',
   NOTIFICATIONS: 'lqcms_notifications_v1',
   DELETED_QC_IDS: 'lqcms_deleted_qc_ids_v1',
+  QC_LOTS: 'lqcms_qc_lots_v1',
 };
 
 // Generic safe storage helper
@@ -1379,6 +1380,26 @@ export class StorageService {
     if (target) {
       this.logAudit('DELETE_CAPA', `Menghapus dokumen CAPA ${target.id} (${target.problemStatement.substring(0, 40)}...)`, null, target);
     }
+  }
+
+  static getQCLots(): QCLot[] {
+    return getStored(KEYS.QC_LOTS, []);
+  }
+
+  static saveQCLot(lot: QCLot): void {
+    const list = this.getQCLots();
+    const index = list.findIndex(l => l.id === lot.id);
+    if (index >= 0) {
+      list[index] = lot;
+    } else {
+      list.push(lot);
+    }
+    setStored(KEYS.QC_LOTS, list);
+  }
+
+  static deleteQCLot(id: string): void {
+    const list = this.getQCLots().filter(l => l.id !== id);
+    setStored(KEYS.QC_LOTS, list);
   }
 
   // --- Audit Logs ---

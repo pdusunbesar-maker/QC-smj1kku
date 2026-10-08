@@ -37,6 +37,8 @@ import { MonthlyQCVolumeChartPanel } from './panels/MonthlyQCVolumeChartPanel';
 import { AutomatedRunningAverageAlertsPanel } from './panels/AutomatedRunningAverageAlertsPanel';
 import { MonthlyTrendAnalysisPanel } from './panels/MonthlyTrendAnalysisPanel';
 import { DailyQCCoveragePanel } from './panels/DailyQCCoveragePanel';
+import { DynamicFishboneRCAPanel } from './panels/DynamicFishboneRCAPanel';
+import { ProactiveRecommendationsPanel } from './panels/ProactiveRecommendationsPanel';
 import { RunningAverageAlertService } from '../../services/runningAverageAlertService';
 
 interface DashboardViewProps {
@@ -81,6 +83,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const activeShiftAlerts = useMemo(() => {
     return runningAvgAlerts.filter(a => a.isActive);
   }, [runningAvgAlerts]);
+
+  // Dynamic evaluation of early warnings (trends and shifts before Westgard violation)
+  const earlyTrendFindings = useMemo(() => {
+    return RunningAverageAlertService.detectEarlyTrendWarnings(
+      qcResults,
+      parameters,
+      instruments
+    );
+  }, [qcResults, parameters, instruments]);
 
   useEffect(() => {
     if (initialData?.qcSaved) {
@@ -601,6 +612,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       />
 
       {/* ========================================================================= */}
+      {/* 2.3. NOTIFIKASI & REKOMENDASI TINDAKAN PROAKTIF (DETEKSI DINI)            */}
+      {/* ========================================================================= */}
+      <ProactiveRecommendationsPanel
+        earlyWarnings={earlyTrendFindings}
+        onNavigateToTab={onNavigateToTab}
+      />
+
+      {/* ========================================================================= */}
       {/* 2.5. SISTEM PERINGATAN OTOMATIS: 3-DAY RUNNING AVERAGE SHIFT ALERTS       */}
       {/* ========================================================================= */}
       <div id="automated-running-avg-panel" className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -804,6 +823,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         qcResults={qcResults}
         instruments={instruments}
         parameters={parameters}
+        onNavigateToTab={onNavigateToTab}
+      />
+
+      {/* ========================================================================= */}
+      {/* 3.5.5. DYNAMIC ROOT CAUSE ANALYSIS (ISHIKAWA FISHBONE) PANEL              */}
+      {/* ========================================================================= */}
+      <DynamicFishboneRCAPanel
+        nonConformities={nonConformities}
+        capas={capas}
         onNavigateToTab={onNavigateToTab}
       />
 
@@ -1229,14 +1257,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
                   {/* Header Title Text */}
                   <div className="flex-1 px-4 text-center">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 leading-tight">
+                    <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-800 leading-tight">
+                      {(() => {
+                        const r = labInfo.regency || 'PEMERINTAH KABUPATEN KAYONG UTARA';
+                        return r.toUpperCase() === 'KABUPATEN KAYONG UTARA' || r.toUpperCase() === 'KAYONG UTARA'
+                          ? 'PEMERINTAH KABUPATEN KAYONG UTARA'
+                          : r.toUpperCase();
+                      })()}
+                    </h3>
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 leading-tight mt-0.5">
                       {labInfo.healthService || 'DINAS KESEHATAN DAN KELUARGA BERENCANA'}
                     </p>
                     <h2 className="text-lg sm:text-xl font-extrabold uppercase text-slate-900 tracking-tight leading-tight mt-0.5">
-                      {labInfo.hospitalName || 'RSUD SEHAT MAKMUR JAYA'}
+                      {labInfo.hospitalName || 'RSUD SULTAN MUHAMMAD JAMALUDIN I'}
                     </h2>
                     <h3 className="text-md sm:text-base font-bold uppercase text-slate-800 tracking-wide mt-0.5">
-                      {labInfo.name || 'LABORATORIUM PATOLOGI KLINIK & KONTROL MUTU'}
+                      {labInfo.name || 'INSTALASI PATOLOGI KLINIK & LABORATORIUM TERPADU'}
                     </h3>
                     <p className="text-[10px] text-slate-500 mt-1 leading-snug">
                       {labInfo.address || 'Jl. Kesehatan Raya No. 45, Blok A, Jakarta Pusat'} · Telp: {labInfo.phone || '(021) 555-1234'}

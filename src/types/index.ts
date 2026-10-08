@@ -83,6 +83,7 @@ export interface Parameter {
   method: string;
   instrumentId: string;
   controlMaterialId: string;
+  qcLotId?: string; // Add Lot QC reference
   targetMean: number;
   targetSD: number;
   targetCV: number; // in %

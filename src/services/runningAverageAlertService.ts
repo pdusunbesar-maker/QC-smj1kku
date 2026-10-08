@@ -47,6 +47,24 @@ export interface AlertFilterOptions {
   instrumentId?: string;
 }
 
+export interface EarlyTrendFinding {
+  parameter: Parameter;
+  instrument: Instrument | undefined;
+  controlLevel: 'Level 1' | 'Level 2' | 'Level 3';
+  latestResults: QCResult[];
+  activeShiftStreak: number;
+  shiftDirection: 'above' | 'below' | 'none';
+  activeTrendStreak: number;
+  trendDirection: 'increasing' | 'decreasing' | 'none';
+  slope: number;
+  correlation: number;
+  rSquared: number;
+  status: 'critical' | 'warning' | 'stable';
+  statusLabel: string;
+  reason: string;
+  recommendation: string;
+}
+
 const ACKNOWLEDGED_ALERTS_KEY = 'qc_acknowledged_running_avg_alerts';
 
 export class RunningAverageAlertService {
@@ -289,5 +307,198 @@ export class RunningAverageAlertService {
     } catch (e) {
       console.warn('Failed to remove acknowledged alert:', e);
     }
+  }
+
+  /**
+   * Evaluates all QC results and detects subtle trends/shifts (Early Warning Signs)
+   * before Westgard rejection rules are triggered.
+   */
+  static detectEarlyTrendWarnings(
+    qcResults: QCResult[],
+    parameters: Parameter[],
+    instruments: Instrument[]
+  ): EarlyTrendFinding[] {
+    const findings: EarlyTrendFinding[] = [];
+
+    if (!qcResults || qcResults.length === 0 || !parameters || parameters.length === 0) {
+      return [];
+    }
+
+    parameters.forEach(param => {
+      const inst = instruments.find(i => i.id === param.instrumentId);
+      const levels: Array<'Level 1' | 'Level 2' | 'Level 3'> = ['Level 1', 'Level 2', 'Level 3'];
+
+      levels.forEach(level => {
+        // Find matching results
+        const groupResults = qcResults.filter(
+          r => r.parameterId === param.id && r.controlLevel === level
+        );
+
+        if (groupResults.length < 3) return; // Need at least 3 points to start visual, 5 for regression
+
+        // Sort chronologically ascending (oldest to newest)
+        const sorted = [...groupResults].sort((a, b) => {
+          const timeA = a.timestamp || new Date(`${a.date}T${a.time || '00:00'}`).getTime();
+          const timeB = b.timestamp || new Date(`${b.date}T${b.time || '00:00'}`).getTime();
+          return timeA - timeB;
+        });
+
+        // Take last 10 points for active trend scanning
+        const latestResults = sorted.slice(-10);
+        const n = latestResults.length;
+
+        // 1. Shift detection ending at the latest point (consecutive points on the same side of the mean)
+        let activeShiftStreak = 0;
+        let shiftDirection: 'above' | 'below' | 'none' = 'none';
+
+        if (n > 0) {
+          const lastPoint = latestResults[n - 1];
+          const lastDiff = lastPoint.value - param.targetMean;
+          
+          if (lastDiff > 0) {
+            shiftDirection = 'above';
+            for (let i = n - 1; i >= 0; i--) {
+              const diff = latestResults[i].value - param.targetMean;
+              if (diff > 0) {
+                activeShiftStreak++;
+              } else {
+                break;
+              }
+            }
+          } else if (lastDiff < 0) {
+            shiftDirection = 'below';
+            for (let i = n - 1; i >= 0; i--) {
+              const diff = latestResults[i].value - param.targetMean;
+              if (diff < 0) {
+                activeShiftStreak++;
+              } else {
+                break;
+              }
+            }
+          }
+        }
+
+        // 2. Trend detection (monotonically increasing/decreasing ending at the latest point)
+        let activeTrendStreak = 1;
+        let trendDirection: 'increasing' | 'decreasing' | 'none' = 'none';
+
+        if (n >= 2) {
+          const lastDiff = latestResults[n - 1].value - latestResults[n - 2].value;
+          if (lastDiff > 0) {
+            trendDirection = 'increasing';
+            for (let i = n - 1; i > 0; i--) {
+              if (latestResults[i].value - latestResults[i - 1].value > 0) {
+                activeTrendStreak++;
+              } else {
+                break;
+              }
+            }
+          } else if (lastDiff < 0) {
+            trendDirection = 'decreasing';
+            for (let i = n - 1; i > 0; i--) {
+              if (latestResults[i].value - latestResults[i - 1].value < 0) {
+                activeTrendStreak++;
+              } else {
+                break;
+              }
+            }
+          }
+        }
+        
+        if (activeTrendStreak < 2) {
+          activeTrendStreak = 0;
+          trendDirection = 'none';
+        }
+
+        // 3. Simple Linear Regression over the last n points (minimum 5 points for mathematical significance)
+        let slope = 0;
+        let correlation = 0;
+        let rSquared = 0;
+
+        if (n >= 5) {
+          const xValues = Array.from({ length: n }, (_, i) => i + 1);
+          const yValues = latestResults.map(r => 
+            param.targetSD > 0 ? (r.value - param.targetMean) / param.targetSD : 0
+          );
+
+          const sumX = xValues.reduce((a, b) => a + b, 0);
+          const sumY = yValues.reduce((a, b) => a + b, 0);
+          const meanX = sumX / n;
+          const meanY = sumY / n;
+
+          let num = 0;
+          let denX = 0;
+          let denY = 0;
+
+          for (let i = 0; i < n; i++) {
+            const diffX = xValues[i] - meanX;
+            const diffY = yValues[i] - meanY;
+            num += diffX * diffY;
+            denX += diffX * diffX;
+            denY += diffY * diffY;
+          }
+
+          if (denX > 0) {
+            slope = num / denX;
+          }
+          if (denX > 0 && denY > 0) {
+            correlation = num / Math.sqrt(denX * denY);
+            rSquared = correlation * correlation;
+          }
+        }
+
+        // 4. Status determination & warnings
+        let status: 'critical' | 'warning' | 'stable' = 'stable';
+        let statusLabel = 'Normal & Stabil';
+        let reason = 'Semua titik bergerak secara acak di sekitar nilai target (Mean). Tidak ada tren linear atau pergeseran terdeteksi.';
+        let recommendation = 'Kestabilan analitik berjalan dengan baik. Lakukan pemantauan kontrol harian seperti biasa.';
+
+        if (activeShiftStreak >= 10) {
+          status = 'critical';
+          statusLabel = 'Pergeseran Rata-rata Aktif (Aturan 10x)';
+          reason = `Terdeteksi pergeseran rata-rata yang sangat kuat dengan ${activeShiftStreak} hasil QC berurutan berada di ${shiftDirection === 'above' ? 'atas (+)' : 'bawah (-)'} garis Mean. Ini melanggar aturan Westgard 10x secara aktif.`;
+          recommendation = 'Lakukan kalibrasi ulang instrumen untuk parameter ini segera. Periksa apakah ada penguapan reagen, perubahan suhu bilik reaksi, atau kontaminasi reagen harian.';
+        } else if (activeShiftStreak >= 6) {
+          status = 'warning';
+          statusLabel = `Indikasi Shift Berkelanjutan (${activeShiftStreak} Titik)`;
+          reason = `Terdeteksi kecenderungan pergeseran dengan ${activeShiftStreak} hasil QC berurutan berada di ${shiftDirection === 'above' ? 'atas (+)' : 'bawah (-)'} garis Mean harian. Ini merupakan peringatan dini (early warning) sebelum terjadinya pelanggaran Westgard.`;
+          recommendation = 'Periksa lot reagen yang sedang berjalan, pastikan tidak ada kontaminasi pada probe, atau gelembung udara pada syring sistem pemipetan.';
+        } else if (activeTrendStreak >= 6) {
+          status = 'warning';
+          statusLabel = `Kecenderungan Tren (${trendDirection === 'increasing' ? 'Naik' : 'Turun'})`;
+          reason = `Terdeteksi tren linear bertahap dengan ${activeTrendStreak} hasil QC berurutan ${trendDirection === 'increasing' ? 'meningkat secara monoton' : 'menurun secara monoton'}. Ini mengindikasikan drift analitis bertahap.`;
+          recommendation = 'Kecenderungan tren bertahap biasanya disebabkan oleh degradasi kualitas reagen onboard, penurunan emisi lampu fotometer, penyusutan volume reagen harian, atau degradasi material kontrol.';
+        } else if (n >= 5 && Math.abs(correlation) >= 0.70 && Math.abs(slope) >= 0.12) {
+          status = 'warning';
+          statusLabel = `Tren Regresi Linear (${slope > 0 ? 'Meningkat' : 'Menurun'})`;
+          reason = `Deteksi regresi mendeteksi tren linear bertahap yang kuat (R² = ${rSquared.toFixed(2)}, Slope = ${slope > 0 ? '+' : ''}${slope.toFixed(2)} SD/run). Data menunjukkan deviasi progresif yang signifikan.`;
+          recommendation = 'Pantau stabilitas reagen onboard. Periksa tanggal expired reagen atau bersihkan cuvette optikal pembacaan alat.';
+        }
+
+        findings.push({
+          parameter: param,
+          instrument: inst,
+          controlLevel: level,
+          latestResults,
+          activeShiftStreak,
+          shiftDirection,
+          activeTrendStreak,
+          trendDirection,
+          slope,
+          correlation,
+          rSquared,
+          status,
+          statusLabel,
+          reason,
+          recommendation,
+        });
+      });
+    });
+
+    // Sort findings so critical is first, then warnings, then stable
+    return findings.sort((a, b) => {
+      const priority = { critical: 3, warning: 2, stable: 1 };
+      return priority[b.status] - priority[a.status];
+    });
   }
 }

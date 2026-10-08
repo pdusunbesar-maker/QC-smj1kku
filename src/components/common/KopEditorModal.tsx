@@ -136,7 +136,14 @@ export const KopEditorModal: React.FC<KopEditorModalProps> = ({
                   />
                 </div>
                 <div className="flex-1 px-1 space-y-0.5">
-                  <h4 className="text-[10px] font-bold uppercase text-slate-700 leading-tight">{form.regency || 'PEMERINTAH KABUPATEN KAYONG UTARA'}</h4>
+                  <h4 className="text-[10px] font-bold uppercase text-slate-700 leading-tight">
+                    {(() => {
+                      const r = form.regency || 'PEMERINTAH KABUPATEN KAYONG UTARA';
+                      return r.toUpperCase() === 'KABUPATEN KAYONG UTARA' || r.toUpperCase() === 'KAYONG UTARA'
+                        ? 'PEMERINTAH KABUPATEN KAYONG UTARA'
+                        : r.toUpperCase();
+                    })()}
+                  </h4>
                   <h4 className="text-[10px] font-extrabold uppercase text-slate-800 leading-tight">{form.healthService || 'DINAS KESEHATAN DAN KELUARGA BERENCANA'}</h4>
                   <h3 className="text-xs sm:text-sm font-black uppercase text-slate-950 leading-tight">{form.hospitalName || 'RSUD SULTAN MUHAMMAD JAMALUDIN I'}</h3>
                   <h5 className="text-[11px] font-bold uppercase text-emerald-950 leading-tight">{form.name || 'INSTALASI PATOLOGI KLINIK & LABORATORIUM TERPADU'}</h5>

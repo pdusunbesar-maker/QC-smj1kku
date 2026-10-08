@@ -16,7 +16,7 @@ import {
   Upload,
   FileSpreadsheet
 } from 'lucide-react';
-import { LaboratoryInfo, Instrument, Parameter, ControlMaterial } from '../../types';
+import { LaboratoryInfo, Instrument, Parameter, ControlMaterial, QCLot } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { StorageService } from '../../services/storage';
 import { ParameterCsvImportModal } from './ParameterCsvImportModal';
@@ -26,10 +26,12 @@ interface MasterDataViewProps {
   instruments: Instrument[];
   parameters: Parameter[];
   controls: ControlMaterial[];
+  qcLots: QCLot[];
   onLabInfoUpdated: (info: LaboratoryInfo) => void;
   onInstrumentsUpdated: (instruments: Instrument[]) => void;
   onParametersUpdated: (parameters: Parameter[]) => void;
   onControlsUpdated: (controls: ControlMaterial[]) => void;
+  onQCLotsUpdated: (lots: QCLot[]) => void;
 }
 
 export const MasterDataView: React.FC<MasterDataViewProps> = ({
@@ -37,10 +39,12 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
   instruments,
   parameters,
   controls,
+  qcLots,
   onLabInfoUpdated,
   onInstrumentsUpdated,
   onParametersUpdated,
   onControlsUpdated,
+  onQCLotsUpdated,
 }) => {
   const { user, can } = useAuth();
   const canEdit = can('manage_master');
@@ -215,6 +219,7 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
             { id: 'instruments', label: `Instrumen (${instruments.length})`, icon: Wrench },
             { id: 'parameters', label: `Parameter (${parameters.length})`, icon: FlaskConical },
             { id: 'controls', label: `Bahan Kontrol (${controls.length})`, icon: Layers },
+            { id: 'lots', label: `Lot QC (${qcLots.length})`, icon: FileSpreadsheet },
           ].map((tab) => {
             const Icon = tab.icon;
             return (

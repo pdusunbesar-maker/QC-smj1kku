@@ -47,6 +47,7 @@ function AppContent() {
   const [instruments, setInstruments] = useState<Instrument[]>(() => StorageService.getInstruments());
   const [parameters, setParameters] = useState<Parameter[]>(() => StorageService.getParameters());
   const [controls, setControls] = useState<ControlMaterial[]>(() => StorageService.getControlMaterials());
+  const [qcLots, setQcLots] = useState<QCLot[]>(() => StorageService.getQCLots());
   const [qcResults, setQcResults] = useState<QCResult[]>(() => StorageService.getQCResults());
   const [westgardRules, setWestgardRules] = useState<WestgardRuleConfig[]>(() => StorageService.getWestgardRules());
   const [nonConformities, setNonConformities] = useState<NonConformity[]>(() => StorageService.getNonConformities());
@@ -87,6 +88,7 @@ function AppContent() {
     setInstruments(StorageService.getInstruments());
     setParameters(StorageService.getParameters());
     setControls(StorageService.getControlMaterials());
+    setQcLots(StorageService.getQCLots());
     setQcResults(StorageService.getQCResults());
     setWestgardRules(StorageService.getWestgardRules());
     setNonConformities(StorageService.getNonConformities());
@@ -410,6 +412,8 @@ function AppContent() {
                 onInstrumentsUpdated={(insts) => setInstruments(insts)}
                 onParametersUpdated={(params) => setParameters(params)}
                 onControlsUpdated={(ctrls) => setControls(ctrls)}
+                qcLots={qcLots}
+                onQCLotsUpdated={(lots) => setQcLots(lots)}
               />
             )}
 

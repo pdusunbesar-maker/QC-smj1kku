@@ -786,7 +786,12 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             {/* Kalimat & Informasi Instansi */}
             <div className="flex-1 text-center px-2 space-y-0.5">
               <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-800 leading-tight">
-                {labInfo.regency || 'PEMERINTAH KABUPATEN KAYONG UTARA'}
+                {(() => {
+                  const r = labInfo.regency || 'PEMERINTAH KABUPATEN KAYONG UTARA';
+                  return r.toUpperCase() === 'KABUPATEN KAYONG UTARA' || r.toUpperCase() === 'KAYONG UTARA'
+                    ? 'PEMERINTAH KABUPATEN KAYONG UTARA'
+                    : r.toUpperCase();
+                })()}
               </h3>
               <h3 className="text-xs sm:text-sm font-extrabold uppercase text-slate-900 leading-tight">
                 {labInfo.healthService || 'DINAS KESEHATAN DAN KELUARGA BERENCANA'}
