@@ -257,6 +257,7 @@ CREATE TABLE IF NOT EXISTS qc_results (
     violations JSONB DEFAULT '[]'::jsonb,
     notes TEXT,
     is_demo BOOLEAN DEFAULT false,
+    is_deleted BOOLEAN DEFAULT false,
     review_status TEXT DEFAULT 'pending' CHECK (review_status IN ('pending', 'accepted', 'rejected', 'investigation_required')),
     reviewed_by TEXT REFERENCES app_users(id) ON DELETE SET NULL,
     reviewed_by_name TEXT,

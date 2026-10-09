@@ -117,12 +117,31 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const todayStr = new Date().toISOString().split('T')[0];
   const dailyStats = useMemo(() => {
     const todayResults = qcResults.filter(r => r.date === todayStr);
+    const totalTests = todayResults.length;
+
+    let westgardViolationsCount = 0;
+    todayResults.forEach(r => {
+      if (r.violations && r.violations.length > 0) {
+        westgardViolationsCount += r.violations.length;
+      } else if (r.status === 'reject' || r.status === 'warning') {
+        westgardViolationsCount += 1;
+      }
+    });
+
+    const activeInst = instruments.filter(i => i.status === 'active').length;
+    const totalInst = instruments.length;
+    const instrumentHealthPct = totalInst > 0 ? Math.round((activeInst / totalInst) * 100) : 100;
+    const instrumentStatusText = instrumentHealthPct >= 80 ? 'Optimal (Beroperasi Normal)' : 'Perlu Perhatian / Maintenance';
+
     return {
-      totalTests: todayResults.length,
-      activeViolations: todayResults.filter(r => r.status === 'reject').length,
+      totalTests,
+      activeViolations: westgardViolationsCount,
       pendingReviews: todayResults.filter(r => r.reviewStatus === 'pending').length,
+      activeInstrumentsCount: activeInst,
+      totalInstruments: totalInst,
+      instrumentStatusText,
     };
-  }, [qcResults, todayStr]);
+  }, [qcResults, instruments, todayStr]);
 
   // Retrieve actual audit logs
   const logs = propAuditLogs || StorageService.getAuditLogs();
@@ -626,6 +645,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         totalTests={dailyStats.totalTests}
         activeViolations={dailyStats.activeViolations}
         pendingReviews={dailyStats.pendingReviews}
+        activeInstrumentsCount={dailyStats.activeInstrumentsCount}
+        totalInstruments={dailyStats.totalInstruments}
+        instrumentStatusText={dailyStats.instrumentStatusText}
       />
 
       {/* ========================================================================= */}

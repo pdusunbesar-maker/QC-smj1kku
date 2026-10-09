@@ -284,6 +284,7 @@ function mapQCResultToDb(r: QCResult) {
     violations: r.violations || [],
     notes: r.notes || null,
     is_demo: r.isDemo || false,
+    is_deleted: r.isDeleted || r.is_deleted || false,
     review_status: r.reviewStatus || 'pending',
     reviewed_by: r.reviewedBy || null,
     reviewed_by_name: r.reviewedByName || null,
@@ -319,6 +320,7 @@ function mapDbToQCResult(row: any): QCResult {
     violations: Array.isArray(row.violations) ? row.violations : [],
     notes: row.notes || undefined,
     isDemo: row.is_demo ?? row.isDemo ?? false,
+    isDeleted: row.is_deleted ?? row.isDeleted ?? false,
     reviewStatus: row.review_status || row.reviewStatus || 'pending',
     reviewedBy: row.reviewed_by || row.reviewedBy,
     reviewedByName: row.reviewed_by_name || row.reviewedByName,
@@ -541,11 +543,13 @@ export class StorageService {
     }
 
     try {
-      // 1. Fetch QC Results
-      const { data: qcData, error: qcErr } = await sb.from('qc_results').select('*').order('date', { ascending: false });
+      // 1. Fetch QC Results with soft delete filter and data validation check
+      const { data: qcData, error: qcErr } = await sb.from('qc_results').select('*').eq('is_deleted', false).order('date', { ascending: false });
       if (!qcErr && qcData && qcData.length > 0) {
         const deletedIds = new Set(this.getDeletedQCIds());
-        const mapped = qcData.map(mapDbToQCResult).filter(r => !deletedIds.has(r.id));
+        const mapped = qcData
+          .map(mapDbToQCResult)
+          .filter(r => !deletedIds.has(r.id) && !r.isDeleted && !(r as any).is_deleted);
         setStored(KEYS.QC_RESULTS, mapped);
       }
 
@@ -690,13 +694,17 @@ export class StorageService {
             const eventType = payload.eventType; // 'INSERT' | 'UPDATE' | 'DELETE'
 
             if (table === 'qc_results') {
-              if (eventType === 'DELETE' && payload.old?.id) {
-                const list = getStored<QCResult[]>(KEYS.QC_RESULTS, []).filter(r => r.id !== payload.old.id);
-                setStored(KEYS.QC_RESULTS, list);
+              const deletedIds = new Set(StorageService.getDeletedQCIds());
+              if (eventType === 'DELETE' || payload.new?.is_deleted || payload.old?.is_deleted) {
+                const targetId = payload.old?.id || payload.new?.id;
+                if (targetId) {
+                  StorageService.trackDeletedQCId(targetId);
+                  const list = getStored<QCResult[]>(KEYS.QC_RESULTS, []).filter(r => r.id !== targetId);
+                  setStored(KEYS.QC_RESULTS, list);
+                }
               } else if (payload.new) {
                 const item = mapDbToQCResult(payload.new);
-                const deletedIds = new Set(StorageService.getDeletedQCIds());
-                if (!deletedIds.has(item.id)) {
+                if (!deletedIds.has(item.id) && !item.isDeleted && !(item as any).is_deleted) {
                   const list = getStored<QCResult[]>(KEYS.QC_RESULTS, []);
                   const idx = list.findIndex(r => r.id === item.id);
                   if (idx >= 0) list[idx] = item;
@@ -1188,7 +1196,13 @@ export class StorageService {
   static getQCResults(): QCResult[] {
     const deletedIds = new Set(this.getDeletedQCIds());
     const rawList = getStored<QCResult[]>(KEYS.QC_RESULTS, []);
-    let list = rawList.filter(r => r.instrumentId !== 'inst-chem-a' && !r.instrumentName?.toLowerCase().includes('cobas c311') && !deletedIds.has(r.id));
+    let list = rawList.filter(r => 
+      r.instrumentId !== 'inst-chem-a' && 
+      !r.instrumentName?.toLowerCase().includes('cobas c311') && 
+      !deletedIds.has(r.id) &&
+      !r.isDeleted &&
+      !(r as any).is_deleted
+    );
     if (list.length !== rawList.length) {
       setStored(KEYS.QC_RESULTS, list);
       const sb = getSupabase();
@@ -1197,9 +1211,9 @@ export class StorageService {
       }
     }
 
-    if (list.length === 0) {
+    if (list.length === 0 && !localStorage.getItem(KEYS.QC_RESULTS)) {
       const demo = generateDemoQCResults();
-      const activeDemo = demo.filter(d => !deletedIds.has(d.id));
+      const activeDemo = demo.filter(d => !deletedIds.has(d.id) && !d.isDeleted && !(d as any).is_deleted);
       if (activeDemo.length > 0) {
         setStored(KEYS.QC_RESULTS, activeDemo);
         return activeDemo;
@@ -1207,32 +1221,6 @@ export class StorageService {
       return [];
     }
 
-    const existingIds = new Set([...list.map(r => r.id), ...Array.from(deletedIds)]);
-
-    // If existing local dataset only contains legacy 45 demo records without multi-month history, backfill
-    if (list.length < 60 && list.some(r => r.id.startsWith('QC-DEMO-'))) {
-      const demo = generateDemoQCResults();
-      const additions = demo.filter(d => !existingIds.has(d.id));
-      if (additions.length > 0) {
-        const merged = [...list, ...additions].sort((a, b) => b.timestamp - a.timestamp);
-        setStored(KEYS.QC_RESULTS, merged);
-        return merged;
-      }
-    }
-
-    // Ensure 3-day shift demonstration items are present
-    if (!list.some(r => r.id.startsWith('QC-SHIFT-ALT-'))) {
-      const demo = generateDemoQCResults();
-      const shiftItems = demo.filter(d => d.id.startsWith('QC-SHIFT-ALT-'));
-      if (shiftItems.length > 0) {
-        const needed = shiftItems.filter(s => !existingIds.has(s.id));
-        if (needed.length > 0) {
-          const merged = [...list, ...needed].sort((a, b) => b.timestamp - a.timestamp);
-          setStored(KEYS.QC_RESULTS, merged);
-          return merged;
-        }
-      }
-    }
     return list;
   }
 
@@ -1284,11 +1272,15 @@ export class StorageService {
 
     const sb = getSupabase();
     if (sb) {
+      // Implement soft delete mechanism (update is_deleted = true in Supabase)
       sb.from('qc_results')
-        .delete()
+        .update({ is_deleted: true })
         .eq('id', id)
         .then(({ error }) => {
-          if (error) console.error('Supabase deleteQCResult error:', error);
+          if (error) {
+            console.error('Supabase soft deleteQCResult error, falling back to hard delete:', error);
+            sb.from('qc_results').delete().eq('id', id).then();
+          }
         });
     }
 

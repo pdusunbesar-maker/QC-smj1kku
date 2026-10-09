@@ -139,6 +139,7 @@ export interface QCResult {
   violations: WestgardViolation[];
   notes?: string;
   isDemo?: boolean;
+  isDeleted?: boolean;
   
   // Review metadata
   reviewStatus: 'pending' | 'accepted' | 'rejected' | 'investigation_required';
