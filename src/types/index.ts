@@ -62,6 +62,7 @@ export interface Instrument {
   nextCalibrationDate: string;
   lastMaintenanceDate: string;
   nextMaintenanceDate: string;
+  deletedAt?: string;
 }
 
 export interface ControlMaterial {
@@ -73,6 +74,7 @@ export interface ControlMaterial {
   expirationDate: string;
   storageCondition: string;
   status: 'active' | 'expired' | 'depleted';
+  deletedAt?: string;
 }
 
 export interface Parameter {
@@ -90,6 +92,7 @@ export interface Parameter {
   minAcceptable: number;
   maxAcceptable: number;
   decimalPlaces: number;
+  deletedAt?: string;
 }
 
 export type WestgardRuleKey = '1_2s' | '1_3s' | '2_2s' | 'R_4s' | '4_1s' | '10x';
@@ -194,6 +197,7 @@ export interface NonConformity {
   status: 'open' | 'under_review' | 'resolved' | 'escalated_to_capa';
   resolvedAt?: string;
   linkedCapaId?: string;
+  deletedAt?: string;
 }
 
 export interface FishboneData {
@@ -294,6 +298,7 @@ export interface CAPA {
   linkedQcResultId?: string;
   linkedQcResultIds?: string[]; // Support multiple QC results
   linkedNonConformityId?: string;
+  deletedAt?: string;
 }
 
 export interface AuditLog {

@@ -1010,7 +1010,7 @@ export class StorageService {
   static getInstruments(): Instrument[] {
     const list = getStored<Instrument[]>(KEYS.INSTRUMENTS, INITIAL_INSTRUMENTS);
     // Sanitize: Purge any deleted instruments (e.g. Cobas c311 / inst-chem-a)
-    const cleaned = list.filter(i => i.id !== 'inst-chem-a' && !i.name.toLowerCase().includes('cobas c311'));
+    const cleaned = list.filter(i => i.id !== 'inst-chem-a' && !i.name.toLowerCase().includes('cobas c311') && !i.deletedAt);
     if (cleaned.length !== list.length) {
       setStored(KEYS.INSTRUMENTS, cleaned);
       const sb = getSupabase();
@@ -1047,48 +1047,27 @@ export class StorageService {
   }
 
   static deleteInstrument(id: string): void {
-    const target = this.getInstruments().find(i => i.id === id);
-    const list = this.getInstruments().filter(i => i.id !== id);
-    setStored(KEYS.INSTRUMENTS, list);
-
-    // Cascade delete parameters, control materials, and QC results linked to deleted instrument
-    const activeParams = this.getParameters().filter(p => p.instrumentId !== id);
-    setStored(KEYS.PARAMETERS, activeParams);
-
-    const activeQC = this.getQCResults().filter(r => r.instrumentId !== id);
-    setStored(KEYS.QC_RESULTS, activeQC);
-
-    const sb = getSupabase();
-    if (sb) {
-      sb.from('instruments')
-        .delete()
-        .eq('id', id)
-        .then(({ error }) => {
-          if (error) console.error('Supabase deleteInstrument error:', error);
-        });
-      sb.from('test_parameters')
-        .delete()
-        .eq('instrument_id', id)
-        .then(({ error }) => {
-          if (error) console.error('Supabase delete Parameters error:', error);
-        });
-      sb.from('qc_results')
-        .delete()
-        .eq('instrument_id', id)
-        .then(({ error }) => {
-          if (error) console.error('Supabase delete QC Results error:', error);
-        });
-    }
-
-    if (target) {
-      this.logAudit('UPDATE_MASTER_DATA', `Menghapus instrumen: ${target.name} (${target.code}) beserta parameter dan hasil terkait.`);
+    const list = this.getInstruments();
+    const idx = list.findIndex(i => i.id === id);
+    if (idx >= 0) {
+      list[idx] = { ...list[idx], deletedAt: new Date().toISOString() };
+      setStored(KEYS.INSTRUMENTS, list);
+      
+      const sb = getSupabase();
+      if (sb) {
+        sb.from('instruments')
+          .update({ deleted_at: new Date().toISOString() })
+          .eq('id', id)
+          .then();
+      }
+      this.logAudit('UPDATE_MASTER_DATA', `Menghapus instrumen: ${list[idx].name} (${list[idx].code})`);
     }
   }
 
   // --- Control Materials ---
   static getControlMaterials(): ControlMaterial[] {
     const list = getStored<ControlMaterial[]>(KEYS.CONTROL_MATERIALS, INITIAL_CONTROL_MATERIALS);
-    const cleaned = list.filter(m => m.id !== 'ctrl-pnu-1' && !m.name.toLowerCase().includes('precinorm'));
+    const cleaned = list.filter(m => m.id !== 'ctrl-pnu-1' && !m.name.toLowerCase().includes('precinorm') && !m.deletedAt);
     if (cleaned.length !== list.length) {
       setStored(KEYS.CONTROL_MATERIALS, cleaned);
       const sb = getSupabase();
@@ -1117,22 +1096,20 @@ export class StorageService {
   }
 
   static deleteControlMaterial(id: string): void {
-    const target = this.getControlMaterials().find(m => m.id === id);
-    const list = this.getControlMaterials().filter(m => m.id !== id);
-    setStored(KEYS.CONTROL_MATERIALS, list);
+    const list = this.getControlMaterials();
+    const idx = list.findIndex(m => m.id === id);
+    if (idx >= 0) {
+      list[idx] = { ...list[idx], deletedAt: new Date().toISOString() };
+      setStored(KEYS.CONTROL_MATERIALS, list);
 
-    const sb = getSupabase();
-    if (sb) {
-      sb.from('control_materials')
-        .delete()
-        .eq('id', id)
-        .then(({ error }) => {
-          if (error) console.error('Supabase deleteControlMaterial error:', error);
-        });
-    }
-
-    if (target) {
-      this.logAudit('UPDATE_MASTER_DATA', `Menghapus bahan kontrol: ${target.name} (Lot: ${target.lotNumber})`);
+      const sb = getSupabase();
+      if (sb) {
+        sb.from('control_materials')
+          .update({ deleted_at: new Date().toISOString() })
+          .eq('id', id)
+          .then();
+      }
+      this.logAudit('UPDATE_MASTER_DATA', `Menghapus bahan kontrol: ${list[idx].name} (Lot: ${list[idx].lotNumber})`);
     }
   }
 
@@ -1141,7 +1118,7 @@ export class StorageService {
     const list = getStored<Parameter[]>(KEYS.PARAMETERS, INITIAL_PARAMETERS);
     const deletedIds = new Set(this.getDeletedParameterIds());
     const activeInsts = new Set(this.getInstruments().map(i => i.id));
-    let cleaned = list.filter(p => !deletedIds.has(p.id) && p.instrumentId !== 'inst-chem-a' && activeInsts.has(p.instrumentId) && !p.name.toLowerCase().includes('cobas c311'));
+    let cleaned = list.filter(p => !deletedIds.has(p.id) && p.instrumentId !== 'inst-chem-a' && activeInsts.has(p.instrumentId) && !p.name.toLowerCase().includes('cobas c311') && !p.deletedAt);
 
     // Pastikan seluruh parameter hematologi Dirui Dimih 3980 dari master data bawaan selalu disertakan (jika belum dihapus)
     const existingIds = new Set(cleaned.map(p => p.id));
@@ -1212,23 +1189,20 @@ export class StorageService {
   }
 
   static deleteParameter(id: string): void {
-    const target = this.getParameters().find(p => p.id === id);
-    this.trackDeletedParameterId(id);
-    const list = this.getParameters().filter(p => p.id !== id);
-    setStored(KEYS.PARAMETERS, list);
-
-    const sb = getSupabase();
-    if (sb) {
-      sb.from('test_parameters')
-        .delete()
-        .eq('id', id)
-        .then(({ error }) => {
-          if (error) console.error('Supabase deleteParameter error:', error);
-        });
-    }
-
-    if (target) {
-      this.logAudit('UPDATE_MASTER_DATA', `Menghapus parameter pemeriksaan: ${target.name} [${target.code}]`);
+    const list = this.getParameters();
+    const idx = list.findIndex(p => p.id === id);
+    if (idx >= 0) {
+      list[idx] = { ...list[idx], deletedAt: new Date().toISOString() };
+      setStored(KEYS.PARAMETERS, list);
+      
+      const sb = getSupabase();
+      if (sb) {
+        sb.from('test_parameters')
+          .update({ deleted_at: new Date().toISOString() })
+          .eq('id', id)
+          .then();
+      }
+      this.logAudit('UPDATE_MASTER_DATA', `Menghapus parameter pemeriksaan: ${list[idx].name} [${list[idx].code}]`);
     }
   }
 
