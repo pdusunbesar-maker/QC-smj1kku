@@ -219,13 +219,126 @@ export const INITIAL_CONTROL_MATERIALS: ControlMaterial[] = [
   },
   {
     id: 'ctrl-hema-8c',
-    name: 'Eightcheck-3WP (Normal)',
+    name: 'Eightcheck-3WP - Level 1 (Normal)',
     manufacturer: 'Sysmex Corporation',
     level: 'Level 1',
     lotNumber: 'LOT-EC8C-9912',
     expirationDate: '2026-12-15',
     storageCondition: '2°C - 8°C',
     status: 'active'
+  },
+  {
+    id: 'ctrl-hema-8c-l2',
+    name: 'Eightcheck-3WP - Level 2 (Low / Rendah)',
+    manufacturer: 'Sysmex Corporation',
+    level: 'Level 2',
+    lotNumber: 'LOT-EC8C-9911',
+    expirationDate: '2026-12-15',
+    storageCondition: '2°C - 8°C',
+    status: 'active'
+  },
+  {
+    id: 'ctrl-hema-8c-l3',
+    name: 'Eightcheck-3WP - Level 3 (High / Tinggi)',
+    manufacturer: 'Sysmex Corporation',
+    level: 'Level 3',
+    lotNumber: 'LOT-EC8C-9913',
+    expirationDate: '2026-12-15',
+    storageCondition: '2°C - 8°C',
+    status: 'active'
+  },
+  {
+    id: 'ctrl-dimih-h1',
+    name: 'Dirui Dimih Control - Level 1 (Normal)',
+    manufacturer: 'Dirui Industrial',
+    level: 'Level 1',
+    lotNumber: 'LOT-DIMIH-L1-26',
+    expirationDate: '2027-04-30',
+    storageCondition: '2°C - 8°C',
+    status: 'active'
+  },
+  {
+    id: 'ctrl-dimih-h2',
+    name: 'Dirui Dimih Control - Level 2 (Low / Rendah)',
+    manufacturer: 'Dirui Industrial',
+    level: 'Level 2',
+    lotNumber: 'LOT-DIMIH-L2-26',
+    expirationDate: '2027-04-30',
+    storageCondition: '2°C - 8°C',
+    status: 'active'
+  },
+  {
+    id: 'ctrl-dimih-h3',
+    name: 'Dirui Dimih Control - Level 3 (High / Tinggi)',
+    manufacturer: 'Dirui Industrial',
+    level: 'Level 3',
+    lotNumber: 'LOT-DIMIH-L3-26',
+    expirationDate: '2027-04-30',
+    storageCondition: '2°C - 8°C',
+    status: 'active'
+  }
+];
+
+export const INITIAL_QC_LOTS: any[] = [
+  {
+    id: 'lot-ec8c-l1',
+    number: 'LOT-EC8C-9912',
+    materialId: 'ctrl-hema-8c',
+    levelId: 'Level 1',
+    manufacturer: 'Sysmex Corporation',
+    expirationDate: '2026-12-15',
+    status: 'active',
+    notes: 'Eightcheck-3WP Level 1 (Normal) untuk Dirui Dimih 3980'
+  },
+  {
+    id: 'lot-ec8c-l2',
+    number: 'LOT-EC8C-9911',
+    materialId: 'ctrl-hema-8c-l2',
+    levelId: 'Level 2',
+    manufacturer: 'Sysmex Corporation',
+    expirationDate: '2026-12-15',
+    status: 'active',
+    notes: 'Eightcheck-3WP Level 2 (Low / Rendah) untuk Dirui Dimih 3980'
+  },
+  {
+    id: 'lot-ec8c-l3',
+    number: 'LOT-EC8C-9913',
+    materialId: 'ctrl-hema-8c-l3',
+    levelId: 'Level 3',
+    manufacturer: 'Sysmex Corporation',
+    expirationDate: '2026-12-15',
+    status: 'active',
+    notes: 'Eightcheck-3WP Level 3 (High / Tinggi) untuk Dirui Dimih 3980'
+  },
+  {
+    id: 'lot-dimih-l1',
+    number: 'LOT-DIMIH-L1-26',
+    materialId: 'ctrl-dimih-h1',
+    levelId: 'Level 1',
+    manufacturer: 'Dirui Industrial',
+    expirationDate: '2027-04-30',
+    status: 'active',
+    notes: 'Dirui Hematology Control Level 1 Normal'
+  },
+  {
+    id: 'lot-dimih-l2',
+    number: 'LOT-DIMIH-L2-26',
+    materialId: 'ctrl-dimih-h2',
+    levelId: 'Level 2',
+    manufacturer: 'Dirui Industrial',
+    expirationDate: '2027-04-30',
+    status: 'active',
+    notes: 'Dirui Hematology Control Level 2 Low'
+  },
+  {
+    id: 'lot-dimih-l3',
+    number: 'LOT-DIMIH-L3-26',
+    materialId: 'ctrl-dimih-h3',
+    levelId: 'Level 3',
+    manufacturer: 'Dirui Industrial',
+    expirationDate: '2027-04-30',
+    status: 'active',
+    notes: 'Dirui Hematology Control Level 3 High'
   }
 ];
 

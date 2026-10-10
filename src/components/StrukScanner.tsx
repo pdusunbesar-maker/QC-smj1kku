@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import Tesseract from "tesseract.js";
 import { supabase } from "../lib/supabase";
 import { StorageService } from "../services/storage";
-import { Parameter, Instrument, ControlMaterial, QCResult } from "../types";
+import { Parameter, Instrument, ControlMaterial, QCLot, QCResult } from "../types";
 import { 
   Sparkles, 
   Upload, 
@@ -35,7 +35,9 @@ import {
   ChevronUp,
   Target,
   Filter,
-  CheckCircle
+  CheckCircle,
+  Tag,
+  Shield
 } from "lucide-react";
 
 export interface HasilQC {
@@ -141,14 +143,21 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
   const [instruments, setInstruments] = useState<Instrument[]>([]);
   const [parameters, setParameters] = useState<Parameter[]>([]);
   const [controls, setControls] = useState<ControlMaterial[]>([]);
+  const [qcLots, setQcLots] = useState<QCLot[]>([]);
 
-  // QC Metadata Config
+  // QC Metadata Config - Terintegrasi Master Data
   const [selectedInstrumentId, setSelectedInstrumentId] = useState<string>("inst-dirui-3980");
+  const [selectedControlMaterialId, setSelectedControlMaterialId] = useState<string>("ctrl-hema-8c");
   const [selectedControlLevel, setSelectedControlLevel] = useState<"Level 1" | "Level 2" | "Level 3">("Level 1");
   const [selectedLotNumber, setSelectedLotNumber] = useState<string>("LOT-EC8C-9912");
+  const [isCustomLot, setIsCustomLot] = useState<boolean>(false);
   const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toISOString().split("T")[0]);
   const [selectedTime, setSelectedTime] = useState<string>(() => new Date().toTimeString().split(" ")[0].substring(0, 5));
   const [syncToLeveyJennings, setSyncToLeveyJennings] = useState<boolean>(true);
+
+  // Struk Header Detection State
+  const [detectedReceiptLot, setDetectedReceiptLot] = useState<string | null>(null);
+  const [detectedReceiptLevel, setDetectedReceiptLevel] = useState<string | null>(null);
 
   // Preprocessing Adjustments State (User Tuning & Rescan)
   const [activePreset, setActivePreset] = useState<PreprocessPreset>('standard');
@@ -166,15 +175,25 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
     const instList = StorageService.getInstruments();
     const paramList = StorageService.getParameters();
     const ctrlList = StorageService.getControlMaterials();
+    const lotList = StorageService.getQCLots();
 
     setInstruments(instList);
     setParameters(paramList);
     setControls(ctrlList);
+    setQcLots(lotList);
 
     // If Dirui instrument exists, ensure it is selected
     const diruiInst = instList.find(i => i.id === "inst-dirui-3980" || i.code.includes("3980"));
     if (diruiInst) {
       setSelectedInstrumentId(diruiInst.id);
+    }
+
+    // Default to Eightcheck Level 1 or first hematology control
+    const defaultCtrl = ctrlList.find(c => c.id === 'ctrl-hema-8c' || c.name.toLowerCase().includes('eightcheck')) || ctrlList[0];
+    if (defaultCtrl) {
+      setSelectedControlMaterialId(defaultCtrl.id);
+      setSelectedControlLevel(defaultCtrl.level || 'Level 1');
+      setSelectedLotNumber(defaultCtrl.lotNumber || 'LOT-EC8C-9912');
     }
   }, []);
 
@@ -190,6 +209,90 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
       code: "DIMIH-3980"
     };
   }, [instruments, selectedInstrumentId]);
+
+  // Bahan Kontrol Terpilih dari Master Data
+  const selectedControlMaterial = useMemo(() => {
+    return controls.find(c => c.id === selectedControlMaterialId) 
+      || controls.find(c => c.level === selectedControlLevel) 
+      || controls[0];
+  }, [controls, selectedControlMaterialId, selectedControlLevel]);
+
+  // Daftar Nomor LOT Master yang Tersedia untuk Bahan Kontrol & Level Terpilih
+  const availableLots = useMemo(() => {
+    const map = new Map<string, { number: string; expDate?: string; status: string; id?: string }>();
+    
+    // 1. Lot dari bahan kontrol terpilih
+    if (selectedControlMaterial?.lotNumber) {
+      map.set(selectedControlMaterial.lotNumber, {
+        number: selectedControlMaterial.lotNumber,
+        expDate: selectedControlMaterial.expirationDate,
+        status: selectedControlMaterial.status || 'active',
+        id: selectedControlMaterial.id
+      });
+    }
+
+    // 2. Lot dari daftar tabel Master QCLot
+    qcLots.forEach(l => {
+      const matchMaterial = l.materialId === selectedControlMaterialId || l.materialId === selectedControlMaterial?.id;
+      const matchLevel = l.levelId === selectedControlLevel || !l.levelId;
+      if (matchMaterial || matchLevel) {
+        if (!map.has(l.number)) {
+          map.set(l.number, {
+            number: l.number,
+            expDate: l.expirationDate,
+            status: l.status || 'active',
+            id: l.id
+          });
+        }
+      }
+    });
+
+    // 3. Tambahan lot dari bahan kontrol lain yang berlevel sama
+    controls.filter(c => c.level === selectedControlLevel).forEach(c => {
+      if (c.lotNumber && !map.has(c.lotNumber)) {
+        map.set(c.lotNumber, {
+          number: c.lotNumber,
+          expDate: c.expirationDate,
+          status: c.status || 'active',
+          id: c.id
+        });
+      }
+    });
+
+    return Array.from(map.values());
+  }, [selectedControlMaterial, selectedControlMaterialId, selectedControlLevel, qcLots, controls]);
+
+  // Handler Ganti Bahan Kontrol Master (Auto-Sync Level & Lot)
+  const handleControlMaterialChange = (materialId: string) => {
+    setSelectedControlMaterialId(materialId);
+    const found = controls.find(c => c.id === materialId);
+    if (found) {
+      setSelectedControlLevel(found.level);
+      setSelectedLotNumber(found.lotNumber);
+    }
+  };
+
+  // Handler Ganti Level Kontrol Master (Auto-Sync Bahan Kontrol & Lot)
+  const handleLevelChange = (newLevel: "Level 1" | "Level 2" | "Level 3") => {
+    setSelectedControlLevel(newLevel);
+    
+    // Cari bahan kontrol yang sesuai dengan level baru dari keluarga yang sama (Eightcheck atau Dirui)
+    const currentName = selectedControlMaterial?.name.toLowerCase() || "";
+    const isDiruiBrand = currentName.includes("dirui");
+    
+    let matchedCtrl = controls.find(c => 
+      c.level === newLevel && (isDiruiBrand ? c.name.toLowerCase().includes("dirui") : c.name.toLowerCase().includes("eightcheck"))
+    );
+
+    if (!matchedCtrl) {
+      matchedCtrl = controls.find(c => c.level === newLevel);
+    }
+
+    if (matchedCtrl) {
+      setSelectedControlMaterialId(matchedCtrl.id);
+      setSelectedLotNumber(matchedCtrl.lotNumber);
+    }
+  };
 
   // Alias mapper to match receipt OCR codes to master parameters
   const findMatchingMasterParameter = useCallback((itemCode: string): Parameter | undefined => {
@@ -253,7 +356,8 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
   }, [dimihParameters, parameters]);
 
   // Evaluates SDI (Z-Score) & Westgard Status against Master Data
-  const evaluateMasterDataMetrics = useCallback((nilaiStr: string, param?: Parameter, flagStr?: string | null) => {
+  // Menyesuaikan target rata-rata sesuai Level Kontrol (Level 1 Normal, Level 2 Low, Level 3 High)
+  const evaluateMasterDataMetrics = useCallback((nilaiStr: string, param?: Parameter, flagStr?: string | null, levelOverride?: "Level 1" | "Level 2" | "Level 3") => {
     const val = parseFloat(nilaiStr);
     if (isNaN(val) || !param || !param.targetSD || param.targetSD <= 0) {
       return {
@@ -266,7 +370,24 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
       };
     }
 
-    const zScore = (val - param.targetMean) / param.targetSD;
+    const currentLevel = levelOverride || selectedControlLevel;
+    let targetMean = param.targetMean;
+    let targetSD = param.targetSD;
+
+    // Penyesuaian rentang target bila menggunakan bahan kontrol Level 2 (Low) atau Level 3 (High)
+    if (currentLevel === 'Level 2') {
+      const isHemoglobin = ['HGB', 'HCT'].includes(param.code.toUpperCase());
+      const factor = isHemoglobin ? 0.60 : 0.50;
+      targetMean = Number((param.targetMean * factor).toFixed(2));
+      targetSD = Number((param.targetSD * factor).toFixed(2)) || 0.1;
+    } else if (currentLevel === 'Level 3') {
+      const isHemoglobin = ['HGB', 'HCT'].includes(param.code.toUpperCase());
+      const factor = isHemoglobin ? 1.40 : 1.70;
+      targetMean = Number((param.targetMean * factor).toFixed(2));
+      targetSD = Number((param.targetSD * factor).toFixed(2)) || 0.1;
+    }
+
+    const zScore = (val - targetMean) / targetSD;
     const absZ = Math.abs(zScore);
     const sign = zScore >= 0 ? "+" : "";
     const sdPosition = `${sign}${zScore.toFixed(2)} SD`;
@@ -283,14 +404,14 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
     }
 
     return {
-      targetMean: param.targetMean,
-      targetSD: param.targetSD,
+      targetMean,
+      targetSD,
       zScore: Number(zScore.toFixed(2)),
       sdPosition,
       status,
       violation
     };
-  }, []);
+  }, [selectedControlLevel]);
 
   /**
    * Preprocessing Canvas Tingkat Lanjut (WAJIB):
@@ -412,9 +533,9 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
 
   /**
    * Logika Parsing FOKUS MASTER DATA:
-   * 1. Mencari parameter yang ADA di Master Data (HGB, HCT, WBC, PLT, RBC, dsb.)
-   * 2. Mengesampingkan parameter / teks yang TIDAK ADA di Master Data
-   * 3. Pemindaian bertarget khusus (Targeted Extractor) untuk parameter kunci
+   * 1. Mendeteksi LOT & LEVEL dari Header Struk dan menyelaraskan ke Master Data
+   * 2. Mencari parameter yang ADA di Master Data (HGB, HCT, WBC, PLT, RBC, dsb.)
+   * 3. Mengesampingkan parameter / teks yang TIDAK ADA di Master Data
    */
   const parseStruk = useCallback((text: string): HasilQC[] => {
     setRawOcrText(text);
@@ -422,10 +543,70 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
     const resultsMap = new Map<string, HasilQC>();
     const ignored: IgnoredItem[] = [];
 
-    // Regex baris: [FLAG?] [ITEM] [FLAG?] [NILAI] [UNIT?]
+    // --- A. DETEKSI OTOMATIS NOMOR LOT & LEVEL DARI STRUK ---
+    const lotMatch = text.match(/\bLOT\s*[:#-]?\s*([A-Z0-9\-_]+)/i);
+    let matchedLotFound: string | null = null;
+    let matchedLevelFound: ("Level 1" | "Level 2" | "Level 3") | null = null;
+
+    if (lotMatch && lotMatch[1]) {
+      const detectedLotStr = lotMatch[1].trim();
+      matchedLotFound = detectedLotStr;
+      
+      // Cari apakah LOT ini ada pada Master Data Bahan Kontrol
+      const matchedCtrl = controls.find(c => c.lotNumber.toUpperCase() === detectedLotStr.toUpperCase())
+        || controls.find(c => detectedLotStr.toUpperCase().includes(c.lotNumber.toUpperCase()) || c.lotNumber.toUpperCase().includes(detectedLotStr.toUpperCase()));
+
+      if (matchedCtrl) {
+        setSelectedControlMaterialId(matchedCtrl.id);
+        setSelectedControlLevel(matchedCtrl.level);
+        setSelectedLotNumber(matchedCtrl.lotNumber);
+        setDetectedReceiptLot(matchedCtrl.lotNumber);
+        setDetectedReceiptLevel(matchedCtrl.level);
+        matchedLevelFound = matchedCtrl.level;
+      } else {
+        // Cari di daftar Master QCLots
+        const matchLotObj = qcLots.find(l => l.number.toUpperCase() === detectedLotStr.toUpperCase());
+        if (matchLotObj) {
+          setSelectedLotNumber(matchLotObj.number);
+          if (matchLotObj.levelId) {
+            setSelectedControlLevel(matchLotObj.levelId as any);
+            matchedLevelFound = matchLotObj.levelId as any;
+          }
+          if (matchLotObj.materialId) setSelectedControlMaterialId(matchLotObj.materialId);
+          setDetectedReceiptLot(matchLotObj.number);
+        } else {
+          setSelectedLotNumber(detectedLotStr);
+          setDetectedReceiptLot(detectedLotStr);
+        }
+      }
+    }
+
+    // Deteksi Level dari Header (misal: "SAMPLE ID: QC-DIMIH-LV1", "LEVEL 1", "LV2", "NORMAL")
+    const levelMatch = text.match(/\b(?:LEVEL\s*([123])|LV([123])|QC[A-Z0-9\-_]*LV([123])|NORMAL|LOW|HIGH)\b/i);
+    if (levelMatch) {
+      let lvlName: "Level 1" | "Level 2" | "Level 3" = "Level 1";
+      const lvlNum = levelMatch[1] || levelMatch[2] || levelMatch[3];
+      const matchText = levelMatch[0].toUpperCase();
+
+      if (lvlNum === "1" || matchText.includes("NORMAL")) lvlName = "Level 1";
+      else if (lvlNum === "2" || matchText.includes("LOW")) lvlName = "Level 2";
+      else if (lvlNum === "3" || matchText.includes("HIGH")) lvlName = "Level 3";
+
+      matchedLevelFound = lvlName;
+      setDetectedReceiptLevel(lvlName);
+      setSelectedControlLevel(lvlName);
+
+      // Sinkronkan ke bahan kontrol master yang sesuai dengan level ini
+      const matchCtrl = controls.find(c => c.level === lvlName && (c.name.includes("Eightcheck") || c.name.includes("Dimih")));
+      if (matchCtrl) {
+        setSelectedControlMaterialId(matchCtrl.id);
+        if (!matchedLotFound) setSelectedLotNumber(matchCtrl.lotNumber);
+      }
+    }
+
+    // --- B. PARSING PARAMETER DENGAN FOKUS MASTER DATA ---
     const lineRegex = /(?:([LH])\s+)?([A-Z0-9\-%#]+)\s+(?:([LH])\s+)?([0-9]+[.,]?[0-9]*)\s*([0-9\^\/\%a-zA-Z#]+)?/i;
 
-    // Tahap 1: Line-by-line parsing
     for (let idx = 0; idx < lines.length; idx++) {
       const line = lines[idx];
       const clean = line.replace(/\^/g, "^").trim();
@@ -436,7 +617,7 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
         const flagPre = m[1]?.toUpperCase() || null;
         let itemRaw = m[2].toUpperCase().replace("#", "#").replace("%", "%");
         const flagMid = m[3]?.toUpperCase() || null;
-        let nilaiRaw = m[4].replace(",", "."); // ganti koma desimal ke titik
+        let nilaiRaw = m[4].replace(",", ".");
         let unitRaw = (m[5] || "")
           .replace("10A3", "10^3/uL")
           .replace("10A6", "10^6/uL")
@@ -468,7 +649,6 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
         const matchedParam = findMatchingMasterParameter(itemRaw);
 
         if (!matchedParam) {
-          // KESAMPINGKAN parameter/teks yang tidak ada di master data
           ignored.push({
             item: itemRaw,
             value: nilaiRaw,
@@ -478,10 +658,9 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
           continue;
         }
 
-        // Simpan hasil terverifikasi Master Data
         const canonicalCode = matchedParam.code.toUpperCase();
         if (!resultsMap.has(canonicalCode)) {
-          const metrics = evaluateMasterDataMetrics(nilaiRaw, matchedParam, flag);
+          const metrics = evaluateMasterDataMetrics(nilaiRaw, matchedParam, flag, matchedLevelFound || selectedControlLevel);
           const isCore = CORE_MASTER_CODES.includes(canonicalCode);
 
           resultsMap.set(canonicalCode, {
@@ -504,8 +683,7 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
       }
     }
 
-    // Tahap 2: Pemindaian Bertarget Khusus untuk Parameter Kunci (HGB, HCT, WBC, PLT, RBC)
-    // Memastikan parameter inti tidak terlewatkan jika ada format baris yang sedikit bergeser
+    // --- C. PEMINDAIAN BERTARGET KHUSUS PARAMETER KUNCI (HGB, HCT, WBC, PLT, RBC) ---
     const coreTargetMatchers = [
       { code: "HGB", regex: /(?:^|[^\w])(?:HGB|HB|HEMOGLOBIN|H8B)(?:[:=-]|\s+)\s*([LH])?\s*([0-9]+\.?[0-9]*)\s*([LH])?\s*([a-zA-Z\^\/\%]+)?/i },
       { code: "HCT", regex: /(?:^|[^\w])(?:HCT|HT|HEMATOKRIT|HGI)(?:[:=-]|\s+)\s*([LH])?\s*([0-9]+\.?[0-9]*)\s*([LH])?\s*([a-zA-Z\^\/\%]+)?/i },
@@ -522,7 +700,7 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
           if (matchedParam) {
             const flag = m[1]?.toUpperCase() || m[3]?.toUpperCase() || null;
             const val = m[2];
-            const metrics = evaluateMasterDataMetrics(val, matchedParam, flag);
+            const metrics = evaluateMasterDataMetrics(val, matchedParam, flag, matchedLevelFound || selectedControlLevel);
 
             resultsMap.set(code, {
               id: `item-${Date.now()}-core-${code}`,
@@ -564,7 +742,7 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
 
     setIgnoredItems(ignored);
     return sortedResults;
-  }, [findMatchingMasterParameter, evaluateMasterDataMetrics]);
+  }, [findMatchingMasterParameter, evaluateMasterDataMetrics, controls, qcLots, selectedControlLevel]);
 
   /**
    * Eksekusi OCR dengan Tesseract.js v5
@@ -582,7 +760,7 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
       tessedit_pageseg_mode: "6", // PSM 6: Single uniform block of text
     });
 
-    setProgress("Memvalidasi & memfokuskan parameter Master Data (HGB, HCT, WBC, PLT, RBC)...");
+    setProgress("Memvalidasi parameter, Bahan Kontrol & LOT Master...");
     const parsed = parseStruk(data.text);
     setHasil(parsed);
     setProgress(`Selesai! Ditemukan ${parsed.length} parameter Master Data (HGB, HCT, WBC, PLT, RBC, dll).`);
@@ -635,7 +813,6 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
 
   /**
    * FITUR SCAN ULANG (RESCAN) KHUSUS JIKA HASIL TIDAK SESUAI
-   * Memproses ulang gambar yang sudah ada dengan filter / threshold / crop berbeda tanpa perlu upload ulang!
    */
   const handleRescanWithFilter = async (presetId: PreprocessPreset, customThresh?: number) => {
     if (!sourceFile && !previewSrc) return;
@@ -727,6 +904,8 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
     setProcessedPreviewSrc("");
     setFotoUrl("");
     setRawOcrText("");
+    setDetectedReceiptLot(null);
+    setDetectedReceiptLevel(null);
     setProgress("");
     setStatusMessage(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -737,7 +916,6 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
    * Tambah Baris Parameter Manual (Hanya dari Master Data)
    */
   const handleAddManualRow = () => {
-    // Default to first available master parameter or HGB
     const targetParam = dimihParameters.find(p => p.code === 'HGB') || dimihParameters[0] || parameters[0];
     if (!targetParam) return;
 
@@ -791,15 +969,51 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
     ctx.font = "14px monospace";
     ctx.fillText("----------------------------------------------", 30, 130);
     ctx.fillText(`DATE: ${selectedDate}   TIME: ${selectedTime}`, 30, 155);
-    ctx.fillText(`SAMPLE ID : QC-DIMIH-LV1    LOT: ${selectedLotNumber}`, 30, 180);
+    ctx.fillText(`SAMPLE ID : QC-DIMIH-${selectedControlLevel.replace(" ", "")}   LOT: ${selectedLotNumber}`, 30, 180);
     ctx.fillText(`OPERATOR  : ${atlmId}`, 30, 205);
     ctx.fillText("----------------------------------------------", 30, 230);
     ctx.font = "bold 15px monospace";
     ctx.fillText("ITEM       FLAG   VALUE    UNIT", 30, 255);
     ctx.fillText("----------------------------------------------", 30, 275);
 
-    // Mock realistic receipt rows focusing on Master Data
-    const mockRows = [
+    // Realistic sample values reflecting Master Data
+    const mockRows = selectedControlLevel === "Level 2" ? [
+      { item: "WBC", flag: "L", val: "3.60", unit: "10^3/uL" },
+      { item: "RBC", flag: "L", val: "2.25", unit: "10^6/uL" },
+      { item: "HGB", flag: "L", val: "6.8", unit: "g/dL" },
+      { item: "HCT", flag: "L", val: "20.5", unit: "%" },
+      { item: "MCV", flag: "", val: "88.0", unit: "fL" },
+      { item: "MCH", flag: "", val: "29.2", unit: "pg" },
+      { item: "MCHC", flag: "", val: "33.1", unit: "g/dL" },
+      { item: "PLT", flag: "L", val: "120", unit: "10^3/uL" },
+      { item: "LYM%", flag: "", val: "31.5", unit: "%" },
+      { item: "MXD%", flag: "", val: "7.2", unit: "%" },
+      { item: "NEUT%", flag: "", val: "61.3", unit: "%" },
+      { item: "RDW-CV", flag: "", val: "13.5", unit: "%" },
+      { item: "RDW-SD", flag: "", val: "42.0", unit: "fL" },
+      { item: "MPV", flag: "", val: "9.6", unit: "fL" },
+      { item: "PDW", flag: "", val: "15.4", unit: "%" },
+      { item: "PCT", flag: "", val: "0.14", unit: "%" },
+      { item: "P-LCR", flag: "", val: "27.5", unit: "%" }
+    ] : selectedControlLevel === "Level 3" ? [
+      { item: "WBC", flag: "H", val: "12.20", unit: "10^3/uL" },
+      { item: "RBC", flag: "H", val: "6.30", unit: "10^6/uL" },
+      { item: "HGB", flag: "H", val: "18.8", unit: "g/dL" },
+      { item: "HCT", flag: "H", val: "56.7", unit: "%" },
+      { item: "MCV", flag: "", val: "89.2", unit: "fL" },
+      { item: "MCH", flag: "", val: "29.8", unit: "pg" },
+      { item: "MCHC", flag: "", val: "33.5", unit: "g/dL" },
+      { item: "PLT", flag: "H", val: "415", unit: "10^3/uL" },
+      { item: "LYM%", flag: "", val: "31.5", unit: "%" },
+      { item: "MXD%", flag: "", val: "7.2", unit: "%" },
+      { item: "NEUT%", flag: "", val: "61.3", unit: "%" },
+      { item: "RDW-CV", flag: "", val: "13.5", unit: "%" },
+      { item: "RDW-SD", flag: "", val: "42.0", unit: "fL" },
+      { item: "MPV", flag: "", val: "9.6", unit: "fL" },
+      { item: "PDW", flag: "", val: "15.4", unit: "%" },
+      { item: "PCT", flag: "", val: "0.42", unit: "%" },
+      { item: "P-LCR", flag: "", val: "27.5", unit: "%" }
+    ] : [
       { item: "WBC", flag: "", val: "7.20", unit: "10^3/uL" },
       { item: "RBC", flag: "", val: "4.50", unit: "10^6/uL" },
       { item: "HGB", flag: "L", val: "11.4", unit: "g/dL" },
@@ -833,7 +1047,7 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
     ctx.fillText("----------------------------------------------", 30, y);
     y += 25;
     ctx.font = "13px monospace";
-    ctx.fillText("* STATUS: DIRUI DIMIH 3980 CONTROL NORMAL *", 30, y);
+    ctx.fillText(`* STATUS: DIMIH 3980 ${selectedControlLevel.toUpperCase()} REPORT *`, 30, y);
 
     const dataUrl = canvas.toDataURL("image/png");
     setPreviewSrc(dataUrl);
@@ -850,7 +1064,7 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
         setLoading(false);
       }
     }, "image/png");
-  }, [selectedDate, selectedTime, selectedLotNumber, atlmId, preprocessImage, runOcrRecognition]);
+  }, [selectedDate, selectedTime, selectedLotNumber, selectedControlLevel, atlmId, preprocessImage, runOcrRecognition]);
 
   // Handle row value change with dynamic recalculation against Master Data
   const handleValueChange = (index: number, newVal: string) => {
@@ -949,7 +1163,10 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
 
           if (matchParam) {
             const numVal = parseFloat(h.nilai) || 0;
-            const zScore = matchParam.targetSD > 0 ? (numVal - matchParam.targetMean) / matchParam.targetSD : 0;
+            const evalMetrics = evaluateMasterDataMetrics(h.nilai, matchParam, h.flag);
+            const targetMean = evalMetrics.targetMean ?? matchParam.targetMean;
+            const targetSD = evalMetrics.targetSD ?? matchParam.targetSD;
+            const zScore = evalMetrics.zScore ?? (targetSD > 0 ? (numVal - targetMean) / targetSD : 0);
             const absZ = Math.abs(zScore);
             const status: "pass" | "warning" | "reject" = 
               absZ >= 3.0 ? "reject" : absZ >= 2.0 || h.flag ? "warning" : "pass";
@@ -991,13 +1208,13 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
               lotNumber: selectedLotNumber,
               value: numVal,
               unit: matchParam.unit || h.unit,
-              mean: matchParam.targetMean,
-              sd: matchParam.targetSD,
+              mean: targetMean,
+              sd: targetSD,
               zScore: Number(zScore.toFixed(2)),
               sdPosition: `${zScore >= 0 ? "+" : ""}${zScore.toFixed(2)} SD`,
               status,
               violations,
-              notes: `Diinput via Scan Struk OCR Dirui Dimih 3980 (Flag: ${h.flag || "Normal"})`,
+              notes: `Scan Struk OCR Dimih 3980 | Bahan Kontrol: ${selectedControlMaterial?.name || 'Master'} | Lot: ${selectedLotNumber} | ${selectedControlLevel} (Flag: ${h.flag || "Normal"})`,
               source: "AI_VISION",
               verificationStatus: "VERIFIED",
               reviewStatus: "pending"
@@ -1021,7 +1238,7 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
       // Audit Log
       StorageService.logAudit(
         "INPUT_QC_RESULT",
-        `Input Scan Struk Hematologi Dirui Dimih 3980 (${hemaPayload.length} item, ${syncedQCResultsCount} terintegrasi Master QC)`
+        `Input Scan Struk Hematologi Dirui Dimih 3980 (${hemaPayload.length} item, Bahan Kontrol: ${selectedControlMaterial?.name}, Lot: ${selectedLotNumber})`
       );
 
       StorageService.notifyDataChanged("qc_results");
@@ -1048,12 +1265,12 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
               Scan Struk QC Hematologi Dirui Dimih 3980
             </h2>
             <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold font-mono border border-emerald-300 flex items-center gap-1">
-              <Target className="h-3 w-3" />
-              <span>Fokus Master Data</span>
+              <Shield className="h-3 w-3" />
+              <span>Master Bahan Kontrol & LOT Terintegrasi</span>
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Ekstraksi OCR terarah yang <strong>hanya memproses parameter Master Data</strong> (HGB, HCT, WBC, PLT, RBC, dll.) dan secara otomatis <strong>mengesampingkan teks/parameter di luar Master Data</strong>.
+            Ekstraksi OCR terarah yang terhubung langsung dengan <strong>Bahan Kontrol, Kontrol Level, dan Nomor LOT Master</strong> instrumen <strong>{activeInstrument.name}</strong>.
           </p>
         </div>
 
@@ -1064,7 +1281,7 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
             className="px-3.5 py-2 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
           >
             <Sparkles className="h-3.5 w-3.5 text-blue-600" />
-            <span>Coba Contoh Struk Dimih 3980</span>
+            <span>Coba Contoh Struk Dimih 3980 ({selectedControlLevel})</span>
           </button>
         </div>
       </div>
@@ -1081,7 +1298,7 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
               <span className="text-emerald-700 font-mono">HGB, HCT, WBC, PLT, RBC, MCV, MCH, MCHC, dkk.</span>
             </div>
             <p className="text-[11px] text-slate-600 mt-0.5">
-              Item yang tidak terdaftar pada Master Data instrumen <strong>{activeInstrument.name}</strong> akan disisihkan dan tidak dimasukkan ke dalam tabel QC.
+              Item yang tidak terdaftar pada Master Data instrumen <strong>{activeInstrument.name}</strong> akan disisihkan otomatis.
             </p>
           </div>
         </div>
@@ -1120,55 +1337,157 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
         </div>
       )}
 
-      {/* Master Data Integration Settings Ribbon */}
-      <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Instrumen Hematologi Master:</label>
-          <select
-            value={selectedInstrumentId}
-            onChange={(e) => setSelectedInstrumentId(e.target.value)}
-            className="w-full bg-white border border-slate-300 rounded-lg p-2 font-semibold text-slate-800 focus:outline-none focus:border-blue-500"
-          >
-            {instruments.map(inst => (
-              <option key={inst.id} value={inst.id}>
-                {inst.name} ({inst.code})
-              </option>
-            ))}
-          </select>
+      {/* MASTER DATA INTEGRATION SETTINGS RIBBON: BAHAN KONTROL, LEVEL, DAN NOMOR LOT MASTER */}
+      <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/90 space-y-3 text-xs shadow-2xs">
+        <div className="flex items-center justify-between flex-wrap gap-2 border-b border-slate-200/80 pb-2.5">
+          <div className="flex items-center gap-2">
+            <Layers className="h-4 w-4 text-blue-600" />
+            <span className="font-extrabold text-slate-800 text-sm">
+              Integrasi Bahan Kontrol & Nomor LOT Master
+            </span>
+          </div>
+          {detectedReceiptLot && (
+            <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold font-mono text-[11px] border border-emerald-300 flex items-center gap-1 shadow-2xs">
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+              <span>Struk Terdeteksi: Lot {detectedReceiptLot} ({detectedReceiptLevel || selectedControlLevel})</span>
+            </span>
+          )}
         </div>
 
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Bahan Kontrol & Level:</label>
-          <select
-            value={selectedControlLevel}
-            onChange={(e) => setSelectedControlLevel(e.target.value as any)}
-            className="w-full bg-white border border-slate-300 rounded-lg p-2 font-semibold text-slate-800 focus:outline-none focus:border-blue-500"
-          >
-            <option value="Level 1">Eightcheck-3WP - Level 1 (Normal)</option>
-            <option value="Level 2">Eightcheck-3WP - Level 2 (Low)</option>
-            <option value="Level 3">Eightcheck-3WP - Level 3 (High)</option>
-          </select>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* 1. Instrumen Master */}
+          <div>
+            <label className="font-bold text-slate-700 block mb-1">Instrumen Master:</label>
+            <select
+              value={selectedInstrumentId}
+              onChange={(e) => setSelectedInstrumentId(e.target.value)}
+              className="w-full bg-white border border-slate-300 rounded-lg p-2 font-semibold text-slate-800 focus:outline-none focus:border-blue-500"
+            >
+              {instruments.map(inst => (
+                <option key={inst.id} value={inst.id}>
+                  {inst.name} ({inst.code})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 2. Bahan Kontrol Master */}
+          <div>
+            <label className="font-bold text-slate-700 block mb-1">Bahan Kontrol Master:</label>
+            <select
+              value={selectedControlMaterialId}
+              onChange={(e) => handleControlMaterialChange(e.target.value)}
+              className="w-full bg-white border border-slate-300 rounded-lg p-2 font-semibold text-slate-800 focus:outline-none focus:border-blue-500"
+            >
+              {controls.map(ctrl => (
+                <option key={ctrl.id} value={ctrl.id}>
+                  {ctrl.name} [{ctrl.level}]
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 3. Level Kontrol Master (Segmented Buttons) */}
+          <div>
+            <label className="font-bold text-slate-700 block mb-1">Level Kontrol Master:</label>
+            <div className="grid grid-cols-3 gap-1 bg-slate-200/80 p-1 rounded-lg">
+              {(["Level 1", "Level 2", "Level 3"] as const).map(lvl => (
+                <button
+                  key={lvl}
+                  type="button"
+                  onClick={() => handleLevelChange(lvl)}
+                  className={`py-1.5 px-1.5 rounded-md font-bold text-[11px] transition-all cursor-pointer text-center ${
+                    selectedControlLevel === lvl
+                      ? lvl === "Level 1"
+                        ? "bg-emerald-600 text-white shadow-2xs font-extrabold"
+                        : lvl === "Level 2"
+                        ? "bg-amber-600 text-white shadow-2xs font-extrabold"
+                        : "bg-indigo-600 text-white shadow-2xs font-extrabold"
+                      : "text-slate-600 hover:text-slate-900 bg-transparent hover:bg-slate-300/40"
+                  }`}
+                >
+                  {lvl === "Level 1" ? "L1 (Normal)" : lvl === "Level 2" ? "L2 (Low)" : "L3 (High)"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 4. Nomor LOT Kontrol Master */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="font-bold text-slate-700 block">Nomor LOT Master:</label>
+              <button
+                type="button"
+                onClick={() => setIsCustomLot(!isCustomLot)}
+                className="text-[10px] text-blue-600 hover:text-blue-800 font-bold cursor-pointer"
+              >
+                {isCustomLot ? "Pilih Lot Terdaftar" : "✏️ Input Manual"}
+              </button>
+            </div>
+
+            {isCustomLot ? (
+              <input
+                type="text"
+                value={selectedLotNumber}
+                onChange={(e) => setSelectedLotNumber(e.target.value)}
+                className="w-full bg-white border border-slate-300 rounded-lg p-2 font-mono font-bold text-slate-800 focus:outline-none focus:border-blue-500"
+                placeholder="LOT-EC8C-9912"
+              />
+            ) : (
+              <select
+                value={selectedLotNumber}
+                onChange={(e) => setSelectedLotNumber(e.target.value)}
+                className="w-full bg-white border border-slate-300 rounded-lg p-2 font-mono font-bold text-slate-800 focus:outline-none focus:border-blue-500"
+              >
+                {availableLots.map((lot, idx) => (
+                  <option key={idx} value={lot.number}>
+                    {lot.number} {lot.expDate ? `(Exp: ${lot.expDate})` : ''}
+                  </option>
+                ))}
+                {!availableLots.some(l => l.number === selectedLotNumber) && (
+                  <option value={selectedLotNumber}>{selectedLotNumber} (Struk Terdeteksi)</option>
+                )}
+              </select>
+            )}
+          </div>
         </div>
 
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">No. Lot Kontrol:</label>
-          <input
-            type="text"
-            value={selectedLotNumber}
-            onChange={(e) => setSelectedLotNumber(e.target.value)}
-            className="w-full bg-white border border-slate-300 rounded-lg p-2 font-mono font-bold text-slate-800 focus:outline-none focus:border-blue-500"
-            placeholder="LOT-EC8C-9912"
-          />
-        </div>
+        {/* Informasi Detail Bahan Kontrol & Lot Terpilih */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-slate-200/80 text-[11px] text-slate-600">
+          <div className="flex items-center gap-3 flex-wrap">
+            <span>
+              <strong>Bahan Kontrol:</strong> {selectedControlMaterial?.name || "Eightcheck-3WP"}
+            </span>
+            <span>•</span>
+            <span>
+              <strong>Produsen:</strong> {selectedControlMaterial?.manufacturer || "Sysmex Corporation"}
+            </span>
+            <span>•</span>
+            <span>
+              <strong>Nomor LOT:</strong> <span className="font-mono font-bold text-blue-700">{selectedLotNumber}</span>
+            </span>
+            {selectedControlMaterial?.expirationDate && (
+              <>
+                <span>•</span>
+                <span>
+                  <strong>Kadaluarsa:</strong> {selectedControlMaterial.expirationDate}
+                </span>
+              </>
+            )}
+          </div>
 
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Tanggal Pemeriksaan:</label>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="w-full bg-white border border-slate-300 rounded-lg p-2 font-semibold text-slate-800 focus:outline-none focus:border-blue-500"
-          />
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px] border border-emerald-200">
+              {selectedControlMaterial?.status === 'active' ? '✓ Master Lot Aktif' : 'Master Terdaftar'}
+            </span>
+            <span className={`px-2 py-0.5 rounded font-bold text-[10px] font-mono ${
+              selectedControlLevel === "Level 1" ? "bg-emerald-100 text-emerald-800" :
+              selectedControlLevel === "Level 2" ? "bg-amber-100 text-amber-800" :
+              "bg-indigo-100 text-indigo-800"
+            }`}>
+              {selectedControlLevel}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -1495,7 +1814,7 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
           <div className="space-y-2">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div className="text-xs text-slate-600 font-medium">
-                * Menampilkan hasil parameter yang sesuai dengan Master Data. Nilai dapat dikoreksi sebelum disimpan:
+                * Evaluasi SDI dihitung terhadap target Bahan Kontrol <strong>{selectedControlMaterial?.name} ({selectedControlLevel})</strong>. Nilai dapat dikoreksi sebelum disimpan:
               </div>
               <button
                 type="button"
@@ -1514,7 +1833,7 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
                     <th className="p-3">Item Struk</th>
                     <th className="p-3">Parameter Master Terkait</th>
                     <th className="p-3 text-right">Hasil (OCR)</th>
-                    <th className="p-3 text-center">Target Mean ± SD</th>
+                    <th className="p-3 text-center">Target Mean ± SD ({selectedControlLevel})</th>
                     <th className="p-3 text-center">SDI (Z-Score)</th>
                     <th className="p-3 text-center">Status Mutu</th>
                     <th className="p-3 text-center">Flag</th>

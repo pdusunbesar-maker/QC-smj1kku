@@ -26,6 +26,7 @@ import {
   INITIAL_CAPAS,
   INITIAL_AUDIT_LOGS,
   INITIAL_NOTIFICATIONS,
+  INITIAL_QC_LOTS,
 } from './demoData';
 import { DEFAULT_WESTGARD_RULES } from '../utils/qcCalculations';
 import { getSupabase } from './supabase';
@@ -1421,7 +1422,7 @@ export class StorageService {
   }
 
   static getQCLots(): QCLot[] {
-    return getStored(KEYS.QC_LOTS, []);
+    return getStored(KEYS.QC_LOTS, INITIAL_QC_LOTS);
   }
 
   static saveQCLot(lot: QCLot): void {
