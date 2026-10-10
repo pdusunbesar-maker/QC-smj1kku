@@ -1062,8 +1062,9 @@ export class StorageService {
   // --- Instruments ---
   static getInstruments(): Instrument[] {
     const list = getStored<Instrument[]>(KEYS.INSTRUMENTS, INITIAL_INSTRUMENTS);
+    const deletedIds = new Set(this.getDeletedInstrumentIds());
     // Sanitize: Purge any deleted instruments (e.g. Cobas c311 / inst-chem-a)
-    const cleaned = list.filter(i => i.id !== 'inst-chem-a' && !i.name.toLowerCase().includes('cobas c311') && !i.deletedAt);
+    const cleaned = list.filter(i => i.id !== 'inst-chem-a' && !i.name.toLowerCase().includes('cobas c311') && !deletedIds.has(i.id) && !i.deletedAt);
     if (cleaned.length !== list.length) {
       setStored(KEYS.INSTRUMENTS, cleaned);
       const sb = getSupabase();
@@ -1105,6 +1106,7 @@ export class StorageService {
     if (idx >= 0) {
       list[idx] = { ...list[idx], deletedAt: new Date().toISOString() };
       setStored(KEYS.INSTRUMENTS, list);
+      this.trackDeletedInstrumentId(id);
       
       const sb = getSupabase();
       if (sb) {
@@ -1120,7 +1122,8 @@ export class StorageService {
   // --- Control Materials ---
   static getControlMaterials(): ControlMaterial[] {
     const list = getStored<ControlMaterial[]>(KEYS.CONTROL_MATERIALS, INITIAL_CONTROL_MATERIALS);
-    const cleaned = list.filter(m => m.id !== 'ctrl-pnu-1' && !m.name.toLowerCase().includes('precinorm') && !m.deletedAt);
+    const deletedIds = new Set(this.getDeletedControlIds());
+    const cleaned = list.filter(m => m.id !== 'ctrl-pnu-1' && !m.name.toLowerCase().includes('precinorm') && !deletedIds.has(m.id) && !m.deletedAt);
     if (cleaned.length !== list.length) {
       setStored(KEYS.CONTROL_MATERIALS, cleaned);
       const sb = getSupabase();
@@ -1154,6 +1157,7 @@ export class StorageService {
     if (idx >= 0) {
       list[idx] = { ...list[idx], deletedAt: new Date().toISOString() };
       setStored(KEYS.CONTROL_MATERIALS, list);
+      this.trackDeletedControlId(id);
 
       const sb = getSupabase();
       if (sb) {
@@ -1277,6 +1281,30 @@ export class StorageService {
     if (!list.includes(id)) {
       list.push(id);
       setStored(KEYS.DELETED_QC_IDS, list);
+    }
+  }
+
+  static getDeletedInstrumentIds(): string[] {
+    return getStored<string[]>(KEYS.DELETED_INSTRUMENT_IDS, []);
+  }
+
+  static trackDeletedInstrumentId(id: string): void {
+    const list = this.getDeletedInstrumentIds();
+    if (!list.includes(id)) {
+      list.push(id);
+      setStored(KEYS.DELETED_INSTRUMENT_IDS, list);
+    }
+  }
+
+  static getDeletedControlIds(): string[] {
+    return getStored<string[]>(KEYS.DELETED_CONTROL_IDS, []);
+  }
+
+  static trackDeletedControlId(id: string): void {
+    const list = this.getDeletedControlIds();
+    if (!list.includes(id)) {
+      list.push(id);
+      setStored(KEYS.DELETED_CONTROL_IDS, list);
     }
   }
 
