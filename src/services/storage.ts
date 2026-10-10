@@ -12,6 +12,7 @@ import {
   User,
   RoleDefinition,
   QCLot,
+  QCHematologi,
 } from '../types';
 import {
   INITIAL_LAB_INFO,
@@ -45,6 +46,7 @@ const KEYS = {
   NOTIFICATIONS: 'lqcms_notifications_v1',
   DELETED_QC_IDS: 'lqcms_deleted_qc_ids_v1',
   QC_LOTS: 'lqcms_qc_lots_v1',
+  QC_HEMATOLOGI: 'lqcms_qc_hematologi_v1',
 };
 
 // Generic safe storage helper
@@ -459,6 +461,35 @@ function mapAuditToDb(a: AuditLog) {
   };
 }
 
+function mapQCHematologiToDb(q: QCHematologi) {
+  return {
+    id: q.id,
+    tanggal: q.tanggal,
+    item: q.item,
+    hasil: Number(q.hasil),
+    flag: q.flag || null,
+    unit: q.unit,
+    foto_url: q.fotoUrl || q.foto_url || null,
+    atlm_id: q.atlmId || q.atlm_id || null,
+  };
+}
+
+function mapDbToQCHematologi(row: any): QCHematologi {
+  return {
+    id: row.id,
+    tanggal: row.tanggal,
+    item: row.item,
+    hasil: Number(row.hasil),
+    flag: row.flag || null,
+    unit: row.unit || '',
+    fotoUrl: row.foto_url || row.fotoUrl || '',
+    foto_url: row.foto_url || row.fotoUrl || '',
+    atlmId: row.atlm_id || row.atlmId || '',
+    atlm_id: row.atlm_id || row.atlmId || '',
+    createdAt: row.created_at || row.createdAt,
+  };
+}
+
 function mapDbToAudit(row: any): AuditLog {
   return {
     id: row.id,
@@ -606,6 +637,13 @@ export class StorageService {
       if (!auditErr && auditData && auditData.length > 0) {
         const mapped = auditData.map(mapDbToAudit);
         setStored(KEYS.AUDIT_LOGS, mapped);
+      }
+
+      // 10. Fetch QC Hematologi (Dirui Dimih 3980 OCR)
+      const { data: hemaData, error: hemaErr } = await sb.from('qc_hematologi').select('*').order('created_at', { ascending: false }).limit(200);
+      if (!hemaErr && hemaData && hemaData.length > 0) {
+        const mapped = hemaData.map(mapDbToQCHematologi);
+        setStored(KEYS.QC_HEMATOLOGI, mapped);
       }
 
       if (onSynced) onSynced();
@@ -1393,6 +1431,115 @@ export class StorageService {
   static deleteQCLot(id: string): void {
     const list = this.getQCLots().filter(l => l.id !== id);
     setStored(KEYS.QC_LOTS, list);
+  }
+
+  // --- QC Hematologi (Dirui Dimih 3980 OCR) ---
+  static getQCHematologi(): QCHematologi[] {
+    return getStored<QCHematologi[]>(KEYS.QC_HEMATOLOGI, []);
+  }
+
+  static async uploadStrukPhoto(blob: Blob, customName?: string): Promise<string | null> {
+    const sb = getSupabase();
+    if (!sb) return null;
+    try {
+      const fileName = customName || `struk-${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
+      const { error } = await sb.storage
+        .from('struk-qc')
+        .upload(fileName, blob, { contentType: 'image/jpeg', upsert: true });
+
+      if (error) {
+        console.warn('Supabase uploadStrukPhoto warning:', error.message);
+        return null;
+      }
+
+      const { data } = sb.storage.from('struk-qc').getPublicUrl(fileName);
+      return data?.publicUrl || null;
+    } catch (e) {
+      console.error('Error in uploadStrukPhoto:', e);
+      return null;
+    }
+  }
+
+  static async saveQCHematologiBatch(
+    items: Array<{
+      item: string;
+      hasil: number;
+      flag: 'L' | 'H' | null | string;
+      unit: string;
+      tanggal?: string;
+    }>,
+    photoBlobOrUrl?: Blob | string,
+    targetDate?: string
+  ): Promise<{ success: boolean; records: QCHematologi[]; fotoUrl?: string; error?: string }> {
+    try {
+      let fotoUrl = typeof photoBlobOrUrl === 'string' ? photoBlobOrUrl : '';
+      if (photoBlobOrUrl && typeof photoBlobOrUrl !== 'string') {
+        const uploaded = await this.uploadStrukPhoto(photoBlobOrUrl);
+        if (uploaded) fotoUrl = uploaded;
+      }
+
+      const currentUser = this.getCurrentUser();
+      const tanggalDefault = targetDate || new Date().toISOString().split('T')[0];
+
+      const newRecords: QCHematologi[] = items.map(item => ({
+        id: `QCH-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+        tanggal: item.tanggal || tanggalDefault,
+        item: item.item,
+        hasil: Number(item.hasil),
+        flag: item.flag || null,
+        unit: item.unit,
+        fotoUrl: fotoUrl || undefined,
+        foto_url: fotoUrl || undefined,
+        atlmId: currentUser.id,
+        atlm_id: currentUser.id,
+        createdAt: new Date().toISOString(),
+      }));
+
+      // Store locally
+      const existing = this.getQCHematologi();
+      const updated = [...newRecords, ...existing];
+      setStored(KEYS.QC_HEMATOLOGI, updated);
+
+      // Save to Supabase
+      const sb = getSupabase();
+      if (sb) {
+        const dbPayload = newRecords.map(mapQCHematologiToDb);
+        const { error } = await sb.from('qc_hematologi').insert(dbPayload);
+        if (error) {
+          console.warn('Supabase saveQCHematologi error:', error.message);
+        }
+      }
+
+      // Also create audit log
+      this.logAudit(
+        'INPUT_QC_RESULT',
+        `Menyimpan hasil Scan Struk Hematologi Dirui Dimih 3980 (${newRecords.length} parameter: ${newRecords.map(r => r.item).join(', ')})`,
+        newRecords
+      );
+
+      this.notifyDataChanged('qc_hematologi');
+      return { success: true, records: newRecords, fotoUrl };
+    } catch (err: any) {
+      console.error('saveQCHematologiBatch failed:', err);
+      return { success: false, records: [], error: err.message };
+    }
+  }
+
+  static deleteQCHematologi(id: string): void {
+    const list = this.getQCHematologi().filter(item => item.id !== id);
+    setStored(KEYS.QC_HEMATOLOGI, list);
+
+    const sb = getSupabase();
+    if (sb) {
+      sb.from('qc_hematologi')
+        .delete()
+        .eq('id', id)
+        .then(({ error }) => {
+          if (error) console.error('Supabase deleteQCHematologi error:', error);
+        });
+    }
+
+    this.notifyDataChanged('qc_hematologi');
   }
 
   // --- Audit Logs ---

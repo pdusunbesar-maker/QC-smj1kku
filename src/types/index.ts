@@ -430,3 +430,19 @@ export interface AIMapping {
   status: 'active' | 'inactive';
   notes?: string;
 }
+
+export interface QCHematologi {
+  id: string;
+  tanggal: string; // YYYY-MM-DD
+  item: string;
+  hasil: number;
+  flag: 'L' | 'H' | null | string;
+  unit: string;
+  fotoUrl?: string;
+  foto_url?: string;
+  atlmId?: string;
+  atlm_id?: string;
+  createdAt?: string;
+  created_at?: string;
+}
+

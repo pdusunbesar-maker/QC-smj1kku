@@ -48,6 +48,7 @@ interface QCScanViewProps {
   parameters?: Parameter[];
   instruments?: Instrument[];
   onScanComplete: (results: any[], previewUrl: string | null, documentMeta?: any) => void;
+  onNavigateToTab?: (tab: string, payload?: any) => void;
 }
 
 interface CropRegion {
@@ -675,7 +676,8 @@ export const QCScanView: React.FC<QCScanViewProps> = ({
   controls, 
   parameters: propParameters, 
   instruments: propInstruments, 
-  onScanComplete 
+  onScanComplete,
+  onNavigateToTab
 }) => {
   const [instruments, setInstruments] = useState<Instrument[]>(() => propInstruments || []);
   const [parameters, setParameters] = useState<Parameter[]>(() => propParameters || []);
@@ -1398,6 +1400,20 @@ export const QCScanView: React.FC<QCScanViewProps> = ({
                 <span>Batch Multi-Foto ({batchQueue.length} Struk)</span>
               </button>
             </div>
+
+            {onNavigateToTab && (
+              <button
+                type="button"
+                onClick={() => onNavigateToTab('qc-hematologi')}
+                className="px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-800 hover:from-blue-100 hover:to-indigo-100 border border-blue-200 shadow-2xs transition-all cursor-pointer"
+              >
+                <Scan className="h-3.5 w-3.5 text-blue-600" />
+                <span>Struk Dirui Dimih 3980 (OCR)</span>
+                <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-blue-600 text-white">
+                  Tesseract v5
+                </span>
+              </button>
+            )}
           </div>
 
           {scanMode === 'batch' && batchQueue.length > 0 && (

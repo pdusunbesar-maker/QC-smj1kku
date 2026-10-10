@@ -386,12 +386,32 @@ CREATE TABLE IF NOT EXISTS notifications (
     read BOOLEAN DEFAULT false
 );
 
+-- 16. QC HEMATOLOGI TABLE (DIRUI DIMIH 3980 OCR)
+CREATE TABLE IF NOT EXISTS qc_hematologi (
+    id TEXT PRIMARY KEY,
+    tanggal DATE NOT NULL DEFAULT CURRENT_DATE,
+    item TEXT NOT NULL,
+    hasil NUMERIC(10, 3) NOT NULL,
+    flag TEXT,
+    unit TEXT,
+    foto_url TEXT,
+    atlm_id TEXT REFERENCES app_users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- STORAGE BUCKET "struk-qc" FOR RECEIPT IMAGES
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('struk-qc', 'struk-qc', true)
+ON CONFLICT (id) DO NOTHING;
+
 -- INDEXES FOR PERFORMANCE
 CREATE INDEX IF NOT EXISTS idx_qc_parameter ON qc_results(parameter_id);
 CREATE INDEX IF NOT EXISTS idx_qc_instrument ON qc_results(instrument_id);
 CREATE INDEX IF NOT EXISTS idx_qc_date ON qc_results(date);
 CREATE INDEX IF NOT EXISTS idx_qc_status ON qc_results(status);
 CREATE INDEX IF NOT EXISTS idx_qc_review ON qc_results(review_status);
+CREATE INDEX IF NOT EXISTS idx_qc_hema_tanggal ON qc_hematologi(tanggal);
+CREATE INDEX IF NOT EXISTS idx_qc_hema_item ON qc_hematologi(item);
 CREATE INDEX IF NOT EXISTS idx_audit_time ON audit_logs(timestamp);
 CREATE INDEX IF NOT EXISTS idx_capa_status ON capa(status);
 
@@ -407,10 +427,15 @@ ALTER TABLE westgard_rules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE qc_results ENABLE ROW LEVEL SECURITY;
 ALTER TABLE qc_violations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE qc_statistics ENABLE ROW LEVEL SECURITY;
+ALTER TABLE qc_hematologi ENABLE ROW LEVEL SECURITY;
 ALTER TABLE non_conformities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE capa ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Public qc_hematologi" ON qc_hematologi;
+CREATE POLICY "Public qc_hematologi" ON qc_hematologi FOR ALL USING (true) WITH CHECK (true);
+
 
 DROP POLICY IF EXISTS "Public laboratories" ON laboratories;
 CREATE POLICY "Public laboratories" ON laboratories FOR ALL USING (true) WITH CHECK (true);

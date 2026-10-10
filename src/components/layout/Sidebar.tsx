@@ -16,6 +16,7 @@ import {
   LogOut,
   X,
   Camera,
+  Scan,
   PanelLeftClose,
   PanelLeftOpen
 } from 'lucide-react';
@@ -68,6 +69,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           label: 'Scan QC',
           icon: Camera,
           badge: null,
+          roleRestricted: role === 'viewer',
+        },
+        {
+          id: 'qc-hematologi',
+          label: 'Scan Struk Dirui 3980',
+          icon: Scan,
+          badge: 'OCR',
+          badgeColor: 'bg-blue-400/20 text-blue-300 border border-blue-300/30',
           roleRestricted: role === 'viewer',
         },
         {

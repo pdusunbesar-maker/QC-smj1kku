@@ -22,6 +22,7 @@ import { MasterDataView } from './components/master/MasterDataView';
 import { QCReviewView } from './components/qc/QCReviewView';
 import { QCScanView } from './components/qc/QCScanView';
 import { QCVerificationView } from './components/qc/QCVerificationView';
+import { DiruiHematologiScanView } from './components/qc/DiruiHematologiScanView';
 import { LeveyJenningsChart } from './components/chart/LeveyJenningsChart';
 import { WestgardRulesView } from './components/westgard/WestgardRulesView';
 import { NonConformityView } from './components/nonconformity/NonConformityView';
@@ -223,12 +224,22 @@ function AppContent() {
                 controls={controls}
                 parameters={parameters}
                 instruments={instruments}
+                onNavigateToTab={handleNavigateToTab}
                 onScanComplete={(results, previewUrl, docMeta) => {
                   setScannedResults(results);
                   setScanPreviewUrl(previewUrl);
                   setScannedDocumentMeta(docMeta);
                   setActiveTab('qc-verification');
                 }} 
+              />
+            )}
+
+            {/* 3b. Scan Struk Hematologi Dirui Dimih 3980 (OCR) */}
+            {activeTab === 'qc-hematologi' && (
+              <DiruiHematologiScanView
+                instruments={instruments}
+                parameters={parameters}
+                onNavigateToTab={handleNavigateToTab}
               />
             )}
 
