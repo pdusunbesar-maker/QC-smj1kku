@@ -1500,7 +1500,7 @@ export const QCScanView: React.FC<QCScanViewProps> = ({
       {/* Embedded StrukScanner or Regular Single/Batch Scan View */}
       {scanMode === 'struk-scanner' ? (
         <div className="space-y-4">
-          <StrukScanner atlmId={user?.id || 'ATLM-01'} />
+          <StrukScanner atlmId={user?.id || 'ATLM-01'} onNavigateToTab={onNavigateToTab} />
         </div>
       ) : (
         <>

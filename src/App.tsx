@@ -238,7 +238,7 @@ function AppContent() {
             {/* 3b. Scan Struk Hematologi (StrukScanner) */}
             {activeTab === 'qc-hematologi' && (
               <div className="space-y-4 max-w-4xl mx-auto">
-                <StrukScanner atlmId={user?.id || 'ATLM-01'} />
+                <StrukScanner atlmId={user?.id || 'ATLM-01'} onNavigateToTab={handleNavigateToTab} />
               </div>
             )}
 

@@ -1126,8 +1126,15 @@ export class StorageService {
   static getParameters(): Parameter[] {
     const list = getStored<Parameter[]>(KEYS.PARAMETERS, INITIAL_PARAMETERS);
     const activeInsts = new Set(this.getInstruments().map(i => i.id));
-    const cleaned = list.filter(p => p.instrumentId !== 'inst-chem-a' && activeInsts.has(p.instrumentId) && !p.name.toLowerCase().includes('cobas c311'));
-    if (cleaned.length !== list.length) {
+    let cleaned = list.filter(p => p.instrumentId !== 'inst-chem-a' && activeInsts.has(p.instrumentId) && !p.name.toLowerCase().includes('cobas c311'));
+
+    // Pastikan seluruh parameter hematologi Dirui Dimih 3980 dari master data bawaan selalu disertakan
+    const existingIds = new Set(cleaned.map(p => p.id));
+    const missingDimih = INITIAL_PARAMETERS.filter(p => p.instrumentId === 'inst-dirui-3980' && !existingIds.has(p.id));
+    if (missingDimih.length > 0) {
+      cleaned = [...cleaned, ...missingDimih];
+      setStored(KEYS.PARAMETERS, cleaned);
+    } else if (cleaned.length !== list.length) {
       setStored(KEYS.PARAMETERS, cleaned);
       const sb = getSupabase();
       if (sb) {
