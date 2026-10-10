@@ -1325,14 +1325,13 @@ export class StorageService {
 
     const sb = getSupabase();
     if (sb) {
-      // Implement soft delete mechanism (update is_deleted = true in Supabase)
+      // Perform hard delete in Supabase to ensure permanent removal
       sb.from('qc_results')
-        .update({ is_deleted: true })
+        .delete()
         .eq('id', id)
         .then(({ error }) => {
           if (error) {
-            console.error('Supabase soft deleteQCResult error, falling back to hard delete:', error);
-            sb.from('qc_results').delete().eq('id', id).then();
+            console.error('Supabase hard deleteQCResult error:', error);
           }
         });
     }
