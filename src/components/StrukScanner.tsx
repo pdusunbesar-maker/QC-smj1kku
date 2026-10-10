@@ -3,6 +3,7 @@ import Tesseract from "tesseract.js";
 import { supabase } from "../lib/supabase";
 import { StorageService } from "../services/storage";
 import { Parameter, Instrument, ControlMaterial, QCLot, QCResult } from "../types";
+import { evaluateWestgardRules } from "../utils/qcCalculations";
 import { 
   Sparkles, 
   Upload, 
@@ -1158,6 +1159,9 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
       // 2. Sinkronkan ke Master QC Results (qc_results) jika parameter terpetakan
       let syncedQCResultsCount = 0;
       if (syncToLeveyJennings) {
+        const existingQCResults = StorageService.getQCResults();
+        const activeRules = StorageService.getWestgardRules();
+
         hasil.forEach(h => {
           const matchParam = parameters.find(p => p.id === h.parameterId) || findMatchingMasterParameter(h.item);
 
@@ -1167,33 +1171,26 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
             const targetMean = evalMetrics.targetMean ?? matchParam.targetMean;
             const targetSD = evalMetrics.targetSD ?? matchParam.targetSD;
             const zScore = evalMetrics.zScore ?? (targetSD > 0 ? (numVal - targetMean) / targetSD : 0);
-            const absZ = Math.abs(zScore);
-            const status: "pass" | "warning" | "reject" = 
-              absZ >= 3.0 ? "reject" : absZ >= 2.0 || h.flag ? "warning" : "pass";
 
-            const violations: any[] = [];
-            if (absZ >= 3.0) {
-              violations.push({
-                rule: "1_3s",
-                ruleName: "1:3s Violation",
-                type: "reject",
-                description: `Nilai ${numVal} ${matchParam.unit} melampaui batas kritis 3 SD`,
-                pointsInvolved: [],
-                detectedAt: new Date().toISOString()
-              });
-            } else if (absZ >= 2.0) {
-              violations.push({
-                rule: "1_2s",
-                ruleName: "1:2s Warning",
-                type: "warning",
-                description: `Nilai ${numVal} ${matchParam.unit} melampaui batas peringatan 2 SD`,
-                pointsInvolved: [],
-                detectedAt: new Date().toISOString()
-              });
-            }
+            // Ambil riwayat QC sebelumnya untuk parameter & level ini (urut kronologis)
+            const previousHistory = existingQCResults
+              .filter(r => r.parameterId === matchParam.id && r.controlLevel === selectedControlLevel)
+              .sort((a, b) => a.timestamp - b.timestamp);
+
+            const resultId = `QC-DIMIH-${Date.now()}-${matchParam.code}-${Math.random().toString(36).substring(7)}`;
+
+            // Evaluasi aturan Westgard multi-rule (termasuk deteksi otomatis 10x pergeseran sistematik)
+            const westgardEval = evaluateWestgardRules(
+              { id: resultId, value: numVal, mean: targetMean, sd: targetSD, zScore },
+              previousHistory,
+              activeRules
+            );
+
+            const status = westgardEval.status;
+            const violations = westgardEval.violations;
 
             const qcResult: QCResult = {
-              id: `QC-DIMIH-${Date.now()}-${matchParam.code}-${Math.random().toString(36).substring(7)}`,
+              id: resultId,
               date: selectedDate,
               time: selectedTime,
               timestamp: Date.now(),
@@ -1217,7 +1214,7 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
               notes: `Scan Struk OCR Dimih 3980 | Bahan Kontrol: ${selectedControlMaterial?.name || 'Master'} | Lot: ${selectedLotNumber} | ${selectedControlLevel} (Flag: ${h.flag || "Normal"})`,
               source: "AI_VISION",
               verificationStatus: "VERIFIED",
-              reviewStatus: "pending"
+              reviewStatus: status === "reject" ? "rejected" : status === "warning" ? "investigation_required" : "accepted"
             };
 
             StorageService.saveQCResult(qcResult);

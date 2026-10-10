@@ -436,7 +436,7 @@ export const MonthlyTrendAnalysisPanel: React.FC<MonthlyTrendAnalysisPanelProps>
             <div className="p-4 rounded-2xl bg-rose-50/50 border border-rose-200/80 space-y-2">
               <div className="text-xs font-semibold text-rose-800 uppercase tracking-wider font-mono flex items-center gap-1.5">
                 <XCircle className="h-3.5 w-3.5 text-rose-500" />
-                <span>Shift Aktif (Alergi 10x)</span>
+                <span>Shift Aktif (Aturan Westgard 10x)</span>
               </div>
               <div className="flex items-baseline gap-2">
                 <span className={`text-2xl font-black font-mono ${earlyWarningStats.criticalCount > 0 ? 'text-rose-700' : 'text-slate-900'}`}>

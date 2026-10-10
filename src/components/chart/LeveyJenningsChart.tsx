@@ -26,7 +26,7 @@ import {
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas-pro';
 import { QCResult, Parameter, QCStatistics, LaboratoryInfo, QCStatus, WestgardViolation } from '../../types';
-import { calculateQCStatistics, calculateTrendline, detect6ConsecutiveTrends, calculateProcessCapability, calculateSigmaMetric } from '../../utils/qcCalculations';
+import { calculateQCStatistics, calculateTrendline, detect6ConsecutiveTrends, detect10xConsecutiveShifts, Shift10xDetection, calculateProcessCapability, calculateSigmaMetric } from '../../utils/qcCalculations';
 import { StorageService } from '../../services/storage';
 import { KopEditorModal } from '../common/KopEditorModal';
 
@@ -289,6 +289,19 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
     const values = plottedPoints.map(p => p.value);
     return detect6ConsecutiveTrends(values);
   }, [plottedPoints]);
+
+  // Deteksi Otomatis Aturan Westgard 10x (Pergeseran Tren Akurasi Instrumen / Systematic Shift)
+  const detected10xShifts = useMemo<Shift10xDetection[]>(() => {
+    return detect10xConsecutiveShifts(
+      plottedPoints.map(p => ({
+        id: p.id,
+        date: p.date,
+        value: p.value,
+        zScore: p.zScore
+      })),
+      parameter.targetMean
+    );
+  }, [plottedPoints, parameter.targetMean]);
 
   // Violations in current selection
   const violationsList = useMemo(() => {
@@ -819,6 +832,93 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
           </div>
         </div>
 
+        {/* DETEKSI OTOMATIS ATURAN WESTGARD 10x (SISTEMATIS) - PERGESERAN AKURASI INSTRUMEN */}
+        {detected10xShifts.length > 0 && (
+          <div className="rounded-xl border border-indigo-200 bg-gradient-to-r from-indigo-50/90 via-purple-50/50 to-white p-4 shadow-xs print-avoid-break space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-indigo-100 pb-2.5">
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white font-black text-xs shadow-xs">
+                  10x
+                </span>
+                <div>
+                  <h4 className="text-xs font-black uppercase tracking-wide text-indigo-950 flex items-center gap-1.5 flex-wrap">
+                    <span>Deteksi Otomatis Aturan Westgard 10x (Pergeseran Tren Akurasi Instrumen)</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                      Systematic Shift ({detected10xShifts.length} Zona Terdeteksi)
+                    </span>
+                  </h4>
+                  <p className="text-[11px] text-slate-600 mt-0.5">
+                    Sistem mendeteksi rentetan ≥10 titik kontrol berturut-turut pada sisi mean yang sama, mengindikasikan pergeseran akurasi analitik pada instrumen.
+                  </p>
+                </div>
+              </div>
+
+              {/* Action shortcuts */}
+              <div className="flex items-center gap-2 shrink-0">
+                {onCreateCapa && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const latestShift = detected10xShifts[detected10xShifts.length - 1];
+                      const targetPt = plottedPoints[latestShift.end];
+                      if (targetPt) onCreateCapa(targetPt.rawResult);
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <ShieldAlert className="h-3.5 w-3.5" />
+                    <span>Terbitkan CAPA Shift 10x</span>
+                  </button>
+                )}
+                {onCreateNC && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const latestShift = detected10xShifts[detected10xShifts.length - 1];
+                      const targetPt = plottedPoints[latestShift.end];
+                      if (targetPt) onCreateNC(targetPt.rawResult);
+                    }}
+                    className="px-3 py-1.5 rounded-lg border border-indigo-300 bg-white hover:bg-indigo-50 text-indigo-800 font-bold text-xs transition-colors cursor-pointer"
+                  >
+                    <span>Lapor NC</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* List of Detected 10x Shifts with Diagnostics */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {detected10xShifts.map((shift, idx) => (
+                <div key={idx} className="p-3 rounded-lg border border-indigo-100 bg-white/90 space-y-2 shadow-2xs">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-indigo-900 flex items-center gap-1.5">
+                      <AlertTriangle className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
+                      <span>{shift.title}</span>
+                    </span>
+                    <span className="font-mono text-[11px] text-slate-500 font-semibold bg-slate-100 px-1.5 py-0.5 rounded">
+                      {shift.startDate} s/d {shift.endDate}
+                    </span>
+                  </div>
+
+                  <p className="text-[11px] text-slate-700 leading-relaxed">
+                    {shift.description} Nilai rata-rata bergeser sebesar <strong>{shift.meanDiff > 0 ? '+' : ''}{shift.meanDiff} {parameter.unit}</strong> ({shift.meanBiasPercent > 0 ? '+' : ''}{shift.meanBiasPercent}% bias terhadap target mean {parameter.targetMean} {parameter.unit}).
+                  </p>
+
+                  <div className="text-[10px] text-slate-600 bg-indigo-50/60 p-2.5 rounded-lg border border-indigo-100/70 space-y-1">
+                    <p className="font-bold text-indigo-950">🔍 Dampak & Kemungkinan Penyebab:</p>
+                    <p className="text-slate-700">{shift.instrumentImpact}</p>
+                    <p className="font-bold text-indigo-950 pt-1">🛠️ Tindakan Pencegahan / Korektif yang Dianjurkan:</p>
+                    <ul className="list-disc list-inside space-y-0.5 text-slate-700">
+                      {shift.recommendations.map((rec, rIdx) => (
+                        <li key={rIdx}>{rec}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* SVG LEVEY-JENNINGS CHART CANVAS (PROPORTIONAL FONTS & NUMBERS) */}
         <div 
           ref={containerRef}
@@ -1009,6 +1109,61 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
                    </text>
                  </g>
               ))}
+
+              {/* Highlight Aturan Westgard 10x (Pergeseran Sistematik / Systematic Shift) */}
+              {detected10xShifts.map((shift, i) => {
+                const startX = getX(shift.start, plottedPoints.length) - 8;
+                const endX = getX(shift.end, plottedPoints.length) + 8;
+                const bandW = Math.max(36, endX - startX);
+                const isAbove = shift.side === 'above';
+                const strokeColor = isAbove ? '#4f46e5' : '#7c3aed';
+                const fillColor = isAbove ? '#6366f1' : '#8b5cf6';
+                const textColor = isAbove ? '#312e81' : '#4c1d95';
+                const labelX = startX + bandW / 2;
+
+                return (
+                  <g key={`shift10x-${i}`}>
+                    {/* Shaded vertical zone */}
+                    <rect
+                      x={startX}
+                      y={padding.top}
+                      width={bandW}
+                      height={chartHeight}
+                      fill={fillColor}
+                      fillOpacity="0.14"
+                      stroke={strokeColor}
+                      strokeWidth="1.5"
+                      strokeDasharray="4,3"
+                      rx={6}
+                    />
+                    {/* Header Pill Label on SVG */}
+                    <g transform={`translate(${labelX}, ${padding.top + 34})`}>
+                      <rect
+                        x="-105"
+                        y="-11"
+                        width="210"
+                        height="22"
+                        rx="11"
+                        fill="#ffffff"
+                        stroke={strokeColor}
+                        strokeWidth="1.5"
+                        filter="drop-shadow(0 2px 4px rgba(0,0,0,0.12))"
+                      />
+                      <text
+                        x="0"
+                        y="3.5"
+                        fill={textColor}
+                        fontSize="9.5"
+                        fontWeight="800"
+                        textAnchor="middle"
+                        fontFamily="sans-serif"
+                      >
+                        ⚠️ ATURAN 10x: SHIFT ({shift.count}x {isAbove ? '+' : '-'})
+                      </text>
+                    </g>
+                  </g>
+                );
+              })}
 
               {/* QC Result Data Points (1 per date when in single_per_date mode) */}
               {plottedPoints.map((pt, idx) => {
@@ -1246,7 +1401,7 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
 
         {/* LEGEND & GUIDELINES */}
         <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600 pt-2 border-t border-slate-200 print-avoid-break">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-wrap">
             <div className="flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
               <span className="font-medium">Normal / In-Control (&lt; ±2SD)</span>
@@ -1258,6 +1413,10 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
             <div className="flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-full bg-rose-600" />
               <span className="font-medium">Reject / Out-of-Control (±3SD)</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-indigo-600 ring-2 ring-indigo-200" />
+              <span className="font-medium text-indigo-900 font-semibold">Aturan 10x (Pergeseran Akurasi Sistematik)</span>
             </div>
           </div>
           <div className="text-[11px] text-slate-500 font-mono">

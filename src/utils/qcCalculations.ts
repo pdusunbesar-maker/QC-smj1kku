@@ -345,6 +345,101 @@ export function detect6ConsecutiveTrends(values: number[]) {
   return trends;
 }
 
+export interface Shift10xDetection {
+  start: number; // Start index pada plotted points
+  end: number;   // End index pada plotted points
+  count: number; // Jumlah titik berurutan (≥10)
+  side: 'above' | 'below';
+  directionText: string; // "+ Mean" atau "- Mean"
+  pointIds: string[];
+  startDate?: string;
+  endDate?: string;
+  meanDiff: number; // Rata-rata pergeseran nilai terhadap Target Mean
+  meanBiasPercent: number; // Persentase bias rata-rata
+  type: 'warning' | 'reject';
+  title: string;
+  description: string;
+  instrumentImpact: string;
+  recommendations: string[];
+}
+
+/**
+ * Deteksi Otomatis Aturan Westgard '10x' (Sistematis) pada Levey-Jennings
+ * Mengidentifikasi pergeseran tren akurasi instrumen (systematic shift / calibration drift).
+ * Terpicu apabila minimal 10 hasil kontrol berturut-turut berada di sisi Mean yang sama.
+ */
+export function detect10xConsecutiveShifts(
+  points: { id: string; date?: string; value: number; zScore?: number }[],
+  targetMean: number
+): Shift10xDetection[] {
+  const detections: Shift10xDetection[] = [];
+  if (points.length < 10) return detections;
+
+  let currentSide: 'above' | 'below' | null = null;
+  let streakStart = 0;
+  let currentStreak = 0;
+
+  const pushDetection = (start: number, end: number, count: number, side: 'above' | 'below') => {
+    const involved = points.slice(start, end + 1);
+    const sumDiff = involved.reduce((acc, p) => acc + (p.value - targetMean), 0);
+    const meanDiff = Number((sumDiff / count).toFixed(3));
+    const meanBiasPercent = targetMean !== 0 ? Number(((meanDiff / targetMean) * 100).toFixed(2)) : 0;
+    const directionText = side === 'above' ? 'Atas (+ Mean)' : 'Bawah (- Mean)';
+
+    detections.push({
+      start,
+      end,
+      count,
+      side,
+      directionText,
+      pointIds: involved.map(p => p.id),
+      startDate: involved[0]?.date,
+      endDate: involved[involved.length - 1]?.date,
+      meanDiff,
+      meanBiasPercent,
+      type: 'warning',
+      title: `Aturan Westgard 10x Terdeteksi (${count} Titik di Sisi ${directionText})`,
+      description: `Terdapat ${count} hasil QC berurutan berada di sisi ${directionText}. Ini mengindikasikan pergeseran sistematik (systematic shift) pada akurasi instrumen.`,
+      instrumentImpact: 'Pergeseran akurasi pengukuran (drift calibration), degradasi reagen/deteriorasi fotometer, atau pengaruh temperatur kamar/flowcell analiser.',
+      recommendations: [
+        'Lakukan evaluasi dan re-kalibrasi instrumen hematologi analiser',
+        'Periksa kondisi fisik, kestabilan nomor lot reagen, dan tanggal kedaluwarsa',
+        'Uji ulang dengan vial bahan kontrol baru yang belum mengalami evaporasi',
+        'Verifikasi suhu flowcell/ruang inkubasi dan lakukan flushing jalur cairan alat'
+      ]
+    });
+  };
+
+  for (let i = 0; i < points.length; i++) {
+    const pt = points[i];
+    const diff = pt.zScore !== undefined ? pt.zScore : (pt.value - targetMean);
+    const side: 'above' | 'below' | 'on_mean' = diff > 0.0001 ? 'above' : (diff < -0.0001 ? 'below' : 'on_mean');
+
+    if (side === 'on_mean') {
+      if (currentStreak >= 10 && currentSide) {
+        pushDetection(streakStart, i - 1, currentStreak, currentSide);
+      }
+      currentSide = null;
+      currentStreak = 0;
+    } else if (side === currentSide) {
+      currentStreak++;
+    } else {
+      if (currentStreak >= 10 && currentSide) {
+        pushDetection(streakStart, i - 1, currentStreak, currentSide);
+      }
+      currentSide = side;
+      streakStart = i;
+      currentStreak = 1;
+    }
+  }
+
+  if (currentStreak >= 10 && currentSide) {
+    pushDetection(streakStart, points.length - 1, currentStreak, currentSide);
+  }
+
+  return detections;
+}
+
 /**
  * Calculate Cp and Cpk (Process Capability)
  */
