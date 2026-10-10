@@ -368,6 +368,23 @@ CREATE POLICY "Public audit_logs" ON audit_logs FOR ALL USING (true) WITH CHECK 
 DROP POLICY IF EXISTS "Public notifications" ON notifications;
 CREATE POLICY "Public notifications" ON notifications FOR ALL USING (true) WITH CHECK (true);
 
+-- QC HEMATOLOGI (DIRUI DIMIH 3980 OCR RESULTS) TABLE
+CREATE TABLE IF NOT EXISTS qc_hematologi (
+    id TEXT PRIMARY KEY DEFAULT ('HMA-' || substr(md5(random()::text), 1, 8)),
+    item TEXT NOT NULL,
+    hasil NUMERIC(10, 3) NOT NULL,
+    flag TEXT,
+    unit TEXT,
+    foto_url TEXT,
+    atlm_id TEXT,
+    tanggal DATE NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE qc_hematologi ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public qc_hematologi" ON qc_hematologi;
+CREATE POLICY "Public qc_hematologi" ON qc_hematologi FOR ALL USING (true) WITH CHECK (true);
+
 -- 18. INITIAL SEED DATA FOR RSUD SULTAN MUHAMMAD JAMALUDIN I
 INSERT INTO laboratories (id, name, hospital_name, regency, province, room_unit, head_of_lab, head_nip, address, email, accreditation)
 VALUES (
