@@ -12,7 +12,8 @@ import {
   History,
   Info,
   Loader2,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Zap
 } from 'lucide-react';
 import { QCBatchUploadPanel } from './QCBatchUploadPanel';
 import { Parameter, Instrument, ControlMaterial, QCResult, WestgardViolation } from '../../types';
@@ -45,7 +46,95 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
   initialData,
 }) => {
   const { user } = useAuth();
-  const [inputMode, setInputMode] = useState<'manual' | 'batch'>('manual');
+  const [inputMode, setInputMode] = useState<'manual' | 'instrument-batch' | 'batch'>('manual');
+
+  // Instrument Batch Input State
+  const [ibInstrumentId, setIbInstrumentId] = useState(instruments[0]?.id || '');
+  const [ibLevel, setIbLevel] = useState<'Level 1' | 'Level 2' | 'Level 3'>('Level 1');
+  const [ibLotNumber, setIbLotNumber] = useState(controls[0]?.lotNumber || 'LOT-CST1-2026A');
+  const [ibValues, setIbValues] = useState<Record<string, string>>({});
+  const [ibNotes, setIbNotes] = useState('');
+  const [ibSubmitting, setIbSubmitting] = useState(false);
+  const [ibSuccessMessage, setIbSuccessMessage] = useState<string | null>(null);
+
+  const ibAvailableParameters = useMemo(() => {
+    return parameters.filter(p => p.instrumentId === ibInstrumentId);
+  }, [parameters, ibInstrumentId]);
+
+  const handleInstrumentBatchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const instParams = parameters.filter(p => p.instrumentId === ibInstrumentId);
+    const filledEntries = instParams.filter(p => {
+      const valStr = ibValues[p.id];
+      return valStr !== undefined && valStr.trim() !== '' && !isNaN(parseFloat(valStr));
+    });
+
+    if (filledEntries.length === 0) {
+      alert('Silakan isi minimal satu nilai parameter instrumen.');
+      return;
+    }
+
+    setIbSubmitting(true);
+    const fullDate = `${date}T${time}:00`;
+    const fullTimestamp = new Date(fullDate).getTime();
+    const currentInst = instruments.find(i => i.id === ibInstrumentId) || instruments[0];
+
+    let savedCount = 0;
+    filledEntries.forEach(param => {
+      const val = parseFloat(ibValues[param.id]);
+      const mean = param.targetMean;
+      const sd = param.targetSD;
+      const zScore = calculateZScore(val, mean, sd);
+      const sdPosition = formatSDPosition(zScore);
+      const history = existingResults.filter(r => r.parameterId === param.id);
+      const tempId = `QC-IB-${Date.now()}-${param.code}`;
+      const westgardRules = StorageService.getWestgardRules();
+      const { status, violations } = evaluateWestgardRules(
+        { id: tempId, value: val, mean, sd, zScore },
+        history,
+        westgardRules
+      );
+
+      const newResult: QCResult = {
+        id: `QC-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+        date,
+        time,
+        timestamp: fullTimestamp,
+        operatorId: user.id,
+        operatorName: user.name,
+        instrumentId: currentInst.id,
+        instrumentName: currentInst.name,
+        parameterId: param.id,
+        parameterName: param.name,
+        parameterCode: param.code,
+        controlLevel: ibLevel,
+        lotNumber: ibLotNumber,
+        value: val,
+        unit: param.unit,
+        mean,
+        sd,
+        zScore,
+        sdPosition,
+        status,
+        violations,
+        notes: ibNotes.trim() || `Input Cepat Multi-Parameter Instrumen ${currentInst.name}`,
+        reviewStatus: status === 'pass' ? 'accepted' : 'pending',
+      };
+
+      StorageService.saveQCResult(newResult);
+      StorageService.logAudit(
+        'INPUT_QC_BATCH',
+        `Input QC Multi-Parameter ${param.code} nilai ${val} ${param.unit} (${sdPosition}) status: ${status.toUpperCase()}`,
+        newResult
+      );
+      onResultAdded(newResult);
+      savedCount++;
+    });
+
+    setIbSubmitting(false);
+    setIbSuccessMessage(`Berhasil menyimpan ${savedCount} parameter QC untuk instrumen ${currentInst.name}!`);
+    setTimeout(() => setIbSuccessMessage(null), 4000);
+  };
 
   const today = new Date().toISOString().split('T')[0];
   const currentTime = new Date().toTimeString().split(' ')[0].substring(0, 5);
@@ -255,11 +344,11 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
       </div>
 
       {/* Tab Selector Segmented Control */}
-      <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl max-w-md font-semibold text-xs print:hidden">
+      <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl max-w-xl font-semibold text-xs print:hidden">
         <button
           type="button"
           onClick={() => setInputMode('manual')}
-          className={`flex-1 px-4 py-2 rounded-lg transition-all cursor-pointer whitespace-nowrap text-center ${
+          className={`flex-1 px-3 py-2 rounded-lg transition-all cursor-pointer whitespace-nowrap text-center ${
             inputMode === 'manual'
               ? 'bg-white text-slate-900 shadow-sm font-bold'
               : 'text-slate-600 hover:text-slate-900'
@@ -269,15 +358,27 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
         </button>
         <button
           type="button"
+          onClick={() => setInputMode('instrument-batch')}
+          className={`flex-1 px-3 py-2 rounded-lg transition-all cursor-pointer whitespace-nowrap text-center flex items-center justify-center gap-1.5 ${
+            inputMode === 'instrument-batch'
+              ? 'bg-white text-slate-900 shadow-sm font-bold'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Zap className="h-3.5 w-3.5 text-blue-600" />
+          <span>⚡ Input Cepat per Instrumen</span>
+        </button>
+        <button
+          type="button"
           onClick={() => setInputMode('batch')}
-          className={`flex-1 px-4 py-2 rounded-lg transition-all cursor-pointer whitespace-nowrap text-center flex items-center justify-center gap-1.5 ${
+          className={`flex-1 px-3 py-2 rounded-lg transition-all cursor-pointer whitespace-nowrap text-center flex items-center justify-center gap-1.5 ${
             inputMode === 'batch'
               ? 'bg-white text-slate-900 shadow-sm font-bold'
               : 'text-slate-600 hover:text-slate-900'
           }`}
         >
           <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />
-          <span>Batch Ingest Data Alat (CSV/Excel)</span>
+          <span>Batch Ingest (Excel)</span>
         </button>
       </div>
 
@@ -713,6 +814,201 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
           </div>
         </div>
       </div>
+      ) : inputMode === 'instrument-batch' ? (
+        <div className="space-y-6">
+          {/* Instrument Selection Grid Cards */}
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+              1. Pilih Instrumen Pemeriksaan (Klik untuk Memuat Semua Parameter)
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {instruments.map(inst => {
+                const paramCount = parameters.filter(p => p.instrumentId === inst.id).length;
+                const isSelected = ibInstrumentId === inst.id;
+                return (
+                  <button
+                    key={inst.id}
+                    type="button"
+                    onClick={() => setIbInstrumentId(inst.id)}
+                    className={`p-4 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                      isSelected
+                        ? 'bg-blue-600 border-blue-600 text-white shadow-md ring-2 ring-blue-400/30'
+                        : 'bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-800'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold ${isSelected ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-800'}`}>
+                          {inst.code}
+                        </span>
+                        <span className={`text-[10px] font-semibold ${isSelected ? 'text-blue-100' : 'text-slate-500'}`}>
+                          {paramCount} Parameter
+                        </span>
+                      </div>
+                      <h4 className="font-bold text-sm leading-snug">{inst.name}</h4>
+                    </div>
+                    <div className={`mt-3 pt-2 border-t text-[11px] flex items-center justify-between ${isSelected ? 'border-white/20 text-blue-100' : 'border-slate-200 text-slate-500'}`}>
+                      <span>{inst.brand}</span>
+                      <span className="font-semibold">{isSelected ? '✓ Terpilih' : 'Klik Pilih'}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Parameters Input Table for Selected Instrument */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-5 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="font-bold text-slate-900 text-sm">
+                  2. Masukkan Nilai QC untuk Semua Parameter ({instruments.find(i => i.id === ibInstrumentId)?.name || 'Instrumen'})
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Isi nilai pada parameter yang diperiksa. Parameter yang dikosongkan akan diabaikan.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3 flex-wrap">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase">Level Kontrol</label>
+                  <select
+                    value={ibLevel}
+                    onChange={(e) => setIbLevel(e.target.value as any)}
+                    className="mt-1 px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800"
+                  >
+                    <option value="Level 1">Level 1 (Normal)</option>
+                    <option value="Level 2">Level 2 (Low / Rendah)</option>
+                    <option value="Level 3">Level 3 (High / Tinggi)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase">Nomor LOT</label>
+                  <input
+                    type="text"
+                    value={ibLotNumber}
+                    onChange={(e) => setIbLotNumber(e.target.value)}
+                    className="mt-1 px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-mono font-bold text-slate-800 w-36"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {ibSuccessMessage && (
+              <div className="m-5 p-3 bg-emerald-50 border border-emerald-300 rounded-xl text-emerald-900 text-xs font-semibold flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                <span>{ibSuccessMessage}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleInstrumentBatchSubmit} className="p-5 space-y-4">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-100 text-slate-700 uppercase tracking-wider text-[10px]">
+                    <tr>
+                      <th className="p-3 rounded-l-lg">Parameter / Tes</th>
+                      <th className="p-3">Kode</th>
+                      <th className="p-3">Satuan</th>
+                      <th className="p-3">Target Mean ± SD</th>
+                      <th className="p-3">Nilai QC Hasil (*Input*)</th>
+                      <th className="p-3 rounded-r-lg">Status & Evaluasi Z-Score</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {ibAvailableParameters.map(param => {
+                      const valStr = ibValues[param.id] || '';
+                      const numVal = parseFloat(valStr);
+                      let analysis: any = null;
+                      if (!isNaN(numVal)) {
+                        const zScore = calculateZScore(numVal, param.targetMean, param.targetSD);
+                        const sdPos = formatSDPosition(zScore);
+                        const history = existingResults.filter(r => r.parameterId === param.id);
+                        const westgardRules = StorageService.getWestgardRules();
+                        const evalRes = evaluateWestgardRules(
+                          { id: `T-${param.id}`, value: numVal, mean: param.targetMean, sd: param.targetSD, zScore },
+                          history,
+                          westgardRules
+                        );
+                        analysis = { zScore, sdPos, status: evalRes.status };
+                      }
+
+                      return (
+                        <tr key={param.id} className="hover:bg-slate-50/80">
+                          <td className="p-3 font-bold text-slate-900">{param.name}</td>
+                          <td className="p-3 font-mono font-semibold text-blue-700">{param.code}</td>
+                          <td className="p-3 text-slate-600">{param.unit}</td>
+                          <td className="p-3 font-mono text-slate-600">{param.targetMean} ± {param.targetSD}</td>
+                          <td className="p-3">
+                            <input
+                              type="number"
+                              step="any"
+                              value={valStr}
+                              onChange={(e) => setIbValues({ ...ibValues, [param.id]: e.target.value })}
+                              placeholder={`Mean: ${param.targetMean}`}
+                              className="w-36 px-3 py-2 bg-white border border-slate-300 rounded-lg font-mono font-bold text-slate-900 focus:border-blue-500 focus:outline-none shadow-2xs"
+                            />
+                          </td>
+                          <td className="p-3">
+                            {analysis ? (
+                              <div className="flex items-center gap-2">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                  analysis.status === 'pass' ? 'bg-emerald-100 text-emerald-800' :
+                                  analysis.status === 'warning' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
+                                }`}>
+                                  {analysis.status}
+                                </span>
+                                <span className="font-mono text-[11px] font-semibold text-slate-700">
+                                  {analysis.sdPos}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 text-[11px]">Belum diisi</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Notes */}
+              <div className="pt-2">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Catatan Pengujian Batch Instrumen
+                </label>
+                <textarea
+                  value={ibNotes}
+                  onChange={(e) => setIbNotes(e.target.value)}
+                  rows={2}
+                  placeholder="Catatan operasional instrumen, reagen, atau suhu kalibrasi..."
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+
+              {/* Submit Button */}
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="submit"
+                  disabled={ibSubmitting || Object.values(ibValues).every(v => !v || v.trim() === '')}
+                  className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow-md cursor-pointer transition-all"
+                >
+                  {ibSubmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Menyimpan Semua Hasil...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4" />
+                      <span>Simpan Semua Hasil QC Instrumen Ini (Sekaligus)</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       ) : (
         <QCBatchUploadPanel
           instruments={instruments}
