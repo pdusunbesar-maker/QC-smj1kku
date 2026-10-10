@@ -218,7 +218,7 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
           {[
             { id: 'lab', label: 'Profil Laboratorium', icon: Building2 },
             { id: 'instruments', label: `Instrumen (${instruments.length})`, icon: Wrench },
-            { id: 'parameters', label: `Parameter (${parameters.length})`, icon: FlaskConical },
+            { id: 'parameters', label: `Parameter (${parameters.filter(p => !StorageService.getDeletedParameterIds().includes(p.id)).length})`, icon: FlaskConical },
             { id: 'controls', label: `Bahan Kontrol (${controls.length})`, icon: Layers },
           ].map((tab) => {
             const Icon = tab.icon;
