@@ -45,12 +45,13 @@ function normalizeUnit(rawUnit: string): string {
 }
 
 /**
- * Standard known hematology parameters on Dirui Dimih 3980 / 5-Diff analyzers
+ * Standard hematology parameters present in Master Data (Dirui Dimih 3980 / CST):
+ * Prioritizes HGB, HCT, WBC, PLT, RBC, and sets aside parameters not in master data.
  */
-const KNOWN_DIRUI_ITEMS = new Set([
+export const DEFAULT_MASTER_HEMATOLOGI_ITEMS = new Set([
   'WBC', 'RBC', 'HGB', 'HCT', 'MCV', 'MCH', 'MCHC', 'PLT',
-  'LYM%', 'MXD%', 'NEUT%', 'LYM#', 'MXD#', 'NEUT#', 'MONO%', 'EOS%', 'BASO%',
-  'MONO#', 'EOS#', 'BASO#', 'RDW-CV', 'RDW-SD', 'MPV', 'PDW', 'PCT', 'P-LCR', 'P-LCC'
+  'LYM%', 'MXD%', 'NEUT%', 'LYM#', 'MXD#', 'NEUT#',
+  'RDW-CV', 'RDW-SD', 'MPV', 'PDW', 'PCT', 'P-LCR'
 ]);
 
 /**
@@ -59,8 +60,20 @@ const KNOWN_DIRUI_ITEMS = new Set([
  * Flag bisa L/H sebelum nilai, contoh: "L 31.1" atau "MCHC L 31.1"
  * Regex: /(?:[LH]\s*)?([A-Z\-]+)\s+(?:[LH]\s*)?([0-9]+\.?[0-9]*)\s+([0-9\^\%\/a-zA-Z]+)/g
  * Simpan flag terpisah: flag = L/H/null
+ * 
+ * Difokuskan HANYA untuk parameter yang ada di Master Data (HGB, HCT, WBC, PLT, RBC, dll.)
+ * Mengesampingkan parameter/teks yang tidak ada di Master Data.
  */
-export function parseDiruiHematologiText(rawText: string): DiruiParsedItem[] {
+export function parseDiruiHematologiText(
+  rawText: string,
+  allowedMasterCodes?: string[] | Set<string>
+): DiruiParsedItem[] {
+  const allowedSet = allowedMasterCodes instanceof Set 
+    ? allowedMasterCodes 
+    : Array.isArray(allowedMasterCodes) 
+      ? new Set(allowedMasterCodes.map(c => c.toUpperCase()))
+      : DEFAULT_MASTER_HEMATOLOGI_ITEMS;
+
   const items: DiruiParsedItem[] = [];
   const seenItems = new Map<string, number>();
 
@@ -92,6 +105,11 @@ export function parseDiruiHematologiText(rawText: string): DiruiParsedItem[] {
 
       // Skip non-item header/footer lines
       if (['DATE', 'TIME', 'ID', 'SAMPLE', 'PATIENT', 'NAME', 'NO', 'DIRUI', 'DIMIH', 'OPERATOR'].includes(itemName)) {
+        continue;
+      }
+
+      // FOKUS MASTER DATA: Kesampingkan parameter yang tidak ada di Master Data
+      if (!allowedSet.has(itemName)) {
         continue;
       }
 
@@ -132,6 +150,8 @@ export function parseDiruiHematologiText(rawText: string): DiruiParsedItem[] {
     const unitStr = gMatch[3].trim();
 
     if (['DATE', 'TIME', 'ID', 'SAMPLE', 'DIRUI', 'DIMIH'].includes(itemName)) continue;
+    // FOKUS MASTER DATA: Kesampingkan parameter yang tidak ada di Master Data
+    if (!allowedSet.has(itemName)) continue;
 
     if (!seenItems.has(itemName) && !isNaN(val)) {
       let detectedFlag: 'L' | 'H' | null = null;

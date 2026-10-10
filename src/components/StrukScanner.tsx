@@ -32,7 +32,10 @@ import {
   Maximize2,
   Copy,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Target,
+  Filter,
+  CheckCircle
 } from "lucide-react";
 
 export interface HasilQC {
@@ -43,13 +46,21 @@ export interface HasilQC {
   unit: string;
   status: "ok" | "warning" | "reject";
   // Master data linkage
-  parameterId?: string;
-  parameterName?: string;
+  parameterId: string;
+  parameterName: string;
   targetMean?: number;
   targetSD?: number;
   zScore?: number;
   sdPosition?: string;
   violation?: string;
+  isCoreParameter?: boolean; // HGB, HCT, WBC, PLT, RBC
+}
+
+export interface IgnoredItem {
+  item: string;
+  value: string;
+  rawText: string;
+  reason: string;
 }
 
 interface StrukScannerProps {
@@ -106,10 +117,14 @@ const PREPROCESS_PRESETS: FilterOption[] = [
   },
 ];
 
+// Parameter Utama Laboratorium yang diprioritaskan
+const CORE_MASTER_CODES = ['HGB', 'HCT', 'WBC', 'PLT', 'RBC'];
+
 export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: StrukScannerProps) {
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState("");
   const [hasil, setHasil] = useState<HasilQC[]>([]);
+  const [ignoredItems, setIgnoredItems] = useState<IgnoredItem[]>([]);
   const [fotoUrl, setFotoUrl] = useState("");
   const [sourceFile, setSourceFile] = useState<File | Blob | null>(null);
   const [previewSrc, setPreviewSrc] = useState<string>("");
@@ -119,6 +134,7 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
   // OCR Raw Text & Inspeksi
   const [rawOcrText, setRawOcrText] = useState<string>("");
   const [showRawText, setShowRawText] = useState<boolean>(false);
+  const [showIgnoredPanel, setShowIgnoredPanel] = useState<boolean>(false);
   const [previewTab, setPreviewTab] = useState<'original' | 'processed'>('original');
 
   // Master Data State
@@ -179,12 +195,26 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
   const findMatchingMasterParameter = useCallback((itemCode: string): Parameter | undefined => {
     const clean = itemCode.toUpperCase().trim();
 
-    // 1. Exact code match
+    // 1. Exact code match in selected instrument parameters
     let match = dimihParameters.find(p => p.code.toUpperCase() === clean);
     if (match) return match;
 
     // 2. Alias mapping for Dirui Dimih 3980 printouts
     const aliasMap: Record<string, string> = {
+      // Core Parameters
+      "HB": "HGB",
+      "HEMOGLOBIN": "HGB",
+      "H8B": "HGB",
+      "HT": "HCT",
+      "HEMATOKRIT": "HCT",
+      "HGI": "HCT",
+      "LEUKOSIT": "WBC",
+      "W8C": "WBC",
+      "TROMBOSIT": "PLT",
+      "8LT": "PLT",
+      "ERITROSIT": "RBC",
+      "8BC": "RBC",
+      // Differential & Indices
       "GRAN%": "NEUT%",
       "GRAN#": "NEUT#",
       "NEU%": "NEUT%",
@@ -195,14 +225,14 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
       "MONO#": "MXD#",
       "RDW": "RDW-CV",
       "RDWCV": "RDW-CV",
+      "RDW_CV": "RDW-CV",
       "RDWSD": "RDW-SD",
+      "RDW_SD": "RDW-SD",
+      "MCHG": "MCHC",
       "PLCR": "P-LCR",
+      "P_LCR": "P-LCR",
       "PLCC": "P-LCC",
-      "LEUKOSIT": "WBC",
-      "ERITROSIT": "RBC",
-      "HEMOGLOBIN": "HGB",
-      "HEMATOKRIT": "HCT",
-      "TROMBOSIT": "PLT"
+      "P_LCC": "P-LCC"
     };
 
     const targetCode = aliasMap[clean];
@@ -212,7 +242,14 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
     }
 
     // 3. Fallback search across all master parameters
-    return parameters.find(p => p.code.toUpperCase() === clean);
+    match = parameters.find(p => p.code.toUpperCase() === clean);
+    if (match) return match;
+    if (targetCode) {
+      match = parameters.find(p => p.code.toUpperCase() === targetCode);
+      if (match) return match;
+    }
+
+    return undefined;
   }, [dimihParameters, parameters]);
 
   // Evaluates SDI (Z-Score) & Westgard Status against Master Data
@@ -278,7 +315,7 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
           const origH = img.height;
 
           // 1. Hitung Area Crop Otomatis
-          // Jika crop tabel diaktifkan: buang 6% margin kiri-kanan, 16% header (barcode/judul), 16% footer (grafik histogram)
+          // Jika crop tabel diaktifkan: buang margin meja dan header/footer non-tabel
           let cropX = 0;
           let cropY = 0;
           let cropW = origW;
@@ -319,7 +356,7 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
           const imgData = ctx.getImageData(0, 0, targetWidth, targetHeight);
           const data = imgData.data;
 
-          // Kontras formula baku: cFactor = (259 * (contrast * 255 + 255)) / (255 * (259 - contrast * 255))
+          // Kontras formula: cFactor = (259 * (contrast * 255 + 255)) / (255 * (259 - contrast * 255))
           const cFactor = (259 * (contrastVal * 255 + 255)) / (255 * (259 - contrastVal * 255));
 
           // Hitung rata-rata luminans jika mode adaptif
@@ -346,8 +383,6 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
             else if (gray > 255) gray = 255;
 
             // C: Binarisasi Threshold (180 sebagai default WAJIB)
-            // Tinta termal (< threshold) menjadi Hitam Murni (0)
-            // Kertas latar (>= threshold) menjadi Putih Murni (255)
             if (preset === 'grayscale_only') {
               data[i] = gray;
               data[i + 1] = gray;
@@ -376,27 +411,21 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
   }, [customThreshold, customContrast, autoCropTable, activePreset]);
 
   /**
-   * Logika Parsing Khusus Struk Hematologi Dirui Dimih 3980:
-   * Setiap baris: [FLAG] [ITEM] [FLAG] [NILAI] [UNIT]
-   * Mendukung regex utama, normalisasi typo karakter termal, dan keterkaitan data master
+   * Logika Parsing FOKUS MASTER DATA:
+   * 1. Mencari parameter yang ADA di Master Data (HGB, HCT, WBC, PLT, RBC, dsb.)
+   * 2. Mengesampingkan parameter / teks yang TIDAK ADA di Master Data
+   * 3. Pemindaian bertarget khusus (Targeted Extractor) untuk parameter kunci
    */
   const parseStruk = useCallback((text: string): HasilQC[] => {
     setRawOcrText(text);
     const lines = text.split("\n");
-    const results: HasilQC[] = [];
-    const seenItems = new Set<string>();
+    const resultsMap = new Map<string, HasilQC>();
+    const ignored: IgnoredItem[] = [];
 
     // Regex baris: [FLAG?] [ITEM] [FLAG?] [NILAI] [UNIT?]
-    const lineRegex = /(?:([LH])\s+)?([A-Z0-9\-%#]+)\s+(?:([LH])\s+)?([0-9]+[.,]?[0-9]*)\s+([0-9\^\/\%a-zA-Z#]+)?/i;
+    const lineRegex = /(?:([LH])\s+)?([A-Z0-9\-%#]+)\s+(?:([LH])\s+)?([0-9]+[.,]?[0-9]*)\s*([0-9\^\/\%a-zA-Z#]+)?/i;
 
-    // Daftar parameter sah Dirui Dimih 3980
-    const allowed = [
-      "WBC", "LYM#", "MXD#", "NEU#", "NEUT#", "MID#", "GRAN#", "MONO#", "EOS#", "BASO#",
-      "LYM%", "MXD%", "NEU%", "NEUT%", "MID%", "GRAN%", "MONO%", "EOS%", "BASO%",
-      "RBC", "HGB", "MCV", "HCT", "MCH", "MCHC", 
-      "RDW-SD", "RDW-CV", "RDW", "PLT", "MPV", "PCT", "PDW", "P-LCR", "P-LCC"
-    ];
-
+    // Tahap 1: Line-by-line parsing
     for (let idx = 0; idx < lines.length; idx++) {
       const line = lines[idx];
       const clean = line.replace(/\^/g, "^").trim();
@@ -405,7 +434,7 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
       const m = clean.match(lineRegex);
       if (m) {
         const flagPre = m[1]?.toUpperCase() || null;
-        let item = m[2].toUpperCase().replace("#", "#").replace("%", "%");
+        let itemRaw = m[2].toUpperCase().replace("#", "#").replace("%", "%");
         const flagMid = m[3]?.toUpperCase() || null;
         let nilaiRaw = m[4].replace(",", "."); // ganti koma desimal ke titik
         let unitRaw = (m[5] || "")
@@ -417,96 +446,124 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
           .replace("fL", "fL")
           .replace("pg", "pg");
 
-        // Normalisasi Typo Karakter Umum OCR Thermal Font
-        if (item === "8BC") item = "RBC";
-        if (item === "W8C") item = "WBC";
-        if (item === "MCHG") item = "MCHC";
-        if (item === "H8B") item = "HGB";
-        if (item === "8LT") item = "PLT";
-        if (item === "HGI") item = "HCT";
-        if (item === "RDW_SD") item = "RDW-SD";
-        if (item === "RDW_CV") item = "RDW-CV";
-        if (item === "P_LCR") item = "P-LCR";
+        // Normalisasi Typo Karakter Umum OCR Thermal
+        if (itemRaw === "8BC") itemRaw = "RBC";
+        if (itemRaw === "W8C") itemRaw = "WBC";
+        if (itemRaw === "MCHG") itemRaw = "MCHC";
+        if (itemRaw === "H8B") itemRaw = "HGB";
+        if (itemRaw === "8LT") itemRaw = "PLT";
+        if (itemRaw === "HGI") itemRaw = "HCT";
+        if (itemRaw === "RDW_SD") itemRaw = "RDW-SD";
+        if (itemRaw === "RDW_CV") itemRaw = "RDW-CV";
+        if (itemRaw === "P_LCR") itemRaw = "P-LCR";
 
-        // Abaikan teks judul/header
-        if (["DATE", "TIME", "SAMPLE", "PATIENT", "DIRUI", "DIMIH", "OPERATOR", "ITEM"].includes(item)) {
+        // Abaikan teks judul, header, nomor sampel
+        if (["DATE", "TIME", "SAMPLE", "PATIENT", "DIRUI", "DIMIH", "OPERATOR", "ITEM", "LOT", "ID", "NO", "NAME", "VAL"].includes(itemRaw)) {
           continue;
         }
 
-        // Tentukan flag: L / H
         const flag = flagMid || flagPre || null;
 
-        // Periksa apakah item terdaftar
-        const isMatchAllowed = allowed.some(a => item.includes(a.replace("-", "")) || a.includes(item));
-        if (isMatchAllowed && !seenItems.has(item)) {
-          seenItems.add(item);
+        // FOKUS MASTER DATA: Cari kecocokan di Master Data
+        const matchedParam = findMatchingMasterParameter(itemRaw);
 
-          // Cari keterkaitan ke Master Data Parameter Dimih 3980
-          const matchedParam = findMatchingMasterParameter(item);
+        if (!matchedParam) {
+          // KESAMPINGKAN parameter/teks yang tidak ada di master data
+          ignored.push({
+            item: itemRaw,
+            value: nilaiRaw,
+            rawText: clean,
+            reason: "Tidak terdaftar dalam Master Data Instrumen"
+          });
+          continue;
+        }
+
+        // Simpan hasil terverifikasi Master Data
+        const canonicalCode = matchedParam.code.toUpperCase();
+        if (!resultsMap.has(canonicalCode)) {
           const metrics = evaluateMasterDataMetrics(nilaiRaw, matchedParam, flag);
+          const isCore = CORE_MASTER_CODES.includes(canonicalCode);
 
-          results.push({
-            id: `item-${Date.now()}-${idx}-${Math.random().toString(36).substring(7)}`,
-            item: item,
+          resultsMap.set(canonicalCode, {
+            id: `item-${Date.now()}-${canonicalCode}`,
+            item: matchedParam.code,
             nilai: nilaiRaw,
             flag: flag,
-            unit: matchedParam?.unit || unitRaw || (item.includes("%") ? "%" : ""),
+            unit: matchedParam.unit || unitRaw || (canonicalCode.includes("%") ? "%" : ""),
             status: metrics.status,
-            parameterId: matchedParam?.id,
-            parameterName: matchedParam?.name,
+            parameterId: matchedParam.id,
+            parameterName: matchedParam.name,
             targetMean: metrics.targetMean,
             targetSD: metrics.targetSD,
             zScore: metrics.zScore,
             sdPosition: metrics.sdPosition,
-            violation: metrics.violation
+            violation: metrics.violation,
+            isCoreParameter: isCore
           });
         }
       }
     }
 
-    // Strategi Fallback Global Regex: Tangkap baris yang mungkin memiliki spasi ganda atau terputus
-    const globalRegex = /(?:[LH]\s*)?([A-Z\-]+)\s+(?:[LH]\s*)?([0-9]+\.?[0-9]*)\s+([0-9\^\%\/a-zA-Z]+)/g;
-    let gMatch: RegExpExecArray | null;
+    // Tahap 2: Pemindaian Bertarget Khusus untuk Parameter Kunci (HGB, HCT, WBC, PLT, RBC)
+    // Memastikan parameter inti tidak terlewatkan jika ada format baris yang sedikit bergeser
+    const coreTargetMatchers = [
+      { code: "HGB", regex: /(?:^|[^\w])(?:HGB|HB|HEMOGLOBIN|H8B)(?:[:=-]|\s+)\s*([LH])?\s*([0-9]+\.?[0-9]*)\s*([LH])?\s*([a-zA-Z\^\/\%]+)?/i },
+      { code: "HCT", regex: /(?:^|[^\w])(?:HCT|HT|HEMATOKRIT|HGI)(?:[:=-]|\s+)\s*([LH])?\s*([0-9]+\.?[0-9]*)\s*([LH])?\s*([a-zA-Z\^\/\%]+)?/i },
+      { code: "WBC", regex: /(?:^|[^\w])(?:WBC|LEUKOSIT|W8C)(?:[:=-]|\s+)\s*([LH])?\s*([0-9]+\.?[0-9]*)\s*([LH])?\s*([a-zA-Z\^\/\%]+)?/i },
+      { code: "PLT", regex: /(?:^|[^\w])(?:PLT|TROMBOSIT|8LT)(?:[:=-]|\s+)\s*([LH])?\s*([0-9]+\.?[0-9]*)\s*([LH])?\s*([a-zA-Z\^\/\%]+)?/i },
+      { code: "RBC", regex: /(?:^|[^\w])(?:RBC|ERITROSIT|8BC)(?:[:=-]|\s+)\s*([LH])?\s*([0-9]+\.?[0-9]*)\s*([LH])?\s*([a-zA-Z\^\/\%]+)?/i },
+    ];
 
-    while ((gMatch = globalRegex.exec(text)) !== null) {
-      const fullMatched = gMatch[0];
-      let item = gMatch[1].toUpperCase().trim();
-      const val = gMatch[2];
-      const unitStr = gMatch[3].trim();
+    coreTargetMatchers.forEach(({ code, regex }) => {
+      if (!resultsMap.has(code)) {
+        const m = text.match(regex);
+        if (m) {
+          const matchedParam = findMatchingMasterParameter(code);
+          if (matchedParam) {
+            const flag = m[1]?.toUpperCase() || m[3]?.toUpperCase() || null;
+            const val = m[2];
+            const metrics = evaluateMasterDataMetrics(val, matchedParam, flag);
 
-      if (["DATE", "TIME", "SAMPLE", "DIRUI", "DIMIH", "OPERATOR", "ITEM"].includes(item)) continue;
-
-      if (!seenItems.has(item) && allowed.some(a => a === item || a.includes(item))) {
-        seenItems.add(item);
-        let detectedFlag: 'L' | 'H' | null = null;
-        if (/\bL\s+[0-9]/.test(fullMatched) || /^[LH]\s+/.test(fullMatched)) {
-          detectedFlag = 'L';
-        } else if (/\bH\s+[0-9]/.test(fullMatched)) {
-          detectedFlag = 'H';
+            resultsMap.set(code, {
+              id: `item-${Date.now()}-core-${code}`,
+              item: matchedParam.code,
+              nilai: val,
+              flag: flag,
+              unit: matchedParam.unit || (code === "HGB" ? "g/dL" : code === "HCT" ? "%" : "10^3/uL"),
+              status: metrics.status,
+              parameterId: matchedParam.id,
+              parameterName: matchedParam.name,
+              targetMean: metrics.targetMean,
+              targetSD: metrics.targetSD,
+              zScore: metrics.zScore,
+              sdPosition: metrics.sdPosition,
+              violation: metrics.violation,
+              isCoreParameter: true
+            });
+          }
         }
-
-        const matchedParam = findMatchingMasterParameter(item);
-        const metrics = evaluateMasterDataMetrics(val, matchedParam, detectedFlag);
-
-        results.push({
-          id: `item-${Date.now()}-g-${Math.random().toString(36).substring(7)}`,
-          item: item,
-          nilai: val,
-          flag: detectedFlag,
-          unit: matchedParam?.unit || unitStr || (item.includes("%") ? "%" : ""),
-          status: metrics.status,
-          parameterId: matchedParam?.id,
-          parameterName: matchedParam?.name,
-          targetMean: metrics.targetMean,
-          targetSD: metrics.targetSD,
-          zScore: metrics.zScore,
-          sdPosition: metrics.sdPosition,
-          violation: metrics.violation
-        });
       }
-    }
+    });
 
-    return results;
+    // Urutkan sesuai Standar Klinis Laboratorium (WBC, RBC, HGB, HCT, PLT paling atas)
+    const priorityOrder = [
+      'WBC', 'RBC', 'HGB', 'HCT', 'PLT',
+      'MCV', 'MCH', 'MCHC',
+      'RDW-CV', 'RDW-SD', 'MPV', 'PDW', 'PCT', 'P-LCR',
+      'LYM%', 'MXD%', 'NEUT%', 'LYM#', 'MXD#', 'NEUT#'
+    ];
+
+    const sortedResults = Array.from(resultsMap.values()).sort((a, b) => {
+      const idxA = priorityOrder.indexOf(a.item.toUpperCase());
+      const idxB = priorityOrder.indexOf(b.item.toUpperCase());
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return a.item.localeCompare(b.item);
+    });
+
+    setIgnoredItems(ignored);
+    return sortedResults;
   }, [findMatchingMasterParameter, evaluateMasterDataMetrics]);
 
   /**
@@ -525,10 +582,10 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
       tessedit_pageseg_mode: "6", // PSM 6: Single uniform block of text
     });
 
-    setProgress("Memetakan ke Master Data Dimih 3980...");
+    setProgress("Memvalidasi & memfokuskan parameter Master Data (HGB, HCT, WBC, PLT, RBC)...");
     const parsed = parseStruk(data.text);
     setHasil(parsed);
-    setProgress(`Selesai! Ditemukan ${parsed.length} parameter, terintegrasi ke Master Data Dirui Dimih 3980.`);
+    setProgress(`Selesai! Ditemukan ${parsed.length} parameter Master Data (HGB, HCT, WBC, PLT, RBC, dll).`);
     return parsed;
   }, [parseStruk]);
 
@@ -596,7 +653,6 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
     try {
       let fileToUse: File | Blob | null = sourceFile;
       if (!fileToUse && previewSrc) {
-        // Ambil blob dari previewSrc jika sourceFile belum terisi
         const resp = await fetch(previewSrc);
         fileToUse = await resp.blob();
       }
@@ -665,6 +721,7 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
    */
   const handleResetScan = () => {
     setHasil([]);
+    setIgnoredItems([]);
     setSourceFile(null);
     setPreviewSrc("");
     setProcessedPreviewSrc("");
@@ -677,29 +734,29 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
   };
 
   /**
-   * Tambah Baris Parameter Manual
+   * Tambah Baris Parameter Manual (Hanya dari Master Data)
    */
   const handleAddManualRow = () => {
+    // Default to first available master parameter or HGB
+    const targetParam = dimihParameters.find(p => p.code === 'HGB') || dimihParameters[0] || parameters[0];
+    if (!targetParam) return;
+
+    const metrics = evaluateMasterDataMetrics(targetParam.targetMean.toString(), targetParam, null);
     const newRow: HasilQC = {
       id: `item-${Date.now()}-manual`,
-      item: "WBC",
-      nilai: "7.0",
+      item: targetParam.code,
+      nilai: targetParam.targetMean.toString(),
       flag: null,
-      unit: "10^3/uL",
-      status: "ok"
+      unit: targetParam.unit,
+      status: metrics.status,
+      parameterId: targetParam.id,
+      parameterName: targetParam.name,
+      targetMean: metrics.targetMean,
+      targetSD: metrics.targetSD,
+      zScore: metrics.zScore,
+      sdPosition: metrics.sdPosition,
+      isCoreParameter: CORE_MASTER_CODES.includes(targetParam.code.toUpperCase())
     };
-    const match = findMatchingMasterParameter("WBC");
-    if (match) {
-      const metrics = evaluateMasterDataMetrics("7.0", match, null);
-      newRow.parameterId = match.id;
-      newRow.parameterName = match.name;
-      newRow.unit = match.unit;
-      newRow.targetMean = metrics.targetMean;
-      newRow.targetSD = metrics.targetSD;
-      newRow.zScore = metrics.zScore;
-      newRow.sdPosition = metrics.sdPosition;
-      newRow.status = metrics.status;
-    }
     setHasil(prev => [...prev, newRow]);
   };
 
@@ -741,7 +798,7 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
     ctx.fillText("ITEM       FLAG   VALUE    UNIT", 30, 255);
     ctx.fillText("----------------------------------------------", 30, 275);
 
-    // Mock realistic receipt rows
+    // Mock realistic receipt rows focusing on Master Data
     const mockRows = [
       { item: "WBC", flag: "", val: "7.20", unit: "10^3/uL" },
       { item: "RBC", flag: "", val: "4.50", unit: "10^6/uL" },
@@ -801,9 +858,7 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
     const target = copy[index];
     target.nilai = newVal;
 
-    const matchedParam = target.parameterId 
-      ? parameters.find(p => p.id === target.parameterId)
-      : findMatchingMasterParameter(target.item);
+    const matchedParam = parameters.find(p => p.id === target.parameterId) || findMatchingMasterParameter(target.item);
 
     const metrics = evaluateMasterDataMetrics(newVal, matchedParam, target.flag);
     target.zScore = metrics.zScore;
@@ -820,9 +875,7 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
     const target = copy[index];
     target.flag = newFlag || null;
 
-    const matchedParam = target.parameterId 
-      ? parameters.find(p => p.id === target.parameterId)
-      : findMatchingMasterParameter(target.item);
+    const matchedParam = parameters.find(p => p.id === target.parameterId) || findMatchingMasterParameter(target.item);
 
     const metrics = evaluateMasterDataMetrics(target.nilai, matchedParam, target.flag);
     target.status = metrics.status;
@@ -836,10 +889,13 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
     const copy = [...hasil];
     const target = copy[index];
     const newParam = parameters.find(p => p.id === newParamId);
+    if (!newParam) return;
 
-    target.parameterId = newParam?.id;
-    target.parameterName = newParam?.name;
-    if (newParam?.unit) target.unit = newParam.unit;
+    target.parameterId = newParam.id;
+    target.parameterName = newParam.name;
+    target.item = newParam.code;
+    target.isCoreParameter = CORE_MASTER_CODES.includes(newParam.code.toUpperCase());
+    if (newParam.unit) target.unit = newParam.unit;
 
     const metrics = evaluateMasterDataMetrics(target.nilai, newParam, target.flag);
     target.targetMean = metrics.targetMean;
@@ -889,9 +945,7 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
       let syncedQCResultsCount = 0;
       if (syncToLeveyJennings) {
         hasil.forEach(h => {
-          const matchParam = h.parameterId 
-            ? parameters.find(p => p.id === h.parameterId)
-            : findMatchingMasterParameter(h.item);
+          const matchParam = parameters.find(p => p.id === h.parameterId) || findMatchingMasterParameter(h.item);
 
           if (matchParam) {
             const numVal = parseFloat(h.nilai) || 0;
@@ -955,7 +1009,7 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
         });
       }
 
-      const successText = `Berhasil menyimpan ${hemaPayload.length} parameter hematologi ke tabel qc_hematologi` +
+      const successText = `Berhasil menyimpan ${hemaPayload.length} parameter hematologi master ke tabel qc_hematologi` +
         (syncedQCResultsCount > 0 ? ` dan ${syncedQCResultsCount} data langsung terintegrasi ke grafik Levey-Jennings & Dashboard Mutu!` : "!");
 
       setStatusMessage({
@@ -980,7 +1034,7 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
     }
   };
 
-  const mappedCount = hasil.filter(h => h.parameterId).length;
+  const coreCount = hasil.filter(h => h.isCoreParameter).length;
   const warningCount = hasil.filter(h => h.status === "warning").length;
   const rejectCount = hasil.filter(h => h.status === "reject").length;
 
@@ -989,16 +1043,17 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
       {/* Header Info */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <h2 className="font-extrabold text-xl text-slate-900 tracking-tight">
               Scan Struk QC Hematologi Dirui Dimih 3980
             </h2>
-            <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 font-bold font-mono border border-blue-200">
-              Master Data Terintegrasi
+            <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold font-mono border border-emerald-300 flex items-center gap-1">
+              <Target className="h-3 w-3" />
+              <span>Fokus Master Data</span>
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Pembacaan OCR Tesseract v5 cerdas dengan binarisasi canvas (Threshold 180, Kontras 1.8), terhubung otomatis ke target Mean & SD instrumen <strong>{activeInstrument.name}</strong>.
+            Ekstraksi OCR terarah yang <strong>hanya memproses parameter Master Data</strong> (HGB, HCT, WBC, PLT, RBC, dll.) dan secara otomatis <strong>mengesampingkan teks/parameter di luar Master Data</strong>.
           </p>
         </div>
 
@@ -1013,6 +1068,57 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
           </button>
         </div>
       </div>
+
+      {/* FOCUS BANNER WAJIB */}
+      <div className="p-3.5 bg-gradient-to-r from-blue-50 via-indigo-50/50 to-slate-50 border border-blue-200/90 rounded-xl text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+        <div className="flex items-start sm:items-center gap-2.5">
+          <div className="p-1.5 bg-blue-600 text-white rounded-lg shrink-0">
+            <Target className="h-4 w-4" />
+          </div>
+          <div>
+            <div className="font-bold text-blue-950 flex items-center gap-1.5 flex-wrap">
+              <span>Mode Filter Master Data Aktif:</span>
+              <span className="text-emerald-700 font-mono">HGB, HCT, WBC, PLT, RBC, MCV, MCH, MCHC, dkk.</span>
+            </div>
+            <p className="text-[11px] text-slate-600 mt-0.5">
+              Item yang tidak terdaftar pada Master Data instrumen <strong>{activeInstrument.name}</strong> akan disisihkan dan tidak dimasukkan ke dalam tabel QC.
+            </p>
+          </div>
+        </div>
+
+        {ignoredItems.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowIgnoredPanel(!showIgnoredPanel)}
+            className="px-2.5 py-1 text-[11px] font-bold text-slate-700 bg-white border border-slate-300 hover:bg-slate-100 rounded-lg shrink-0 flex items-center gap-1 cursor-pointer transition-colors"
+          >
+            <Filter className="h-3 w-3 text-slate-500" />
+            <span>{ignoredItems.length} Item Non-Master Dikesampingkan</span>
+            {showIgnoredPanel ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+          </button>
+        )}
+      </div>
+
+      {/* Panel Daftar Item yang Dikesampingkan (Non-Master Items) */}
+      {showIgnoredPanel && ignoredItems.length > 0 && (
+        <div className="p-3.5 bg-amber-50/60 border border-amber-200 rounded-xl text-xs space-y-2">
+          <div className="flex items-center justify-between font-bold text-amber-900">
+            <span>Daftar Parameter/Teks yang Dikesampingkan (Tidak Ada di Master Data):</span>
+            <span className="text-[11px] text-amber-700 font-normal">Otomatis diabaikan demi menjaga kemurnian data QC</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-40 overflow-y-auto">
+            {ignoredItems.map((ig, idx) => (
+              <div key={idx} className="p-2 bg-white rounded border border-amber-200 font-mono text-[11px] flex items-center justify-between">
+                <div>
+                  <span className="font-bold text-slate-800">{ig.item}</span>
+                  <span className="text-slate-500 ml-1.5">{ig.value || "-"}</span>
+                </div>
+                <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 font-sans">Non-Master</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Master Data Integration Settings Ribbon */}
       <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
@@ -1110,7 +1216,7 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
         </div>
 
         <div className="flex flex-wrap items-center justify-between text-[11px] text-slate-500 gap-2 pt-1">
-          <span>* Tips Akurasi: Letakkan struk di atas meja putih/terang, hindari bayangan tangan, dan fokus ke tabel angka.</span>
+          <span>* Tips Akurasi: Letakkan struk di atas meja putih/terang, pastikan teks parameter HGB, HCT, WBC, PLT, RBC terlihat jelas.</span>
           <button
             type="button"
             onClick={() => setShowFilterSettings(!showFilterSettings)}
@@ -1361,14 +1467,17 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
         <div className="space-y-4">
           {/* Summary Badges Bar */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2">
-            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-center">
-              <span className="text-[10px] font-extrabold uppercase text-slate-500">Total Terdeteksi</span>
-              <div className="text-xl font-extrabold font-mono text-slate-900">{hasil.length} Item</div>
+            <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-center">
+              <span className="text-[10px] font-extrabold uppercase text-blue-700 flex items-center justify-center gap-1">
+                <CheckCircle className="h-3 w-3" />
+                <span>Master Data Terpetakan</span>
+              </span>
+              <div className="text-xl font-extrabold font-mono text-blue-900">{hasil.length} Item</div>
             </div>
 
-            <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-center">
-              <span className="text-[10px] font-extrabold uppercase text-blue-700">Terpetakan ke Master</span>
-              <div className="text-xl font-extrabold font-mono text-blue-700">{mappedCount} / {hasil.length}</div>
+            <div className="p-3 rounded-xl bg-indigo-50 border border-indigo-200 text-center">
+              <span className="text-[10px] font-extrabold uppercase text-indigo-700">Parameter Kunci</span>
+              <div className="text-xl font-extrabold font-mono text-indigo-700">{coreCount} / 5 (HGB, HCT, etc)</div>
             </div>
 
             <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-center">
@@ -1384,17 +1493,17 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
 
           {/* Tabel Hasil Terintegrasi Master Data */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div className="text-xs text-slate-600 font-medium">
-                * Silakan koreksi angka jika ada kesalahan OCR sebelum disimpan. Evaluasi SDI & Westgard dihitung secara langsung:
+                * Menampilkan hasil parameter yang sesuai dengan Master Data. Nilai dapat dikoreksi sebelum disimpan:
               </div>
               <button
                 type="button"
                 onClick={handleAddManualRow}
-                className="px-2.5 py-1 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
+                className="px-2.5 py-1 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg flex items-center gap-1 cursor-pointer transition-colors self-start sm:self-auto"
               >
                 <Plus className="h-3.5 w-3.5" />
-                <span>Tambah Parameter Manual</span>
+                <span>Tambah Parameter Master Manual</span>
               </button>
             </div>
 
@@ -1403,7 +1512,7 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
                 <thead>
                   <tr className="bg-slate-100/80 text-slate-700 font-extrabold uppercase text-[10px] border-b border-slate-200">
                     <th className="p-3">Item Struk</th>
-                    <th className="p-3">Kaitan Master Data</th>
+                    <th className="p-3">Parameter Master Terkait</th>
                     <th className="p-3 text-right">Hasil (OCR)</th>
                     <th className="p-3 text-center">Target Mean ± SD</th>
                     <th className="p-3 text-center">SDI (Z-Score)</th>
@@ -1421,18 +1530,16 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
                         h.status === "reject" ? "bg-rose-50/40" : h.status === "warning" ? "bg-amber-50/40" : ""
                       }`}
                     >
-                      {/* Item Name */}
+                      {/* Item Name with Core Parameter Badge */}
                       <td className="p-3 font-mono font-bold text-slate-900">
-                        <input
-                          type="text"
-                          value={h.item}
-                          onChange={(e) => {
-                            const copy = [...hasil];
-                            copy[i].item = e.target.value.toUpperCase();
-                            setHasil(copy);
-                          }}
-                          className="w-20 font-bold border border-transparent hover:border-slate-300 focus:border-blue-500 rounded px-1 py-0.5 bg-transparent"
-                        />
+                        <div className="flex items-center gap-1.5">
+                          <span>{h.item}</span>
+                          {h.isCoreParameter && (
+                            <span className="text-[9px] px-1.5 py-0.2 bg-indigo-100 text-indigo-800 rounded font-bold font-sans">
+                              Kunci
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Master Data Parameter Selector */}
@@ -1440,13 +1547,8 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
                         <select
                           value={h.parameterId || ""}
                           onChange={(e) => handleParameterMappingChange(i, e.target.value)}
-                          className={`text-xs font-bold rounded-lg px-2 py-1 border max-w-xs truncate cursor-pointer ${
-                            h.parameterId 
-                              ? "bg-blue-50 text-blue-900 border-blue-200" 
-                              : "bg-amber-50 text-amber-900 border-amber-300"
-                          }`}
+                          className="text-xs font-bold rounded-lg px-2 py-1 border max-w-xs truncate cursor-pointer bg-blue-50 text-blue-900 border-blue-200"
                         >
-                          <option value="">-- Pilih Parameter Master --</option>
                           {dimihParameters.map(p => (
                             <option key={p.id} value={p.id}>
                               {p.name} [{p.code}] ({p.targetMean} ± {p.targetSD})
@@ -1574,7 +1676,7 @@ export default function StrukScanner({ atlmId = "ATLM-01", onNavigateToTab }: St
                 className="w-full bg-blue-600 hover:bg-blue-700 active:scale-[0.99] disabled:bg-slate-300 transition-all text-white py-3.5 rounded-xl font-bold shadow-md cursor-pointer flex items-center justify-center gap-2 text-sm"
               >
                 <Database className="h-4 w-4" />
-                <span>Simpan ke Database QC Terintegrasi ({hasil.length} Parameter)</span>
+                <span>Simpan {hasil.length} Parameter QC Master ke Database</span>
               </button>
 
               <button
