@@ -132,19 +132,24 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
 
   // Filter raw results by parameter, level, and exact date range
   const filteredRawResults = useMemo(() => {
+    console.log('Total results:', results.length);
     let list = results.filter(r => r.parameterId === parameter.id);
+    console.log('Results filtered by parameter:', list.length);
 
     if (selectedLevel !== 'all') {
       list = list.filter(r => r.controlLevel === selectedLevel);
     }
+    console.log('Results filtered by level:', list.length);
 
     if (startDate) {
       list = list.filter(r => r.date >= startDate);
     }
+    console.log('Results filtered by startDate:', list.length);
 
     if (endDate) {
       list = list.filter(r => r.date <= endDate);
     }
+    console.log('Results filtered by endDate:', list.length);
 
     // Sort chronologically
     return [...list].sort((a, b) => a.timestamp - b.timestamp);

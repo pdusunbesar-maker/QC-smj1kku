@@ -871,6 +871,24 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
 
               <div className="flex items-center gap-3 flex-wrap">
                 <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase">Tanggal</label>
+                  <input
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    className="mt-1 px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase">Waktu</label>
+                  <input
+                    type="time"
+                    value={time}
+                    onChange={(e) => setTime(e.target.value)}
+                    className="mt-1 px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800"
+                  />
+                </div>
+                <div>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase">Level Kontrol</label>
                   <select
                     value={ibLevel}

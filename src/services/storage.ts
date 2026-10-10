@@ -567,6 +567,13 @@ export class StorageService {
     setStored(KEYS.NOTIFICATIONS, INITIAL_NOTIFICATIONS);
   }
 
+  static clearAllData(): void {
+    Object.values(KEYS).forEach(key => localStorage.removeItem(key));
+    // Re-initialize to default or just let App handle it
+    StorageService.init();
+    this.notifyDataChanged('all');
+  }
+
   // --- Real-Time Sync & Hydration from Supabase ---
   static async syncFromSupabase(onSynced?: () => void): Promise<{ success: boolean; count: number; message: string }> {
     const sb = getSupabase();

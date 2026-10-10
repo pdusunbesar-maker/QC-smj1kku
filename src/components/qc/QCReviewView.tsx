@@ -21,13 +21,15 @@ import {
   FileSpreadsheet
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { QCResult } from '../../types';
+import { Instrument, Parameter, QCResult } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { StorageService } from '../../services/storage';
 import { calculateZScore, formatSDPosition } from '../../utils/qcCalculations';
 
 interface QCReviewViewProps {
   results: QCResult[];
+  instruments: Instrument[];
+  parameters: Parameter[];
   onResultUpdated: (updated: QCResult) => void;
   onResultDeleted?: (id: string) => void;
   onNavigateToTab: (tab: string, itemData?: any) => void;
@@ -35,6 +37,8 @@ interface QCReviewViewProps {
 
 export const QCReviewView: React.FC<QCReviewViewProps> = ({
   results,
+  instruments,
+  parameters,
   onResultUpdated,
   onResultDeleted,
   onNavigateToTab,
@@ -42,6 +46,10 @@ export const QCReviewView: React.FC<QCReviewViewProps> = ({
   const { user, can } = useAuth();
   const [filterStatus, setFilterStatus] = useState<string>('pending');
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterInstrumentId, setFilterInstrumentId] = useState<string>('all');
+  const [filterParameterId, setFilterParameterId] = useState<string>('all');
+  const [filterStartDate, setFilterStartDate] = useState('');
+  const [filterEndDate, setFilterEndDate] = useState('');
   
   // Review Modal State
   const [selectedResult, setSelectedResult] = useState<QCResult | null>(null);
@@ -68,10 +76,22 @@ export const QCReviewView: React.FC<QCReviewViewProps> = ({
   const filteredResults = useMemo(() => {
     return results.filter(r => {
       // Filter status
-      if (filterStatus === 'pending' && r.reviewStatus !== 'pending') return false;
-      if (filterStatus === 'accepted' && r.reviewStatus !== 'accepted') return false;
-      if (filterStatus === 'rejected' && r.reviewStatus !== 'rejected') return false;
-      if (filterStatus === 'investigation' && r.reviewStatus !== 'investigation_required') return false;
+      if (filterStatus !== 'all') {
+        if (filterStatus === 'pending' && r.reviewStatus !== 'pending') return false;
+        if (filterStatus === 'accepted' && r.reviewStatus !== 'accepted') return false;
+        if (filterStatus === 'rejected' && r.reviewStatus !== 'rejected') return false;
+        if (filterStatus === 'investigation' && r.reviewStatus !== 'investigation_required') return false;
+      }
+
+      // Filter instrument
+      if (filterInstrumentId !== 'all' && r.instrumentId !== filterInstrumentId) return false;
+
+      // Filter parameter
+      if (filterParameterId !== 'all' && r.parameterId !== filterParameterId) return false;
+
+      // Filter date range
+      if (filterStartDate && r.date < filterStartDate) return false;
+      if (filterEndDate && r.date > filterEndDate) return false;
 
       // Search query
       if (searchQuery) {
@@ -86,7 +106,7 @@ export const QCReviewView: React.FC<QCReviewViewProps> = ({
       }
       return true;
     });
-  }, [results, filterStatus, searchQuery]);
+  }, [results, filterStatus, searchQuery, filterInstrumentId, filterParameterId, filterStartDate, filterEndDate]);
 
   // Handle Supervisor Review Decision
   const handleReviewDecision = (
@@ -392,15 +412,15 @@ export const QCReviewView: React.FC<QCReviewViewProps> = ({
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
         {/* Status Filters */}
-        <div className="flex items-center rounded-lg bg-slate-100 p-1 text-xs font-medium text-slate-600 overflow-x-auto w-full sm:w-auto">
+        <div className="flex items-center rounded-lg bg-slate-100 p-1 text-xs font-medium text-slate-600 overflow-x-auto w-full col-span-full lg:col-span-1">
           {[
             { id: 'pending', label: 'Menunggu Review' },
-            { id: 'accepted', label: 'Disetujui (Accepted)' },
+            { id: 'accepted', label: 'Disetujui' },
             { id: 'investigation', label: 'Investigasi' },
-            { id: 'rejected', label: 'Ditolak (Rejected)' },
-            { id: 'all', label: 'Semua Hasil' },
+            { id: 'rejected', label: 'Ditolak' },
+            { id: 'all', label: 'Semua' },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -417,8 +437,54 @@ export const QCReviewView: React.FC<QCReviewViewProps> = ({
           ))}
         </div>
 
-        {/* Search Field & Inline Export */}
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        {/* Instrument & Parameter Filters */}
+        <select
+          value={filterInstrumentId}
+          onChange={(e) => {
+            setFilterInstrumentId(e.target.value);
+            setFilterParameterId('all'); // Reset parameter when instrument changes
+          }}
+          className="rounded-lg border border-slate-200 px-3 py-2 text-xs focus:border-emerald-500 focus:outline-none"
+        >
+          <option value="all">Semua Instrumen</option>
+          {instruments.map(inst => (
+            <option key={inst.id} value={inst.id}>{inst.name}</option>
+          ))}
+        </select>
+
+        <select
+          value={filterParameterId}
+          onChange={(e) => setFilterParameterId(e.target.value)}
+          className="rounded-lg border border-slate-200 px-3 py-2 text-xs focus:border-emerald-500 focus:outline-none"
+        >
+          <option value="all">Semua Parameter</option>
+          {parameters
+            .filter(p => filterInstrumentId === 'all' || p.instrumentId === filterInstrumentId)
+            .map(p => (
+              <option key={p.id} value={p.id}>{p.name} ({p.code})</option>
+          ))}
+        </select>
+
+        {/* Date Filters */}
+        <div className="flex gap-2">
+          <input
+            type="date"
+            value={filterStartDate}
+            onChange={(e) => setFilterStartDate(e.target.value)}
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs focus:border-emerald-500 focus:outline-none"
+            title="Tanggal Mulai"
+          />
+          <input
+            type="date"
+            value={filterEndDate}
+            onChange={(e) => setFilterEndDate(e.target.value)}
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs focus:border-emerald-500 focus:outline-none"
+            title="Tanggal Selesai"
+          />
+        </div>
+      </div>
+      
+      <div className="flex items-center gap-2">
           <div className="relative flex-1 sm:w-72">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
             <input
@@ -429,6 +495,7 @@ export const QCReviewView: React.FC<QCReviewViewProps> = ({
               className="w-full rounded-lg border border-slate-200 pl-9 pr-3 py-1.5 text-xs focus:border-emerald-500 focus:outline-none"
             />
           </div>
+          {/* Export buttons kept same as before but need to make sure they still work */}
           <button
             type="button"
             onClick={handleExportCSV}
@@ -439,7 +506,6 @@ export const QCReviewView: React.FC<QCReviewViewProps> = ({
             <Download className="h-3.5 w-3.5 text-emerald-700" />
             <span>CSV</span>
           </button>
-
           <button
             type="button"
             onClick={handleExportExcel}
@@ -450,7 +516,6 @@ export const QCReviewView: React.FC<QCReviewViewProps> = ({
             <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-700" />
             <span>Excel</span>
           </button>
-        </div>
       </div>
 
       {/* Table Container */}

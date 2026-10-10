@@ -12,30 +12,24 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 -- 2. LABORATORIES TABLE
 CREATE TABLE IF NOT EXISTS laboratories (
     id TEXT PRIMARY KEY DEFAULT 'lab-rsud-smj1',
-    name TEXT NOT NULL DEFAULT 'Instalasi Patologi Klinik & Laboratorium Terpadu',
-    hospital_name TEXT NOT NULL DEFAULT 'RSUD Sultan Muhammad Jamaludin I',
-    regency TEXT NOT NULL DEFAULT 'Kabupaten Kayong Utara',
+    name TEXT NOT NULL DEFAULT 'INSTALASI PATOLOGI KLINIK & LABORATORIUM TERPADU',
+    hospital_name TEXT NOT NULL DEFAULT 'RSUD SULTAN MUHAMMAD JAMALUDIN I',
+    health_service TEXT NOT NULL DEFAULT 'DINAS KESEHATAN DAN KELUARGA BERENCANA',
+    regency TEXT NOT NULL DEFAULT 'PEMERINTAH KABUPATEN KAYONG UTARA',
     province TEXT NOT NULL DEFAULT 'Kalimantan Barat',
     room_unit TEXT NOT NULL DEFAULT 'Laboratorium Sentral Lantai 1',
     head_of_lab TEXT NOT NULL DEFAULT 'dr. Hendra Wijaya, Sp.PK',
     head_nip TEXT NOT NULL DEFAULT '19800512 200801 1 008',
     head_of_quality TEXT NOT NULL DEFAULT 'Siti Rahmawati, S.Tr.Kes',
     quality_nip TEXT NOT NULL DEFAULT '19850914 201001 2 015',
-    address TEXT NOT NULL DEFAULT 'Jl. Provinsi Sukadana - Teluk Batang KM. 3, Sukadana, Kayong Utara 78852',
+    address TEXT NOT NULL DEFAULT 'Jl. Provinsi Sukadana - Teluk Batang KM. 3, Desa Harapan Mulia, Kec. Sukadana, Kab. Kayong Utara 78852',
     phone TEXT DEFAULT '(0534) 770123 / Ext. 108',
-    email TEXT DEFAULT 'lab.patklin@rsudsultanmuhammadjamaludin1.go.id',
+    email TEXT DEFAULT 'rsudsmj1.kku@gmail.com',
     accreditation TEXT DEFAULT 'KARS Paripurna Bintang 5',
     logo_url TEXT DEFAULT '/Lambang_Daerah_Kab._Kayong_Utara.png',
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-
--- Ensure columns exist if table was already created previously without them
-ALTER TABLE laboratories ADD COLUMN IF NOT EXISTS head_of_quality TEXT DEFAULT 'Siti Rahmawati, S.Tr.Kes';
-ALTER TABLE laboratories ADD COLUMN IF NOT EXISTS quality_nip TEXT DEFAULT '19850914 201001 2 015';
-ALTER TABLE laboratories ADD COLUMN IF NOT EXISTS phone TEXT DEFAULT '(0534) 770123 / Ext. 108';
-ALTER TABLE laboratories ADD COLUMN IF NOT EXISTS accreditation TEXT DEFAULT 'KARS Paripurna Bintang 5';
-ALTER TABLE laboratories ADD COLUMN IF NOT EXISTS logo_url TEXT DEFAULT '/Lambang_Daerah_Kab._Kayong_Utara.png';
 
 -- 3. ROLES & APP USERS TABLE
 CREATE TABLE IF NOT EXISTS roles (
@@ -54,6 +48,7 @@ CREATE TABLE IF NOT EXISTS app_users (
     department TEXT,
     avatar TEXT,
     is_active BOOLEAN DEFAULT true,
+    password TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -156,10 +151,11 @@ CREATE TABLE IF NOT EXISTS qc_results (
     sd NUMERIC(10, 3) NOT NULL,
     z_score NUMERIC(8, 3) NOT NULL,
     sd_position TEXT NOT NULL,
-    status TEXT NOT NULL CHECK (status IN ('pass', 'warning', 'reject')),
+    status TEXT NOT NULL CHECK (status IN ('pass', 'warning', 'reject', 'fail')),
     violations JSONB DEFAULT '[]'::jsonb,
     notes TEXT,
     is_demo BOOLEAN DEFAULT false,
+    is_deleted BOOLEAN DEFAULT false,
     review_status TEXT DEFAULT 'pending' CHECK (review_status IN ('pending', 'accepted', 'rejected', 'investigation_required')),
     reviewed_by TEXT REFERENCES app_users(id) ON DELETE SET NULL,
     reviewed_by_name TEXT,
@@ -224,7 +220,7 @@ CREATE TABLE IF NOT EXISTS non_conformities (
     immediate_action TEXT NOT NULL,
     reported_by TEXT REFERENCES app_users(id) ON DELETE SET NULL,
     reported_by_name TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'under_review', 'resolved', 'escalated_to_capa')),
+    status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'under_review', 'under_investigation', 'resolved', 'escalated_to_capa')),
     resolved_at TIMESTAMPTZ,
     linked_capa_id TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -297,16 +293,7 @@ CREATE INDEX IF NOT EXISTS idx_qc_review ON qc_results(review_status);
 CREATE INDEX IF NOT EXISTS idx_audit_time ON audit_logs(timestamp);
 CREATE INDEX IF NOT EXISTS idx_capa_status ON capa(status);
 
--- 17. ROW LEVEL SECURITY (RLS) POLICIES
-ALTER TABLE laboratories ENABLE ROW LEVEL SECURITY;
-ALTER TABLE app_users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE instruments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE control_materials ENABLE ROW LEVEL SECURITY;
-ALTER TABLE test_parameters ENABLE ROW LEVEL SECURITY;
-ALTER TABLE westgard_rules ENABLE ROW LEVEL SECURITY;
-ALTER TABLE qc_results ENABLE ROW LEVEL SECURITY;
-ALTER TABLE non_conformities ENABLE ROW LEVEL SECURITY;
--- 17. RLS POLICIES - IDEMPOTENT CONFIG
+-- 17. RLS (ROW LEVEL SECURITY) POLICIES
 ALTER TABLE laboratories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE app_users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE roles ENABLE ROW LEVEL SECURITY;
@@ -367,52 +354,3 @@ CREATE POLICY "Public audit_logs" ON audit_logs FOR ALL USING (true) WITH CHECK 
 
 DROP POLICY IF EXISTS "Public notifications" ON notifications;
 CREATE POLICY "Public notifications" ON notifications FOR ALL USING (true) WITH CHECK (true);
-
--- QC HEMATOLOGI (DIRUI DIMIH 3980 OCR RESULTS) TABLE
-CREATE TABLE IF NOT EXISTS qc_hematologi (
-    id TEXT PRIMARY KEY DEFAULT ('HMA-' || substr(md5(random()::text), 1, 8)),
-    item TEXT NOT NULL,
-    hasil NUMERIC(10, 3) NOT NULL,
-    flag TEXT,
-    unit TEXT,
-    foto_url TEXT,
-    atlm_id TEXT,
-    tanggal DATE NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-ALTER TABLE qc_hematologi ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Public qc_hematologi" ON qc_hematologi;
-CREATE POLICY "Public qc_hematologi" ON qc_hematologi FOR ALL USING (true) WITH CHECK (true);
-
--- 18. INITIAL SEED DATA FOR RSUD SULTAN MUHAMMAD JAMALUDIN I
-INSERT INTO laboratories (id, name, hospital_name, regency, province, room_unit, head_of_lab, head_nip, address, email, accreditation)
-VALUES (
-    'lab-rsud-smj1',
-    'Instalasi Patologi Klinik & Laboratorium Terpadu',
-    'RSUD Sultan Muhammad Jamaludin I',
-    'Kabupaten Kayong Utara',
-    'Kalimantan Barat',
-    'Laboratorium Sentral Lantai 1',
-    'dr. Hendra Wijaya, Sp.PK',
-    '19800512 200801 1 008',
-    'Jl. Provinsi Sukadana - Teluk Batang KM. 3, Sukadana, Kayong Utara 78852',
-    'lab.patklin@rsudsultanmuhammadjamaludin1.go.id',
-    'KARS Paripurna Bintang 5'
-) ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO roles (id, name, description) VALUES
-('admin', 'Administrator Sistem', 'Akses penuh ke seluruh modul, master data, audit trail, dan manajemen pengguna.'),
-('supervisor', 'Supervisor / PJ Mutu Laboratorium', 'Melakukan review dan approval QC, verifikasi CAPA, monitoring tren, dan pelaporan.'),
-('analis', 'Analis / Petugas Laboratorium', 'Input data kontrol QC, pemantauan status Levey-Jennings, pelaporan penyimpangan.'),
-('viewer', 'Viewer / Peninjau Akreditasi', 'Hanya dapat melihat dashboard, grafik, dan laporan tanpa hak modifikasi data.')
-ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO app_users (id, name, email, role, nip, department) VALUES
-('usr-admin-1', 'Wahyu Pratama, S.Kom', 'admin.it@rsudsultanmuhammadjamaludin1.go.id', 'admin', '19880419 201102 1 003', 'SIMRS & IT Laboratorium'),
-('usr-spv-1', 'dr. Hendra Wijaya, Sp.PK', 'hendra.wijaya@rsudsultanmuhammadjamaludin1.go.id', 'supervisor', '19800512 200801 1 008', 'Penanggung Jawab Mutu Lab'),
-('usr-spv-2', 'Siti Rahmawati, S.Tr.Kes', 'siti.rahmawati@rsudsultanmuhammadjamaludin1.go.id', 'supervisor', '19850914 201001 2 015', 'Koordinator Teknis & Mutu'),
-('usr-analis-1', 'Ahmad Fauzi, A.Md.AK', 'ahmad.fauzi@rsudsultanmuhammadjamaludin1.go.id', 'analis', '19920325 201503 1 004', 'Analis Kimia Darah'),
-('usr-analis-2', 'Dewi Lestari, A.Md.Kes', 'dewi.lestari@rsudsultanmuhammadjamaludin1.go.id', 'analis', '19951108 201902 2 007', 'Analis Hematologi & Urinalisis'),
-('usr-viewer-1', 'Komite Mutu & Akreditasi', 'komite.mutu@rsudsultanmuhammadjamaludin1.go.id', 'viewer', '19820710 200901 1 012', 'Tim Akreditasi RSUD')
-ON CONFLICT (id) DO NOTHING;

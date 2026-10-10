@@ -238,14 +238,29 @@ export const DatabaseSettingsModal: React.FC<DatabaseSettingsModalProps> = ({
         </div>
 
         <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
-          <button
-            type="button"
-            onClick={onResetData}
-            className="flex items-center gap-1 text-slate-500 hover:text-slate-800"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-            <span>Reset Data Standar</span>
-          </button>
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={onResetData}
+              className="flex items-center gap-1 text-slate-500 hover:text-slate-800"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              <span>Reset Data Standar</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (confirm('Apakah Anda yakin ingin menghapus seluruh data lokal? Tindakan ini tidak dapat dibatalkan.')) {
+                  StorageService.clearAllData();
+                  onClose();
+                }
+              }}
+              className="flex items-center gap-1 text-rose-600 hover:text-rose-800"
+            >
+              <X className="h-3.5 w-3.5" />
+              <span>Bersihkan Semua Data</span>
+            </button>
+          </div>
 
           <button
             type="button"

@@ -20,8 +20,6 @@ import { DashboardView } from './components/dashboard/DashboardView';
 import { QCInputView } from './components/qc/QCInputView';
 import { MasterDataView } from './components/master/MasterDataView';
 import { QCReviewView } from './components/qc/QCReviewView';
-import { QCScanView } from './components/qc/QCScanView';
-import { QCVerificationView } from './components/qc/QCVerificationView';
 import { LeveyJenningsChart } from './components/chart/LeveyJenningsChart';
 import { WestgardRulesView } from './components/westgard/WestgardRulesView';
 import { NonConformityView } from './components/nonconformity/NonConformityView';
@@ -49,7 +47,11 @@ function AppContent() {
   const [parameters, setParameters] = useState<Parameter[]>(() => StorageService.getParameters());
   const [controls, setControls] = useState<ControlMaterial[]>(() => StorageService.getControlMaterials());
   const [qcLots, setQcLots] = useState<QCLot[]>(() => StorageService.getQCLots());
-  const [qcResults, setQcResults] = useState<QCResult[]>(() => StorageService.getQCResults());
+  const [qcResults, setQcResults] = useState<QCResult[]>(() => {
+    const results = StorageService.getQCResults();
+    console.log('Initial QCResults from StorageService:', results);
+    return results;
+  });
   const [westgardRules, setWestgardRules] = useState<WestgardRuleConfig[]>(() => StorageService.getWestgardRules());
   const [nonConformities, setNonConformities] = useState<NonConformity[]>(() => StorageService.getNonConformities());
   const [capas, setCapas] = useState<CAPA[]>(() => StorageService.getCAPAs());
@@ -79,9 +81,20 @@ function AppContent() {
   };
 
   // Parameter selected for Levey-Jennings chart view
-  const [selectedChartParamId, setSelectedChartParamId] = useState<string>(
-    parameters[0]?.id || ''
+  const [selectedInstrumentId, setSelectedInstrumentId] = useState<string>(
+    instruments[0]?.id || ''
   );
+  const [selectedChartParamId, setSelectedChartParamId] = useState<string>(
+    parameters.find(p => p.instrumentId === selectedInstrumentId)?.id || parameters[0]?.id || ''
+  );
+
+  // Update parameters dropdown when instrument changes
+  useEffect(() => {
+    const instrumentParams = parameters.filter(p => p.instrumentId === selectedInstrumentId);
+    if (instrumentParams.length > 0 && !instrumentParams.find(p => p.id === selectedChartParamId)) {
+      setSelectedChartParamId(instrumentParams[0].id);
+    }
+  }, [selectedInstrumentId, parameters, selectedChartParamId]);
 
   // Refresh all state from storage
   const handleReloadAll = () => {
@@ -217,50 +230,12 @@ function AppContent() {
               />
             )}
 
-            {/* 3. Scan QC View */}
-            {activeTab === 'qc-scan' && (
-              <QCScanView 
-                controls={controls}
-                parameters={parameters}
-                instruments={instruments}
-                onNavigateToTab={handleNavigateToTab}
-                onScanComplete={(results, previewUrl, docMeta) => {
-                  setScannedResults(results);
-                  setScanPreviewUrl(previewUrl);
-                  setScannedDocumentMeta(docMeta);
-                  setActiveTab('qc-verification');
-                }} 
-              />
-            )}
-
-
-            {/* 4. Scan QC Verification View */}
-            {activeTab === 'qc-verification' && (
-              <QCVerificationView 
-                extractedData={scannedResults}
-                previewUrl={scanPreviewUrl}
-                documentMeta={scannedDocumentMeta}
-                parameters={parameters}
-                instruments={instruments}
-                controls={controls}
-                existingResults={qcResults}
-                onSave={(savedData) => {
-                  setQcResults(StorageService.getQCResults());
-                  setNotifications(StorageService.getNotifications());
-                  setAuditLogs(StorageService.getAuditLogs());
-                  setScannedResults([]);
-                  setScanPreviewUrl(null);
-                  setScannedDocumentMeta(null);
-                }}
-                onRetakeScan={() => setActiveTab('qc-scan')}
-                onNavigateToTab={handleNavigateToTab}
-              />
-            )}
-
-            {/* 5. QC Review & Approval View */}
+            {/* 3. QC Review & Approval View */}
             {activeTab === 'qc-review' && (
               <QCReviewView
                 results={qcResults}
+                instruments={instruments}
+                parameters={parameters}
                 onResultUpdated={(updatedR) => {
                   setQcResults(StorageService.getQCResults());
                   setAuditLogs(StorageService.getAuditLogs());
@@ -278,7 +253,22 @@ function AppContent() {
             {activeTab === 'levey-jennings' && (
               <div className="space-y-4">
                 {/* Parameter Selection Ribbon */}
-                <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs flex flex-wrap items-center justify-between gap-3 print:hidden">
+                <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs flex flex-wrap items-center gap-3 print:hidden">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-slate-700">Pilih Instrumen:</span>
+                    <select
+                      value={selectedInstrumentId}
+                      onChange={(e) => setSelectedInstrumentId(e.target.value)}
+                      className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-900 bg-white focus:outline-none focus:border-emerald-500"
+                    >
+                      {instruments.map((inst) => (
+                        <option key={inst.id} value={inst.id}>
+                          {inst.name} [{inst.code}]
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-semibold text-slate-700">Pilih Parameter Uji:</span>
                     <select
@@ -286,7 +276,7 @@ function AppContent() {
                       onChange={(e) => setSelectedChartParamId(e.target.value)}
                       className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-900 bg-white focus:outline-none focus:border-emerald-500"
                     >
-                      {parameters.map((p) => (
+                      {parameters.filter(p => p.instrumentId === selectedInstrumentId).map((p) => (
                         <option key={p.id} value={p.id}>
                           {p.name} [{p.code}] - Target Mean: {p.targetMean} {p.unit}
                         </option>
@@ -294,7 +284,7 @@ function AppContent() {
                     </select>
                   </div>
 
-                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <div className="flex items-center gap-2 text-xs text-slate-500 ml-auto">
                     <span className="font-mono text-[11px]">
                       {qcResults.filter(r => r.parameterId === selectedChartParamId).length} Data Pengukuran Tersedia
                     </span>

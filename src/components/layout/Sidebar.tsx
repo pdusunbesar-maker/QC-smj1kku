@@ -64,13 +64,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           badge: null,
           roleRestricted: role === 'viewer',
         },
-        {
-          id: 'qc-scan',
-          label: 'Scan QC',
-          icon: Camera,
-          badge: null,
-          roleRestricted: role === 'viewer',
-        },
 
         {
           id: 'qc-review',
