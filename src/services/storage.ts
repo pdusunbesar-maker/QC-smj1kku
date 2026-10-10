@@ -47,6 +47,8 @@ const KEYS = {
   NOTIFICATIONS: 'lqcms_notifications_v1',
   DELETED_QC_IDS: 'lqcms_deleted_qc_ids_v1',
   DELETED_PARAMETER_IDS: 'lqcms_deleted_parameter_ids_v1',
+  DELETED_INSTRUMENT_IDS: 'lqcms_deleted_instrument_ids_v1',
+  DELETED_CONTROL_IDS: 'lqcms_deleted_control_ids_v1',
   QC_LOTS: 'lqcms_qc_lots_v1',
   QC_HEMATOLOGI: 'lqcms_qc_hematologi_v1',
 };
@@ -180,6 +182,7 @@ function mapInstrumentToDb(i: Instrument) {
     next_calibration_date: i.nextCalibrationDate || null,
     last_maintenance_date: i.lastMaintenanceDate || null,
     next_maintenance_date: i.nextMaintenanceDate || null,
+    deleted_at: i.deletedAt || (i as any).deleted_at || null,
   };
 }
 
@@ -198,6 +201,7 @@ function mapDbToInstrument(row: any): Instrument {
     nextCalibrationDate: row.next_calibration_date || row.nextCalibrationDate || '',
     lastMaintenanceDate: row.last_maintenance_date || row.lastMaintenanceDate || '',
     nextMaintenanceDate: row.next_maintenance_date || row.nextMaintenanceDate || '',
+    deletedAt: row.deleted_at || row.deletedAt || undefined,
   };
 }
 
@@ -211,6 +215,7 @@ function mapControlToDb(c: ControlMaterial) {
     expiration_date: c.expirationDate,
     storage_condition: c.storageCondition,
     status: c.status,
+    deleted_at: c.deletedAt || (c as any).deleted_at || null,
   };
 }
 
@@ -224,6 +229,7 @@ function mapDbToControl(row: any): ControlMaterial {
     expirationDate: row.expiration_date || row.expirationDate,
     storageCondition: row.storage_condition || row.storageCondition,
     status: row.status,
+    deletedAt: row.deleted_at || row.deletedAt || undefined,
   };
 }
 
@@ -242,6 +248,7 @@ function mapParamToDb(p: Parameter) {
     min_acceptable: p.minAcceptable,
     max_acceptable: p.maxAcceptable,
     decimal_places: p.decimalPlaces,
+    deleted_at: p.deletedAt || (p as any).deleted_at || null,
   };
 }
 
@@ -260,6 +267,7 @@ function mapDbToParam(row: any): Parameter {
     minAcceptable: Number(row.min_acceptable ?? row.minAcceptable),
     maxAcceptable: Number(row.max_acceptable ?? row.maxAcceptable),
     decimalPlaces: Number(row.decimal_places ?? row.decimalPlaces ?? 1),
+    deletedAt: row.deleted_at || row.deletedAt || undefined,
   };
 }
 
@@ -289,6 +297,7 @@ function mapQCResultToDb(r: QCResult) {
     notes: r.notes || null,
     is_demo: r.isDemo || false,
     is_deleted: r.isDeleted || false,
+    deleted_at: r.deletedAt || (r as any).deleted_at || null,
     review_status: r.reviewStatus || 'pending',
     reviewed_by: r.reviewedBy || null,
     reviewed_by_name: r.reviewedByName || null,
@@ -324,7 +333,8 @@ function mapDbToQCResult(row: any): QCResult {
     violations: Array.isArray(row.violations) ? row.violations : [],
     notes: row.notes || undefined,
     isDemo: row.is_demo ?? row.isDemo ?? false,
-    isDeleted: row.is_deleted ?? row.isDeleted ?? false,
+    isDeleted: row.is_deleted ?? row.isDeleted ?? (Boolean(row.deleted_at)),
+    deletedAt: row.deleted_at || row.deletedAt || undefined,
     reviewStatus: row.review_status || row.reviewStatus || 'pending',
     reviewedBy: row.reviewed_by || row.reviewedBy,
     reviewedByName: row.reviewed_by_name || row.reviewedByName,
@@ -358,6 +368,7 @@ function mapNCToDb(nc: NonConformity) {
     status: nc.status,
     resolved_at: nc.resolvedAt || null,
     linked_capa_id: nc.linkedCapaId || null,
+    deleted_at: nc.deletedAt || (nc as any).deleted_at || null,
   };
 }
 
@@ -384,6 +395,7 @@ function mapDbToNC(row: any): NonConformity {
     status: row.status,
     resolvedAt: row.resolved_at || row.resolvedAt,
     linkedCapaId: row.linked_capa_id || row.linkedCapaId,
+    deletedAt: row.deleted_at || row.deletedAt || undefined,
   };
 }
 
@@ -414,6 +426,7 @@ function mapCAPAToDb(c: CAPA) {
     closed_at: c.closedAt || null,
     linked_qc_result_id: c.linkedQcResultId || null,
     linked_non_conformity_id: c.linkedNonConformityId || null,
+    deleted_at: c.deletedAt || (c as any).deleted_at || null,
   };
 }
 
@@ -444,6 +457,7 @@ function mapDbToCAPA(row: any): CAPA {
     closedAt: row.closed_at || row.closedAt,
     linkedQcResultId: row.linked_qc_result_id || row.linkedQcResultId,
     linkedNonConformityId: row.linked_non_conformity_id || row.linkedNonConformityId,
+    deletedAt: row.deleted_at || row.deletedAt || undefined,
   };
 }
 
@@ -584,47 +598,86 @@ export class StorageService {
 
     try {
       // 1. Fetch QC Results with soft delete filter and data validation check
-      const { data: qcData, error: qcErr } = await sb.from('qc_results').select('*').eq('is_deleted', false).order('date', { ascending: false });
+      let { data: qcData, error: qcErr } = await sb.from('qc_results').select('*').is('deleted_at', null).eq('is_deleted', false).order('date', { ascending: false });
+      if (qcErr && (qcErr.message?.includes('deleted_at') || qcErr.code === '42703')) {
+        const res = await sb.from('qc_results').select('*').eq('is_deleted', false).order('date', { ascending: false });
+        qcData = res.data;
+        qcErr = res.error;
+      }
       if (!qcErr && qcData && qcData.length > 0) {
         const deletedIds = new Set(this.getDeletedQCIds());
         const mapped = qcData
           .map(mapDbToQCResult)
-          .filter(r => !deletedIds.has(r.id) && !r.isDeleted && !(r as any).is_deleted);
+          .filter(r => !deletedIds.has(r.id) && !r.isDeleted && !(r as any).is_deleted && !r.deletedAt && !(r as any).deleted_at);
         setStored(KEYS.QC_RESULTS, mapped);
       }
 
       // 2. Fetch Instruments
-      const { data: instData, error: instErr } = await sb.from('instruments').select('*');
+      let { data: instData, error: instErr } = await sb.from('instruments').select('*').is('deleted_at', null);
+      if (instErr && (instErr.message?.includes('deleted_at') || instErr.code === '42703')) {
+        const res = await sb.from('instruments').select('*');
+        instData = res.data;
+        instErr = res.error;
+      }
       if (!instErr && instData && instData.length > 0) {
-        const mapped = instData.map(mapDbToInstrument);
+        const deletedInsts = new Set(this.getDeletedInstrumentIds());
+        const mapped = instData
+          .map(mapDbToInstrument)
+          .filter(i => !deletedInsts.has(i.id) && !i.deletedAt && !(i as any).deleted_at && i.id !== 'inst-chem-a' && !i.name.toLowerCase().includes('cobas c311'));
         setStored(KEYS.INSTRUMENTS, mapped);
       }
 
       // 3. Fetch Control Materials
-      const { data: ctrlData, error: ctrlErr } = await sb.from('control_materials').select('*');
+      let { data: ctrlData, error: ctrlErr } = await sb.from('control_materials').select('*').is('deleted_at', null);
+      if (ctrlErr && (ctrlErr.message?.includes('deleted_at') || ctrlErr.code === '42703')) {
+        const res = await sb.from('control_materials').select('*');
+        ctrlData = res.data;
+        ctrlErr = res.error;
+      }
       if (!ctrlErr && ctrlData && ctrlData.length > 0) {
-        const mapped = ctrlData.map(mapDbToControl);
+        const deletedControls = new Set(this.getDeletedControlIds());
+        const mapped = ctrlData
+          .map(mapDbToControl)
+          .filter(c => !deletedControls.has(c.id) && !c.deletedAt && !(c as any).deleted_at && c.id !== 'ctrl-pnu-1' && !c.name.toLowerCase().includes('precinorm'));
         setStored(KEYS.CONTROL_MATERIALS, mapped);
       }
 
       // 4. Fetch Test Parameters
-      const { data: paramData, error: paramErr } = await sb.from('test_parameters').select('*');
+      let { data: paramData, error: paramErr } = await sb.from('test_parameters').select('*').is('deleted_at', null);
+      if (paramErr && (paramErr.message?.includes('deleted_at') || paramErr.code === '42703')) {
+        const res = await sb.from('test_parameters').select('*');
+        paramData = res.data;
+        paramErr = res.error;
+      }
       if (!paramErr && paramData && paramData.length > 0) {
-        const mapped = paramData.map(mapDbToParam);
+        const deletedParamIds = new Set(this.getDeletedParameterIds());
+        const mapped = paramData
+          .map(mapDbToParam)
+          .filter(p => !deletedParamIds.has(p.id) && !p.deletedAt && !(p as any).deleted_at && p.instrumentId !== 'inst-chem-a' && !p.name.toLowerCase().includes('cobas c311'));
         setStored(KEYS.PARAMETERS, mapped);
       }
 
       // 5. Fetch Non Conformities
-      const { data: ncData, error: ncErr } = await sb.from('non_conformities').select('*').order('date', { ascending: false });
+      let { data: ncData, error: ncErr } = await sb.from('non_conformities').select('*').is('deleted_at', null).order('date', { ascending: false });
+      if (ncErr && (ncErr.message?.includes('deleted_at') || ncErr.code === '42703')) {
+        const res = await sb.from('non_conformities').select('*').order('date', { ascending: false });
+        ncData = res.data;
+        ncErr = res.error;
+      }
       if (!ncErr && ncData && ncData.length > 0) {
-        const mapped = ncData.map(mapDbToNC);
+        const mapped = ncData.map(mapDbToNC).filter(n => !n.deletedAt && !(n as any).deleted_at);
         setStored(KEYS.NON_CONFORMITIES, mapped);
       }
 
       // 6. Fetch CAPA
-      const { data: capaData, error: capaErr } = await sb.from('capa').select('*').order('created_at', { ascending: false });
+      let { data: capaData, error: capaErr } = await sb.from('capa').select('*').is('deleted_at', null).order('created_at', { ascending: false });
+      if (capaErr && (capaErr.message?.includes('deleted_at') || capaErr.code === '42703')) {
+        const res = await sb.from('capa').select('*').order('created_at', { ascending: false });
+        capaData = res.data;
+        capaErr = res.error;
+      }
       if (!capaErr && capaData && capaData.length > 0) {
-        const mapped = capaData.map(mapDbToCAPA);
+        const mapped = capaData.map(mapDbToCAPA).filter(c => !c.deletedAt && !(c as any).deleted_at);
         setStored(KEYS.CAPA, mapped);
       }
 
@@ -1248,7 +1301,8 @@ export class StorageService {
       !r.instrumentName?.toLowerCase().includes('cobas c311') && 
       !deletedIds.has(r.id) &&
       !r.isDeleted &&
-      !(r as any).is_deleted
+      !(r as any).is_deleted &&
+      !r.deletedAt
     );
     if (list.length !== rawList.length) {
       setStored(KEYS.QC_RESULTS, list);
@@ -1312,53 +1366,45 @@ export class StorageService {
   }
 
   static deleteQCResult(id: string): void {
-    const target = this.getQCResults().find(r => r.id === id);
-    this.trackDeletedQCId(id);
-    const list = this.getQCResults().filter(r => r.id !== id);
-    setStored(KEYS.QC_RESULTS, list);
-
-    const sb = getSupabase();
-    if (sb) {
-      // Perform hard delete in Supabase to ensure permanent removal
-      sb.from('qc_results')
-        .delete()
-        .eq('id', id)
-        .then(({ error }) => {
-          if (error) {
-            console.error('Supabase hard deleteQCResult error:', error);
-          }
-        });
+    const list = this.getQCResults();
+    const idx = list.findIndex(r => r.id === id);
+    if (idx >= 0) {
+      list[idx] = { ...list[idx], deletedAt: new Date().toISOString() };
+      setStored(KEYS.QC_RESULTS, list);
+      
+      const sb = getSupabase();
+      if (sb) {
+        sb.from('qc_results')
+          .update({ deleted_at: new Date().toISOString() })
+          .eq('id', id)
+          .then();
+      }
+      this.logAudit('DELETE_QC_RESULT', `Menghapus data hasil QC ${list[idx].parameterName} (${list[idx].value} ${list[idx].unit}) tanggal ${list[idx].date}`, null, list[idx]);
+      this.notifyDataChanged('qc_results');
     }
-
-    if (target) {
-      this.logAudit('DELETE_QC_RESULT', `Menghapus data hasil QC ${target.parameterName} (${target.value} ${target.unit}) tanggal ${target.date}`, null, target);
-    }
-
-    this.notifyDataChanged('qc_results');
   }
 
   // --- Non-Conformities ---
   static getNonConformities(): NonConformity[] {
-    return getStored<NonConformity[]>(KEYS.NON_CONFORMITIES, INITIAL_NON_CONFORMITIES);
+    const list = getStored<NonConformity[]>(KEYS.NON_CONFORMITIES, INITIAL_NON_CONFORMITIES);
+    return list.filter(n => !n.deletedAt);
   }
 
   static deleteNonConformity(id: string): void {
-    const target = this.getNonConformities().find(n => n.id === id);
-    const list = this.getNonConformities().filter(n => n.id !== id);
-    setStored(KEYS.NON_CONFORMITIES, list);
+    const list = this.getNonConformities();
+    const idx = list.findIndex(n => n.id === id);
+    if (idx >= 0) {
+      list[idx] = { ...list[idx], deletedAt: new Date().toISOString() };
+      setStored(KEYS.NON_CONFORMITIES, list);
 
-    const sb = getSupabase();
-    if (sb) {
-      sb.from('non_conformities')
-        .delete()
-        .eq('id', id)
-        .then(({ error }) => {
-          if (error) console.error('Supabase deleteNonConformity error:', error);
-        });
-    }
-
-    if (target) {
-      this.logAudit('DELETE_NC', `Menghapus laporan ketidaksesuaian ${target.id} (${target.parameterName})`, null, target);
+      const sb = getSupabase();
+      if (sb) {
+        sb.from('non_conformities')
+          .update({ deleted_at: new Date().toISOString() })
+          .eq('id', id)
+          .then();
+      }
+      this.logAudit('DELETE_NC', `Menghapus laporan ketidaksesuaian ${list[idx].id} (${list[idx].parameterName})`, null, list[idx]);
     }
   }
 
@@ -1381,7 +1427,8 @@ export class StorageService {
 
   // --- CAPA ---
   static getCAPAs(): CAPA[] {
-    return getStored<CAPA[]>(KEYS.CAPA, INITIAL_CAPAS);
+    const list = getStored<CAPA[]>(KEYS.CAPA, INITIAL_CAPAS);
+    return list.filter(c => !c.deletedAt);
   }
 
   static saveCAPA(capa: CAPA): void {
@@ -1402,22 +1449,20 @@ export class StorageService {
   }
 
   static deleteCAPA(id: string): void {
-    const target = this.getCAPAs().find(c => c.id === id);
-    const list = this.getCAPAs().filter(c => c.id !== id);
-    setStored(KEYS.CAPA, list);
+    const list = this.getCAPAs();
+    const idx = list.findIndex(c => c.id === id);
+    if (idx >= 0) {
+      list[idx] = { ...list[idx], deletedAt: new Date().toISOString() };
+      setStored(KEYS.CAPA, list);
 
-    const sb = getSupabase();
-    if (sb) {
-      sb.from('capa')
-        .delete()
-        .eq('id', id)
-        .then(({ error }) => {
-          if (error) console.error('Supabase deleteCAPA error:', error);
-        });
-    }
-
-    if (target) {
-      this.logAudit('DELETE_CAPA', `Menghapus dokumen CAPA ${target.id} (${target.problemStatement.substring(0, 40)}...)`, null, target);
+      const sb = getSupabase();
+      if (sb) {
+        sb.from('capa')
+          .update({ deleted_at: new Date().toISOString() })
+          .eq('id', id)
+          .then();
+      }
+      this.logAudit('DELETE_CAPA', `Menghapus dokumen CAPA ${list[idx].id} (${list[idx].problemStatement.substring(0, 40)}...)`, null, list[idx]);
     }
   }
 

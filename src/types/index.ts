@@ -143,6 +143,7 @@ export interface QCResult {
   notes?: string;
   isDemo?: boolean;
   isDeleted?: boolean;
+  deletedAt?: string;
   
   // Review metadata
   reviewStatus: 'pending' | 'accepted' | 'rejected' | 'investigation_required';
