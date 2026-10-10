@@ -23,6 +23,7 @@ import { QCReviewView } from './components/qc/QCReviewView';
 import { QCScanView } from './components/qc/QCScanView';
 import { QCVerificationView } from './components/qc/QCVerificationView';
 import { DiruiHematologiScanView } from './components/qc/DiruiHematologiScanView';
+import StrukScanner from './components/StrukScanner';
 import { LeveyJenningsChart } from './components/chart/LeveyJenningsChart';
 import { WestgardRulesView } from './components/westgard/WestgardRulesView';
 import { NonConformityView } from './components/nonconformity/NonConformityView';
@@ -234,13 +235,11 @@ function AppContent() {
               />
             )}
 
-            {/* 3b. Scan Struk Hematologi Dirui Dimih 3980 (OCR) */}
+            {/* 3b. Scan Struk Hematologi (StrukScanner) */}
             {activeTab === 'qc-hematologi' && (
-              <DiruiHematologiScanView
-                instruments={instruments}
-                parameters={parameters}
-                onNavigateToTab={handleNavigateToTab}
-              />
+              <div className="space-y-4 max-w-4xl mx-auto">
+                <StrukScanner atlmId={user?.id || 'ATLM-01'} />
+              </div>
             )}
 
             {/* 4. Scan QC Verification View */}

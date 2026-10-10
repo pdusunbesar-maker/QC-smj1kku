@@ -42,6 +42,8 @@ import {
 import { StorageService } from '../../services/storage';
 import { Instrument, Parameter, ControlMaterial } from '../../types';
 import { validateExtractedResultsBatch, PARAMETER_SCHEMAS } from '../../utils/schemaValidation';
+import StrukScanner from '../StrukScanner';
+import { useAuth } from '../../context/AuthContext';
 
 interface QCScanViewProps {
   controls?: ControlMaterial[];
@@ -679,12 +681,13 @@ export const QCScanView: React.FC<QCScanViewProps> = ({
   onScanComplete,
   onNavigateToTab
 }) => {
+  const { user } = useAuth();
   const [instruments, setInstruments] = useState<Instrument[]>(() => propInstruments || []);
   const [parameters, setParameters] = useState<Parameter[]>(() => propParameters || []);
   const [selectedInstrumentId, setSelectedInstrumentId] = useState<string>('auto');
   
-  // Mode: Single image vs Batch multi-image
-  const [scanMode, setScanMode] = useState<'single' | 'batch'>('single');
+  // Mode: Single image vs Batch multi-image vs StrukScanner
+  const [scanMode, setScanMode] = useState<'single' | 'batch' | 'struk-scanner'>('single');
 
   // Single Image states
   const [file, setFile] = useState<File | null>(null);
@@ -1399,6 +1402,18 @@ export const QCScanView: React.FC<QCScanViewProps> = ({
                 <Layers className="h-3.5 w-3.5" />
                 <span>Batch Multi-Foto ({batchQueue.length} Struk)</span>
               </button>
+              <button
+                type="button"
+                onClick={() => setScanMode('struk-scanner')}
+                className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-all ${
+                  scanMode === 'struk-scanner'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Scan className="h-3.5 w-3.5" />
+                <span>Scan Struk Hematologi (Tesseract)</span>
+              </button>
             </div>
 
             {onNavigateToTab && (
@@ -1482,7 +1497,14 @@ export const QCScanView: React.FC<QCScanViewProps> = ({
         </div>
       </div>
 
-      {/* Error Banner */}
+      {/* Embedded StrukScanner or Regular Single/Batch Scan View */}
+      {scanMode === 'struk-scanner' ? (
+        <div className="space-y-4">
+          <StrukScanner atlmId={user?.id || 'ATLM-01'} />
+        </div>
+      ) : (
+        <>
+          {/* Error Banner */}
       {errorMsg && (
         <div className="bg-rose-50 border border-rose-200 text-rose-800 p-4 rounded-xl flex items-center justify-between gap-3">
           <div className="flex items-start gap-3">
@@ -2498,6 +2520,8 @@ export const QCScanView: React.FC<QCScanViewProps> = ({
             </div>
           </div>
         )
+      )}
+        </>
       )}
     </div>
   );
