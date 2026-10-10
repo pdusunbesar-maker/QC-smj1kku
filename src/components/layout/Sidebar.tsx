@@ -71,14 +71,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           badge: null,
           roleRestricted: role === 'viewer',
         },
-        {
-          id: 'qc-hematologi',
-          label: 'Scan Struk Dirui 3980',
-          icon: Scan,
-          badge: 'OCR',
-          badgeColor: 'bg-blue-400/20 text-blue-300 border border-blue-300/30',
-          roleRestricted: role === 'viewer',
-        },
+
         {
           id: 'qc-review',
           label: 'QC Review & Approval',

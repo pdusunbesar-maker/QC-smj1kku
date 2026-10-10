@@ -42,7 +42,6 @@ import {
 import { StorageService } from '../../services/storage';
 import { Instrument, Parameter, ControlMaterial } from '../../types';
 import { validateExtractedResultsBatch, PARAMETER_SCHEMAS } from '../../utils/schemaValidation';
-import StrukScanner from '../StrukScanner';
 import { useAuth } from '../../context/AuthContext';
 
 interface QCScanViewProps {
@@ -1402,33 +1401,7 @@ export const QCScanView: React.FC<QCScanViewProps> = ({
                 <Layers className="h-3.5 w-3.5" />
                 <span>Batch Multi-Foto ({batchQueue.length} Struk)</span>
               </button>
-              <button
-                type="button"
-                onClick={() => setScanMode('struk-scanner')}
-                className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-all ${
-                  scanMode === 'struk-scanner'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Scan className="h-3.5 w-3.5" />
-                <span>Scan Struk Hematologi (Tesseract)</span>
-              </button>
             </div>
-
-            {onNavigateToTab && (
-              <button
-                type="button"
-                onClick={() => onNavigateToTab('qc-hematologi')}
-                className="px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-800 hover:from-blue-100 hover:to-indigo-100 border border-blue-200 shadow-2xs transition-all cursor-pointer"
-              >
-                <Scan className="h-3.5 w-3.5 text-blue-600" />
-                <span>Struk Dirui Dimih 3980 (OCR)</span>
-                <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-blue-600 text-white">
-                  Tesseract v5
-                </span>
-              </button>
-            )}
           </div>
 
           {scanMode === 'batch' && batchQueue.length > 0 && (
@@ -1497,35 +1470,7 @@ export const QCScanView: React.FC<QCScanViewProps> = ({
         </div>
       </div>
 
-      {/* Embedded StrukScanner or Regular Single/Batch Scan View */}
-      {scanMode === 'struk-scanner' ? (
-        <div className="space-y-4">
-          <StrukScanner atlmId={user?.id || 'ATLM-01'} onNavigateToTab={onNavigateToTab} />
-        </div>
-      ) : (
-        <>
-          {/* Error Banner */}
-      {errorMsg && (
-        <div className="bg-rose-50 border border-rose-200 text-rose-800 p-4 rounded-xl flex items-center justify-between gap-3">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
-            <div className="text-sm">
-              <p className="font-bold">Pemberitahuan Sistem</p>
-              <p>{errorMsg}</p>
-            </div>
-          </div>
-          {sourceDataUrl && (
-            <button
-              onClick={handleManualFallback}
-              className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold shrink-0 flex items-center gap-1.5"
-            >
-              <Edit className="h-3.5 w-3.5" /> Lanjut ke Form Verifikasi
-            </button>
-          )}
-        </div>
-      )}
 
-      {/* Camera Live View Modal with Interactive Readout Bounding Box Overlay */}
       {isCameraActive && (
         <div className="bg-slate-950 rounded-2xl p-4 sm:p-5 overflow-hidden text-white shadow-2xl border border-slate-800 space-y-4">
           {/* Header & Controls Bar */}
@@ -2520,8 +2465,6 @@ export const QCScanView: React.FC<QCScanViewProps> = ({
             </div>
           </div>
         )
-      )}
-        </>
       )}
     </div>
   );
