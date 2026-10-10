@@ -235,62 +235,6 @@ const SAMPLE_PRESETS = [
     ]
   },
   {
-    id: 'sample-dimih3980',
-    title: 'Dirui Dimih 3980 Analyzer',
-    description: 'Hemoglobin, Leukosit (WBC), Trombosit (PLT) (Khusus Dimih 3980)',
-    badge: 'Dirui Dimih 3980',
-    instrumentId: 'inst-dirui-3980',
-    color: 'border-purple-500 bg-purple-50/60 text-purple-900',
-    dataUrl: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&auto=format&fit=crop&q=80',
-    documentMeta: {
-      analyzer: 'Dirui Dimih 3980 Automated Analyzer',
-      instrument_id: 'inst-dirui-3980',
-      control_level: 'Level 1',
-      lot_number: 'LOT-EC8C-9912',
-      laboratory_name: 'RSUD SULTAN MUHAMMAD JAMALUDIN I',
-      date: new Date().toISOString().split('T')[0],
-      time: new Date().toTimeString().split(' ')[0].substring(0, 5)
-    },
-    presetResults: [
-      {
-        parameter: { value: 'Hemoglobin (Dirui Dimih 3980)', original_text: 'HGB', confidence: 0.98 },
-        level: { value: 'Level 1', original_text: 'L1', confidence: 0.95 },
-        lot: { value: 'LOT-EC8C-9912', confidence: 0.95 },
-        result: { value: 12.6, original_text: '12,6', confidence: 0.99 },
-        unit: { value: 'g/dL', confidence: 0.98 },
-        mean: { value: 13.5, confidence: 0.95 },
-        sd: { value: 0.4, confidence: 0.95 },
-        source_text: 'HGB 12,6 g/dL',
-        overall_confidence: 0.98,
-        needs_verification: false
-      },
-      {
-        parameter: { value: 'Leukosit / WBC (Dirui Dimih 3980)', original_text: 'WBC', confidence: 0.97 },
-        level: { value: 'Level 1', original_text: 'L1', confidence: 0.95 },
-        lot: { value: 'LOT-EC8C-9912', confidence: 0.95 },
-        result: { value: 7.2, original_text: '7.2', confidence: 0.98 },
-        unit: { value: '10^3/uL', confidence: 0.98 },
-        mean: { value: 7.2, confidence: 0.95 },
-        sd: { value: 0.5, confidence: 0.95 },
-        source_text: 'WBC 7.2 10^3/uL',
-        overall_confidence: 0.97,
-        needs_verification: false
-      },
-      {
-        parameter: { value: 'Trombosit / PLT (Dirui Dimih 3980)', original_text: 'PLT', confidence: 0.96 },
-        level: { value: 'Level 1', original_text: 'L1', confidence: 0.95 },
-        lot: { value: 'LOT-EC8C-9912', confidence: 0.95 },
-        result: { value: 245, original_text: '245', confidence: 0.98 },
-        unit: { value: '10^3/uL', confidence: 0.98 },
-        mean: { value: 250, confidence: 0.95 },
-        sd: { value: 15, confidence: 0.95 },
-        source_text: 'PLT 245 10^3/uL',
-        overall_confidence: 0.96,
-        needs_verification: false
-      }
-    ]
-  },
-  {
     id: 'sample-hema550',
     title: 'Sysmex XN-550 Hematology 5-Diff',
     description: 'WBC, RBC, HGB, HCT, PLT, NEUT%, LYMPH% (Sysmex XN-Series)',
@@ -730,10 +674,7 @@ export const QCScanView: React.FC<QCScanViewProps> = ({
 
   // Auto-sync visual template based on selected instrument
   useEffect(() => {
-    if (selectedInstrumentId === 'inst-dirui-3980') {
-      setCameraTemplate('dimih3980');
-      setCameraTargetMode('receipt');
-    } else if (selectedInstrumentId === 'inst-cst240') {
+    if (selectedInstrumentId === 'inst-cst240') {
       setCameraTemplate('cst240');
       setCameraTargetMode('screen');
     }
@@ -798,7 +739,7 @@ export const QCScanView: React.FC<QCScanViewProps> = ({
     setAutoCropSuccess(false);
     try {
       let instTemplate: 'dimih3980' | 'cst240' | 'auto' = 'auto';
-      if (selectedInstrumentId === 'inst-dirui-3980') {
+      if (selectedInstrumentId === 'inst-unknown') {
         instTemplate = 'dimih3980';
       } else if (selectedInstrumentId === 'inst-cst240') {
         instTemplate = 'cst240';
@@ -1120,8 +1061,8 @@ export const QCScanView: React.FC<QCScanViewProps> = ({
   const handleManualFallback = () => {
     const targetInst = getTargetInstrument();
     onScanComplete(activePresetResults || [], croppedDataUrl || sourceDataUrl, documentMeta || {
-      analyzer: targetInst?.name || 'Dirui Dimih 3980 Automated Analyzer',
-      instrument_id: targetInst?.id || 'inst-dirui-3980',
+      analyzer: targetInst?.name || 'Unknown Analyzer',
+      instrument_id: targetInst?.id || 'inst-unknown',
       control_level: 'Level 1',
       lot_number: 'LOT-EC8C-9912'
     });
@@ -1204,8 +1145,8 @@ export const QCScanView: React.FC<QCScanViewProps> = ({
       const batchValidation = validateExtractedResultsBatch(rawResults, parameters);
       setSchemaValidationSummary(batchValidation.summaryMessage);
 
-      const analyzerName = targetInst?.name || data.document?.analyzer || 'Dirui Dimih 3980 Automated Analyzer';
-      let autoInstId = 'inst-dirui-3980';
+      const analyzerName = targetInst?.name || data.document?.analyzer || 'Unknown Analyzer';
+      let autoInstId = 'inst-unknown';
       if (analyzerName.toLowerCase().includes('cst') || analyzerName.toLowerCase().includes('cs-t240')) {
         autoInstId = 'inst-cst240';
       } else if (analyzerName.toLowerCase().includes('cobas') || analyzerName.toLowerCase().includes('c311')) {
@@ -1321,8 +1262,8 @@ export const QCScanView: React.FC<QCScanViewProps> = ({
       // Run batch schema validation on the combined results
       const batchValidation = validateExtractedResultsBatch(mergedResults, parameters);
 
-      const analyzerName = targetInst?.name || 'Dirui Dimih 3980 Automated Analyzer';
-      let autoInstId = targetInst?.id || 'inst-dirui-3980';
+      const analyzerName = targetInst?.name || 'Unknown Analyzer';
+      let autoInstId = targetInst?.id || 'inst-unknown';
 
       const batchMeta = {
         isBatch: true,
