@@ -123,7 +123,7 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
 
       StorageService.saveQCResult(newResult);
       StorageService.logAudit(
-        'INPUT_QC_BATCH',
+        'INPUT_QC',
         `Input QC Multi-Parameter ${param.code} nilai ${val} ${param.unit} (${sdPosition}) status: ${status.toUpperCase()}`,
         newResult
       );
@@ -407,6 +407,7 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
                 </label>
                 <input
                   type="date"
+                  name="qc-date"
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
                   required
@@ -419,6 +420,7 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
                 </label>
                 <input
                   type="time"
+                  name="qc-time"
                   value={time}
                   onChange={(e) => setTime(e.target.value)}
                   required
@@ -624,6 +626,7 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
                 Keterangan Tambahan / Catatan Operasional
               </label>
               <textarea
+                name="qc-notes"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={2}
@@ -874,6 +877,7 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
                   <label className="block text-[10px] font-bold text-slate-500 uppercase">Tanggal</label>
                   <input
                     type="date"
+                    name="ib-date"
                     value={date}
                     onChange={(e) => setDate(e.target.value)}
                     className="mt-1 px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800"
@@ -883,6 +887,7 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
                   <label className="block text-[10px] font-bold text-slate-500 uppercase">Waktu</label>
                   <input
                     type="time"
+                    name="ib-time"
                     value={time}
                     onChange={(e) => setTime(e.target.value)}
                     className="mt-1 px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800"
@@ -891,6 +896,7 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase">Level Kontrol</label>
                   <select
+                    name="ib-level"
                     value={ibLevel}
                     onChange={(e) => setIbLevel(e.target.value as any)}
                     className="mt-1 px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800"
@@ -904,6 +910,7 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
                   <label className="block text-[10px] font-bold text-slate-500 uppercase">Nomor LOT</label>
                   <input
                     type="text"
+                    name="ib-lot"
                     value={ibLotNumber}
                     onChange={(e) => setIbLotNumber(e.target.value)}
                     className="mt-1 px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-mono font-bold text-slate-800 w-36"

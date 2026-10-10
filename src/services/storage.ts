@@ -287,7 +287,7 @@ function mapQCResultToDb(r: QCResult) {
     violations: r.violations || [],
     notes: r.notes || null,
     is_demo: r.isDemo || false,
-    is_deleted: r.isDeleted || r.is_deleted || false,
+    is_deleted: r.isDeleted || false,
     review_status: r.reviewStatus || 'pending',
     reviewed_by: r.reviewedBy || null,
     reviewed_by_name: r.reviewedByName || null,
@@ -741,8 +741,8 @@ export class StorageService {
 
             if (table === 'qc_results') {
               const deletedIds = new Set(StorageService.getDeletedQCIds());
-              if (eventType === 'DELETE' || payload.new?.is_deleted || payload.old?.is_deleted) {
-                const targetId = payload.old?.id || payload.new?.id;
+              if (eventType === 'DELETE' || (payload.new as any)?.isDeleted || (payload.old as any)?.isDeleted) {
+                const targetId = (payload.old as any)?.id || (payload.new as any)?.id;
                 if (targetId) {
                   StorageService.trackDeletedQCId(targetId);
                   const list = getStored<QCResult[]>(KEYS.QC_RESULTS, []).filter(r => r.id !== targetId);
@@ -750,7 +750,7 @@ export class StorageService {
                 }
               } else if (payload.new) {
                 const item = mapDbToQCResult(payload.new);
-                if (!deletedIds.has(item.id) && !item.isDeleted && !(item as any).is_deleted) {
+                if (!deletedIds.has(item.id) && !item.isDeleted) {
                   const list = getStored<QCResult[]>(KEYS.QC_RESULTS, []);
                   const idx = list.findIndex(r => r.id === item.id);
                   if (idx >= 0) list[idx] = item;
@@ -1035,7 +1035,12 @@ export class StorageService {
       sb.from('instruments')
         .upsert(mapInstrumentToDb(instrument))
         .then(({ error }) => {
-          if (error) console.error('Supabase saveInstrument error:', error);
+          if (error) {
+            console.error('Supabase saveInstrument error:', error);
+            if (error.message === 'TypeError: Failed to fetch') {
+              alert('Gagal terhubung ke Supabase. Pastikan URL Supabase benar dan tidak ada masalah CORS. Coba periksa pengaturan database Anda.');
+            }
+          }
         });
     }
   }
@@ -1526,7 +1531,7 @@ export class StorageService {
 
       // Also create audit log
       this.logAudit(
-        'INPUT_QC_RESULT',
+        'INPUT_QC',
         `Menyimpan hasil Scan Struk Hematologi Dirui Dimih 3980 (${newRecords.length} parameter: ${newRecords.map(r => r.item).join(', ')})`,
         newRecords
       );
