@@ -46,6 +46,7 @@ const KEYS = {
   AUDIT_LOGS: 'lqcms_audit_logs_v1',
   NOTIFICATIONS: 'lqcms_notifications_v1',
   DELETED_QC_IDS: 'lqcms_deleted_qc_ids_v1',
+  DELETED_PARAMETER_IDS: 'lqcms_deleted_parameter_ids_v1',
   QC_LOTS: 'lqcms_qc_lots_v1',
   QC_HEMATOLOGI: 'lqcms_qc_hematologi_v1',
 };
@@ -1138,12 +1139,13 @@ export class StorageService {
   // --- Parameters ---
   static getParameters(): Parameter[] {
     const list = getStored<Parameter[]>(KEYS.PARAMETERS, INITIAL_PARAMETERS);
+    const deletedIds = new Set(this.getDeletedParameterIds());
     const activeInsts = new Set(this.getInstruments().map(i => i.id));
-    let cleaned = list.filter(p => p.instrumentId !== 'inst-chem-a' && activeInsts.has(p.instrumentId) && !p.name.toLowerCase().includes('cobas c311'));
+    let cleaned = list.filter(p => !deletedIds.has(p.id) && p.instrumentId !== 'inst-chem-a' && activeInsts.has(p.instrumentId) && !p.name.toLowerCase().includes('cobas c311'));
 
-    // Pastikan seluruh parameter hematologi Dirui Dimih 3980 dari master data bawaan selalu disertakan
+    // Pastikan seluruh parameter hematologi Dirui Dimih 3980 dari master data bawaan selalu disertakan (jika belum dihapus)
     const existingIds = new Set(cleaned.map(p => p.id));
-    const missingDimih = INITIAL_PARAMETERS.filter(p => p.instrumentId === 'inst-dirui-3980' && !existingIds.has(p.id));
+    const missingDimih = INITIAL_PARAMETERS.filter(p => p.instrumentId === 'inst-dirui-3980' && !existingIds.has(p.id) && !deletedIds.has(p.id));
     if (missingDimih.length > 0) {
       cleaned = [...cleaned, ...missingDimih];
       setStored(KEYS.PARAMETERS, cleaned);
@@ -1211,6 +1213,7 @@ export class StorageService {
 
   static deleteParameter(id: string): void {
     const target = this.getParameters().find(p => p.id === id);
+    this.trackDeletedParameterId(id);
     const list = this.getParameters().filter(p => p.id !== id);
     setStored(KEYS.PARAMETERS, list);
 
@@ -1247,6 +1250,18 @@ export class StorageService {
     if (!list.includes(id)) {
       list.push(id);
       setStored(KEYS.DELETED_QC_IDS, list);
+    }
+  }
+
+  static getDeletedParameterIds(): string[] {
+    return getStored<string[]>(KEYS.DELETED_PARAMETER_IDS, []);
+  }
+
+  static trackDeletedParameterId(id: string): void {
+    const list = this.getDeletedParameterIds();
+    if (!list.includes(id)) {
+      list.push(id);
+      setStored(KEYS.DELETED_PARAMETER_IDS, list);
     }
   }
 
