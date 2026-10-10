@@ -30,6 +30,13 @@ CREATE TABLE IF NOT EXISTS laboratories (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Ensure columns exist if table was already created previously without them
+ALTER TABLE laboratories ADD COLUMN IF NOT EXISTS head_of_quality TEXT DEFAULT 'Siti Rahmawati, S.Tr.Kes';
+ALTER TABLE laboratories ADD COLUMN IF NOT EXISTS quality_nip TEXT DEFAULT '19850914 201001 2 015';
+ALTER TABLE laboratories ADD COLUMN IF NOT EXISTS phone TEXT DEFAULT '(0534) 770123 / Ext. 108';
+ALTER TABLE laboratories ADD COLUMN IF NOT EXISTS accreditation TEXT DEFAULT 'KARS Paripurna Bintang 5';
+ALTER TABLE laboratories ADD COLUMN IF NOT EXISTS logo_url TEXT DEFAULT '/Lambang_Daerah_Kab._Kayong_Utara.png';
+
 -- 3. ROLES & APP USERS TABLE
 CREATE TABLE IF NOT EXISTS roles (
     id TEXT PRIMARY KEY,
