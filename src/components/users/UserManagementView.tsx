@@ -93,8 +93,8 @@ export const UserManagementView: React.FC = () => {
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       return (
-        u.name.toLowerCase().includes(q) ||
-        u.email.toLowerCase().includes(q) ||
+        (u.name || '').toLowerCase().includes(q) ||
+        (u.email || '').toLowerCase().includes(q) ||
         (u.nip && u.nip.toLowerCase().includes(q)) ||
         (u.department && u.department.toLowerCase().includes(q))
       );
@@ -498,7 +498,8 @@ export const UserManagementView: React.FC = () => {
                       </td>
 
                       {roles.map(r => {
-                        const hasPerm = r.id === 'admin' || r.permissions.includes(perm.key);
+                        const perms = r.permissions || [];
+                        const hasPerm = r.id === 'admin' || perms.includes(perm.key);
                         const isLockedAdmin = r.id === 'admin';
 
                         return (

@@ -105,9 +105,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // 2. Name, Role, or Known Alias match
       return list.find(u => {
-        const email = u.email.toLowerCase();
-        const name = u.name.toLowerCase();
-        const role = u.role.toLowerCase();
+        const email = (u.email || '').toLowerCase();
+        const name = (u.name || '').toLowerCase();
+        const role = (u.role || '').toLowerCase();
         const nipDigits = (u.nip || '').replace(/\D/g, '');
 
         if (raw === 'admin' && (role === 'admin' || email.includes('admin') || name.includes('hendra'))) return true;
@@ -180,7 +180,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Check specific role definition permissions
     const currentRoleDef = roles.find(r => r.id === user.role);
     if (currentRoleDef) {
-      return currentRoleDef.permissions.includes(permissionKey);
+      const perms = currentRoleDef.permissions || [];
+      return perms.includes(permissionKey);
     }
 
     // Fallback standard roles
