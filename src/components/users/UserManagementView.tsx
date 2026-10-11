@@ -190,7 +190,7 @@ export const UserManagementView: React.FC = () => {
     if (!canManage) return;
     if (roleDef.id === 'admin') return; // Admin always retains all permissions
 
-    const currentPerms = roleDef.permissions;
+    const currentPerms = roleDef.permissions || [];
     const hasPerm = currentPerms.includes(permKey);
     const updatedPerms = hasPerm
       ? currentPerms.filter(p => p !== permKey)

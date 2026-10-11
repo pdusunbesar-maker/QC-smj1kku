@@ -692,8 +692,12 @@ export class StorageService {
 
     const sb = getSupabase();
     if (sb) {
-      const { error } = await sb.from('laboratories').upsert(mapLabToDbFull(this.labInfo));
-      if (error) console.error('Supabase updateLabInfo error:', error);
+      try {
+        const { error } = await sb.from('laboratories').upsert(mapLabToDbFull(this.labInfo));
+        if (error) console.error('Supabase updateLabInfo error:', error);
+      } catch (err) {
+        console.error('Supabase updateLabInfo network error:', err);
+      }
     }
   }
 
@@ -710,8 +714,12 @@ export class StorageService {
 
     const sb = getSupabase();
     if (sb) {
-      const { error } = await sb.from('app_users').upsert(mapUserToDb(user));
-      if (error) console.error('Supabase saveUser error:', error);
+      try {
+        const { error } = await sb.from('app_users').upsert(mapUserToDb(user));
+        if (error) console.error('Supabase saveUser error:', error);
+      } catch (err) {
+        console.error('Supabase saveUser network error:', err);
+      }
     }
   }
 
@@ -721,8 +729,12 @@ export class StorageService {
 
     const sb = getSupabase();
     if (sb) {
-      const { error } = await sb.from('app_users').delete().eq('id', userId);
-      if (error) console.error('Supabase deleteUser error:', error);
+      try {
+        const { error } = await sb.from('app_users').delete().eq('id', userId);
+        if (error) console.error('Supabase deleteUser error:', error);
+      } catch (err) {
+        console.error('Supabase deleteUser network error:', err);
+      }
     }
   }
 
@@ -743,8 +755,12 @@ export class StorageService {
 
     const sb = getSupabase();
     if (sb) {
-      const { error } = await sb.from('roles').upsert({ id: role.id, name: role.name, description: role.description });
-      if (error) console.error('Supabase saveRole error:', error);
+      try {
+        const { error } = await sb.from('roles').upsert({ id: role.id, name: role.name, description: role.description });
+        if (error) console.error('Supabase saveRole error:', error);
+      } catch (err) {
+        console.error('Supabase saveRole network error:', err);
+      }
     }
   }
 
@@ -754,8 +770,12 @@ export class StorageService {
 
     const sb = getSupabase();
     if (sb) {
-      const { error } = await sb.from('roles').delete().eq('id', id);
-      if (error) console.error('Supabase deleteRole error:', error);
+      try {
+        const { error } = await sb.from('roles').delete().eq('id', id);
+        if (error) console.error('Supabase deleteRole error:', error);
+      } catch (err) {
+        console.error('Supabase deleteRole network error:', err);
+      }
     }
   }
 
@@ -1065,8 +1085,12 @@ export class StorageService {
 
     const sb = getSupabase();
     if (sb) {
-      const { error } = await sb.from('qc_hematologi').upsert(mapQCHematologiToDb(item));
-      if (error) console.error('Supabase saveQCHematologi error:', error);
+      try {
+        const { error } = await sb.from('qc_hematologi').upsert(mapQCHematologiToDb(item));
+        if (error) console.error('Supabase saveQCHematologi error:', error);
+      } catch (err) {
+        console.error('Supabase saveQCHematologi network error:', err);
+      }
     }
   }
 
@@ -1097,8 +1121,12 @@ export class StorageService {
 
     const sb = getSupabase();
     if (sb) {
-      const { error } = await sb.from('audit_logs').insert(mapAuditToDb(newLog));
-      if (error) console.error('Supabase logAudit error:', error);
+      try {
+        const { error } = await sb.from('audit_logs').insert(mapAuditToDb(newLog));
+        if (error) console.error('Supabase logAudit error:', error);
+      } catch (err) {
+        console.error('Supabase logAudit network error:', err);
+      }
     }
   }
 
@@ -1113,8 +1141,12 @@ export class StorageService {
 
     const sb = getSupabase();
     if (sb) {
-      const { error } = await sb.from('notifications').upsert(mapNotifToDb(notification));
-      if (error) console.error('Supabase addNotification error:', error);
+      try {
+        const { error } = await sb.from('notifications').upsert(mapNotifToDb(notification));
+        if (error) console.error('Supabase addNotification error:', error);
+      } catch (err) {
+        console.error('Supabase addNotification network error:', err);
+      }
     }
   }
 
@@ -1126,8 +1158,12 @@ export class StorageService {
 
       const sb = getSupabase();
       if (sb) {
-        const { error } = await sb.from('notifications').update({ read: true }).eq('id', id);
-        if (error) console.error('Supabase markNotificationAsRead error:', error);
+        try {
+          const { error } = await sb.from('notifications').update({ read: true }).eq('id', id);
+          if (error) console.error('Supabase markNotificationAsRead error:', error);
+        } catch (err) {
+          console.error('Supabase markNotificationAsRead network error:', err);
+        }
       }
     }
   }
