@@ -75,6 +75,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
 
   // Signatories modal edit state (Penanggung Jawab Mutu & Pimpinan Lab)
   const [isSignatoriesModalOpen, setIsSignatoriesModalOpen] = useState(false);
+  const [isDownloadDropdownOpen, setIsDownloadDropdownOpen] = useState(false);
   const [signatoriesForm, setSignatoriesForm] = useState({
     headOfLab: labInfo.headOfLab || 'dr. Hendra Wijaya, Sp.PK',
     headNip: labInfo.headNip || '19800512 200801 1 008',
@@ -473,7 +474,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2.5 self-start md:self-auto">
+        <div className="flex flex-wrap items-center gap-2.5 self-start md:self-auto relative">
           {/* Button Edit KOP Surat & Pimpinan */}
           <button
             type="button"
@@ -485,54 +486,95 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             <span>Edit KOP Surat & Pimpinan</span>
           </button>
 
-          {/* Excel XLSX Multi-sheet Export */}
-          <button
-            type="button"
-            onClick={handleExportAuditExcel}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-emerald-900 bg-emerald-100 hover:bg-emerald-200 border border-emerald-400 rounded-lg shadow-2xs transition-colors"
-            title="Ekspor Workbook Excel (.xlsx) Multi-Sheet Lengkap dengan Auto-Perhitungan Statistik QC, Log Westgard, CAPA, & NC"
-          >
-            <FileSpreadsheet className="h-4 w-4 text-emerald-800" />
-            <span>Ekspor Excel (.XLSX)</span>
-          </button>
+          {/* Download Report Dropdown Button */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setIsDownloadDropdownOpen(!isDownloadDropdownOpen)}
+              disabled={isGeneratingPDF}
+              className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 disabled:bg-emerald-400 rounded-lg shadow-xs transition-colors"
+              title="Unduh Laporan Mutu (PDF atau Excel)"
+            >
+              {isGeneratingPDF ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Membuat PDF...</span>
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4" />
+                  <span>Download Report</span>
+                  <ArrowUpDown className="h-3 w-3 opacity-70 ml-0.5" />
+                </>
+              )}
+            </button>
 
-          <button
-            type="button"
-            onClick={handleExportCSV}
-            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded-lg shadow-2xs transition-colors"
-            title="Ekspor data tabel aktif ke format teks .CSV"
-          >
-            <Download className="h-4 w-4 text-slate-600" />
-            <span>CSV</span>
-          </button>
+            {isDownloadDropdownOpen && (
+              <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50 animate-in fade-in zoom-in-95 duration-100">
+                <div className="px-3.5 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
+                  Pilih Format Unduhan Laporan
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsDownloadDropdownOpen(false);
+                    handleExportPDF();
+                  }}
+                  className="w-full text-left px-4 py-2.5 hover:bg-emerald-50 flex items-start gap-3 transition-colors group"
+                >
+                  <div className="p-2 rounded-lg bg-emerald-100 text-emerald-800 group-hover:bg-emerald-200 transition-colors mt-0.5">
+                    <FileDown className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-900 group-hover:text-emerald-900">Download PDF Report</p>
+                    <p className="text-[11px] text-slate-500">Ekspor QC, Westgard & CAPA berformat resmi KOP Surat via jsPDF</p>
+                  </div>
+                </button>
 
-          <button
-            type="button"
-            onClick={handleExportPDF}
-            disabled={isGeneratingPDF}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-emerald-700 hover:bg-emerald-800 disabled:bg-emerald-400 rounded-lg shadow-2xs transition-colors"
-            title="Simpan lembar laporan sebagai file PDF"
-          >
-            {isGeneratingPDF ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Membuat PDF...</span>
-              </>
-            ) : (
-              <>
-                <FileDown className="h-4 w-4" />
-                <span>Simpan PDF</span>
-              </>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsDownloadDropdownOpen(false);
+                    handleExportAuditExcel();
+                  }}
+                  className="w-full text-left px-4 py-2.5 hover:bg-emerald-50 flex items-start gap-3 transition-colors group border-t border-slate-100"
+                >
+                  <div className="p-2 rounded-lg bg-emerald-100 text-emerald-800 group-hover:bg-emerald-200 transition-colors mt-0.5">
+                    <FileSpreadsheet className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-900 group-hover:text-emerald-900">Download Excel Report (.xlsx)</p>
+                    <p className="text-[11px] text-slate-500">Ekspor Multi-Sheet lengkap Statistik QC & CAPA via SheetJS</p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsDownloadDropdownOpen(false);
+                    handleExportCSV();
+                  }}
+                  className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-start gap-3 transition-colors group border-t border-slate-100"
+                >
+                  <div className="p-2 rounded-lg bg-slate-100 text-slate-700 group-hover:bg-slate-200 transition-colors mt-0.5">
+                    <Download className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-900">Download Tabel Aktif (.csv)</p>
+                    <p className="text-[11px] text-slate-500">Unduh data tabel yang sedang aktif</p>
+                  </div>
+                </button>
+              </div>
             )}
-          </button>
+          </div>
           
           <button
             type="button"
             onClick={handlePrint}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-2xs transition-colors"
+            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg shadow-2xs transition-colors"
           >
-            <Printer className="h-4 w-4" />
-            <span>Cetak Lembar</span>
+            <Printer className="h-4 w-4 text-slate-600" />
+            <span>Cetak</span>
           </button>
         </div>
       </div>
