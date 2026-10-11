@@ -252,7 +252,7 @@ export async function runSupabaseDiagnostics(url: string, anonKey: string): Prom
       };
 
       // Step 4: Schema Tables Check
-      const tablesToCheck = ['laboratories', 'app_users', 'instruments', 'qc_results', 'capa'];
+      const tablesToCheck = ['laboratories', 'roles', 'app_users', 'instruments', 'qc_results', 'capa'];
       let missingTables: string[] = [];
       for (const tbl of tablesToCheck) {
         const { error: tblErr } = await client.from(tbl).select('count', { count: 'exact', head: true });
@@ -266,7 +266,7 @@ export async function runSupabaseDiagnostics(url: string, anonKey: string): Prom
           id: 'schema',
           title: 'Skema Database & Tabel Utama',
           status: 'success',
-          message: 'Semua tabel utama (laboratories, app_users, instruments, qc_results, capa) lengkap dan siap.',
+          message: 'Semua tabel utama (laboratories, roles, app_users, instruments, qc_results, capa) lengkap dan siap.',
         };
       } else if (missingTables.length < tablesToCheck.length) {
         steps[3] = {
@@ -385,14 +385,17 @@ CREATE TABLE IF NOT EXISTS roles (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     description TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    permissions TEXT[] DEFAULT '{}',
+    is_system BOOLEAN DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS app_users (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     email TEXT UNIQUE NOT NULL,
-    role TEXT NOT NULL CHECK (role IN ('admin', 'supervisor', 'analis', 'viewer')),
+    role TEXT NOT NULL,
     nip TEXT,
     department TEXT,
     avatar TEXT,
