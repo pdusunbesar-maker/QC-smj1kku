@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   FolderGit2, 
   Plus, 
@@ -45,6 +45,18 @@ export const CAPAView: React.FC<CAPAViewProps> = ({
   const [selectedCapa, setSelectedCapa] = useState<CAPA | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    if (initialData?.prefill?.statusFilter) {
+      setStatusFilter(initialData.prefill.statusFilter);
+    }
+    if (initialData?.prefill?.selectedCapaId) {
+      const found = capas.find(c => c.id === initialData.prefill.selectedCapaId);
+      if (found) {
+        setSelectedCapa(found);
+      }
+    }
+  }, [initialData, capas]);
 
   // Edit CAPA Modal State
   const [editingCapa, setEditingCapa] = useState<CAPA | null>(null);
