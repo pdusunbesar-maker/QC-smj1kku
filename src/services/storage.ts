@@ -127,6 +127,26 @@ function mapDbToUser(row: any): User {
   };
 }
 
+function mapRoleToDb(r: RoleDefinition) {
+  return {
+    id: r.id,
+    name: r.name,
+    description: r.description,
+    permissions: r.permissions || [],
+    is_system: r.isSystem ?? false,
+  };
+}
+
+function mapDbToRole(row: any): RoleDefinition {
+  return {
+    id: row.id,
+    name: row.name || '',
+    description: row.description || '',
+    permissions: Array.isArray(row.permissions) ? row.permissions : [],
+    isSystem: row.is_system ?? row.isSystem ?? false,
+  };
+}
+
 function mapInstrumentToDb(i: Instrument) {
   return {
     id: i.id,
@@ -588,6 +608,13 @@ export class StorageService {
         totalCount += this.users.length;
       }
 
+      // 7b. Roles
+      const { data: roleData, error: roleErr } = await sb.from('roles').select('*');
+      if (!roleErr && roleData) {
+        this.roles = roleData.map(mapDbToRole);
+        totalCount += this.roles.length;
+      }
+
       // 8. Laboratories
       const { data: labData, error: labErr } = await sb.from('laboratories').select('*').limit(1);
       if (!labErr && labData && labData.length > 0) {
@@ -623,6 +650,7 @@ export class StorageService {
     try {
       await sb.from('laboratories').upsert(mapLabToDbFull(this.labInfo));
       if (this.users.length > 0) await sb.from('app_users').upsert(this.users.map(mapUserToDb));
+      if (this.roles.length > 0) await sb.from('roles').upsert(this.roles.map(mapRoleToDb));
       if (this.instruments.length > 0) await sb.from('instruments').upsert(this.instruments.map(mapInstrumentToDb));
       if (this.controlMaterials.length > 0) await sb.from('control_materials').upsert(this.controlMaterials.map(mapControlToDb));
       if (this.parameters.length > 0) await sb.from('test_parameters').upsert(this.parameters.map(mapParamToDb));
@@ -733,12 +761,18 @@ export class StorageService {
   }
 
   static getRoles(): RoleDefinition[] {
-    return this.roles.length > 0 ? this.roles : [
-      { id: 'admin', name: 'Administrator', description: 'Akses penuh seluruh sistem & konfigurasi' },
-      { id: 'supervisor', name: 'Supervisor / Penanggung Jawab', description: 'Validasi QC, CAPA, & Tinjauan Mutu' },
-      { id: 'analis', name: 'Analis / ATLM', description: 'Input harian QC & Pemeriksaan' },
-      { id: 'viewer', name: 'Viewer / Auditor', description: 'Akses baca laporan & grafik' },
+    const defaultRoles: RoleDefinition[] = [
+      { id: 'admin', name: 'Administrator', description: 'Akses penuh seluruh sistem & konfigurasi', permissions: [], isSystem: true },
+      { id: 'supervisor', name: 'Supervisor / Penanggung Jawab', description: 'Validasi QC, CAPA, & Tinjauan Mutu', permissions: ['input_qc', 'verify_qc', 'view_reports', 'manage_capa', 'manage_nc', 'view_audit'], isSystem: true },
+      { id: 'analis', name: 'Analis / ATLM', description: 'Input harian QC & Pemeriksaan', permissions: ['input_qc', 'view_reports', 'manage_nc'], isSystem: true },
+      { id: 'viewer', name: 'Viewer / Auditor', description: 'Akses baca laporan & grafik', permissions: ['view_reports'], isSystem: true },
     ];
+    if (this.roles.length === 0) {
+      return defaultRoles;
+    }
+    const existingIds = this.roles.map(r => r.id);
+    const missingDefaults = defaultRoles.filter(d => !existingIds.includes(d.id));
+    return [...missingDefaults, ...this.roles];
   }
 
   static async saveRole(role: RoleDefinition): Promise<void> {
@@ -750,15 +784,17 @@ export class StorageService {
     const sb = getSupabase();
     if (sb) {
       try {
-        const { error } = await sb.from('roles').upsert({ id: role.id, name: role.name, description: role.description });
+        const { error } = await sb.from('roles').upsert(mapRoleToDb(role));
         if (error) console.error('Supabase saveRole error:', error);
       } catch (err) {
         console.error('Supabase saveRole network error:', err);
       }
     }
+    await this.logAudit('UPDATE_MASTER_DATA', `Menyimpan konfigurasi hak akses peran: ${role.name}`);
   }
 
   static async deleteRole(id: string): Promise<void> {
+    const role = this.roles.find(r => r.id === id);
     this.roles = this.roles.filter(r => r.id !== id);
     this.notifyDataChanged('roles');
 
@@ -770,6 +806,9 @@ export class StorageService {
       } catch (err) {
         console.error('Supabase deleteRole network error:', err);
       }
+    }
+    if (role) {
+      await this.logAudit('UPDATE_MASTER_DATA', `Menghapus peran kustom: ${role.name}`);
     }
   }
 
