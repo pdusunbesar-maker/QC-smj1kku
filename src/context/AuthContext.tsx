@@ -16,8 +16,8 @@ interface AuthContextType {
   addUser: (newUser: Omit<User, 'id'>) => { success: boolean; message?: string };
   updateUser: (updatedUser: User) => { success: boolean; message?: string };
   deleteUser: (userId: string) => { success: boolean; message?: string };
-  saveRole: (role: RoleDefinition) => void;
-  deleteRole: (roleId: string) => { success: boolean; message?: string };
+  saveRole: (role: RoleDefinition) => Promise<void>;
+  deleteRole: (roleId: string) => Promise<{ success: boolean; message?: string }> | { success: boolean; message?: string };
   refreshUsersAndRoles: () => void;
 }
 
@@ -280,9 +280,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { success: true };
   };
 
-  const saveRole = (roleDef: RoleDefinition) => {
-    StorageService.saveRole(roleDef);
-    StorageService.logAudit(
+  const saveRole = async (roleDef: RoleDefinition) => {
+    await StorageService.saveRole(roleDef);
+    await StorageService.logAudit(
       'UPDATE_MASTER_DATA',
       `Menyimpan konfigurasi hak akses peran: ${roleDef.name}`,
       roleDef
@@ -290,7 +290,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshUsersAndRoles();
   };
 
-  const deleteRole = (roleId: string): { success: boolean; message?: string } => {
+  const deleteRole = async (roleId: string): Promise<{ success: boolean; message?: string }> => {
     const target = roles.find(r => r.id === roleId);
     if (!target) return { success: false, message: 'Peran tidak ditemukan.' };
     if (target.isSystem) {
@@ -302,8 +302,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: false, message: `Masih terdapat ${usersWithRole.length} pengguna yang menggunakan peran ini. Ubah peran mereka terlebih dahulu.` };
     }
 
-    StorageService.deleteRole(roleId);
-    StorageService.logAudit('UPDATE_MASTER_DATA', `Menghapus peran kustom: ${target.name}`);
+    await StorageService.deleteRole(roleId);
+    await StorageService.logAudit('UPDATE_MASTER_DATA', `Menghapus peran kustom: ${target.name}`);
     refreshUsersAndRoles();
     return { success: true };
   };

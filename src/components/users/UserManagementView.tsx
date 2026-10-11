@@ -186,7 +186,7 @@ export const UserManagementView: React.FC = () => {
   };
 
   // Role permissions toggle
-  const handleToggleRolePermission = (roleDef: RoleDefinition, permKey: string) => {
+  const handleToggleRolePermission = async (roleDef: RoleDefinition, permKey: string) => {
     if (!canManage) return;
     if (roleDef.id === 'admin') return; // Admin always retains all permissions
 
@@ -196,18 +196,18 @@ export const UserManagementView: React.FC = () => {
       ? currentPerms.filter(p => p !== permKey)
       : [...currentPerms, permKey];
 
-    saveRole({
+    await saveRole({
       ...roleDef,
       permissions: updatedPerms,
     });
   };
 
-  const handleSaveNewRole = (e: React.FormEvent) => {
+  const handleSaveNewRole = async (e: React.FormEvent) => {
     e.preventDefault();
     const id = newRoleForm.id.trim().toLowerCase().replace(/\s+/g, '_');
     if (!id || !newRoleForm.name) return;
 
-    saveRole({
+    await saveRole({
       id,
       name: newRoleForm.name.trim(),
       description: newRoleForm.description.trim(),
@@ -224,11 +224,11 @@ export const UserManagementView: React.FC = () => {
     });
   };
 
-  const handleConfirmDeleteRole = () => {
+  const handleConfirmDeleteRole = async () => {
     if (!roleToDelete) return;
-    const res = deleteRole(roleToDelete.id);
-    if (!res.success) {
-      alert(res.message);
+    const res = await deleteRole(roleToDelete.id);
+    if (!res.success && typeof res === 'object' && 'success' in res && !res.success) {
+      alert((res as any).message);
     }
     setRoleToDelete(null);
   };
