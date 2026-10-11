@@ -11,12 +11,16 @@ import {
   ShieldCheck,
   CloudDownload,
   CloudUpload,
-  RefreshCw
+  RefreshCw,
+  Activity,
+  AlertTriangle
 } from 'lucide-react';
 import { 
   getStoredSupabaseConfig, 
   saveStoredSupabaseConfig, 
   testSupabaseConnection, 
+  runSupabaseDiagnostics,
+  DiagnosticStepResult,
   SUPABASE_SQL_SCHEMA 
 } from '../../services/supabase';
 import { StorageService } from '../../services/storage';
@@ -39,8 +43,10 @@ export const DatabaseSettingsModal: React.FC<DatabaseSettingsModalProps> = ({
   const [supabaseAnonKey, setSupabaseAnonKey] = useState(currentConfig.anonKey);
   const [isTesting, setIsTesting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isDiagnosing, setIsDiagnosing] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [syncResult, setSyncResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [diagnosticSteps, setDiagnosticSteps] = useState<DiagnosticStepResult[] | null>(null);
   const [copiedSQL, setCopiedSQL] = useState(false);
 
   const handleTestConnection = async () => {
@@ -49,6 +55,14 @@ export const DatabaseSettingsModal: React.FC<DatabaseSettingsModalProps> = ({
     const res = await testSupabaseConnection(supabaseUrl, supabaseAnonKey);
     setTestResult(res);
     setIsTesting(false);
+  };
+
+  const handleRunDiagnostics = async () => {
+    setIsDiagnosing(true);
+    setDiagnosticSteps(null);
+    const results = await runSupabaseDiagnostics(supabaseUrl, supabaseAnonKey);
+    setDiagnosticSteps(results);
+    setIsDiagnosing(false);
   };
 
   const handleSaveConfig = () => {
@@ -200,6 +214,80 @@ export const DatabaseSettingsModal: React.FC<DatabaseSettingsModalProps> = ({
               <span>{syncResult.message}</span>
             </div>
           )}
+
+          {/* Diagnostic Tool Section */}
+          <div className="space-y-3 pt-3 border-t border-slate-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="font-bold text-xs text-slate-800 flex items-center gap-1.5">
+                  <Activity className="h-4 w-4 text-emerald-600" />
+                  Alat Diagnostik Kesehatan Koneksi & Konfigurasi Supabase
+                </span>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Menjalankan serangkaian pemeriksaan mendalam (Format Kredensial, DNS/HTTPS, PostgREST Auth, Skema Tabel, & Storage Bucket).
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={isDiagnosing}
+                onClick={handleRunDiagnostics}
+                className="flex items-center gap-1.5 px-3 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-semibold rounded-lg text-xs transition-colors shadow-2xs disabled:opacity-50 shrink-0"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${isDiagnosing ? 'animate-spin' : ''}`} />
+                <span>{isDiagnosing ? 'Menjalankan Diagnostik...' : 'Jalankan Tes Diagnostik'}</span>
+              </button>
+            </div>
+
+            {diagnosticSteps && (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2 text-xs">
+                <div className="font-semibold text-slate-800 border-b border-slate-200 pb-1.5 flex items-center justify-between">
+                  <span>Hasil Laporan Diagnostik (Health Check)</span>
+                  <span className="text-[10px] text-slate-500 font-normal">
+                    {diagnosticSteps.filter(s => s.status === 'success').length} dari {diagnosticSteps.length} tes berhasil
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {diagnosticSteps.map((step) => (
+                    <div 
+                      key={step.id} 
+                      className={`p-2.5 rounded-lg border flex items-start gap-2.5 ${
+                        step.status === 'success' ? 'bg-emerald-50/60 border-emerald-200 text-emerald-900' :
+                        step.status === 'warning' ? 'bg-amber-50/60 border-amber-200 text-amber-900' :
+                        step.status === 'error' ? 'bg-rose-50/60 border-rose-200 text-rose-800' :
+                        'bg-white border-slate-200 text-slate-600'
+                      }`}
+                    >
+                      <div className="shrink-0 mt-0.5">
+                        {step.status === 'success' && <CheckCircle2 className="h-4 w-4 text-emerald-600" />}
+                        {step.status === 'warning' && <AlertTriangle className="h-4 w-4 text-amber-600" />}
+                        {step.status === 'error' && <AlertCircle className="h-4 w-4 text-rose-600" />}
+                        {step.status === 'pending' && <RefreshCw className="h-4 w-4 text-slate-400 animate-spin" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold flex items-center justify-between">
+                          <span>{step.title}</span>
+                          <span className={`text-[10px] uppercase px-1.5 py-0.5 rounded font-mono ${
+                            step.status === 'success' ? 'bg-emerald-100 text-emerald-800' :
+                            step.status === 'warning' ? 'bg-amber-100 text-amber-800' :
+                            step.status === 'error' ? 'bg-rose-100 text-rose-800' :
+                            'bg-slate-100 text-slate-600'
+                          }`}>
+                            {step.status}
+                          </span>
+                        </div>
+                        <p className="mt-0.5 text-xs text-slate-700">{step.message}</p>
+                        {step.details && (
+                          <p className="mt-1 text-[10px] font-mono bg-white/70 p-1.5 rounded border border-slate-200/60 text-slate-600 break-all">
+                            {step.details}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* SQL Schema Preview & One-Click Copy */}

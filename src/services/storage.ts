@@ -520,6 +520,49 @@ export class StorageService {
   private static deletedCtrlIds: string[] = [];
   private static deletedParamIds: string[] = [];
 
+  private static initSeedData() {
+    if (this.users.length === 0) {
+      this.users = [
+        { id: 'usr-admin', name: 'Admin Lab', email: 'admin@rsudsmj1.kku.go.id', role: 'admin', nip: '19850101 201001 1 001', department: 'Patologi Klinik', isActive: true, password: 'password123' },
+        { id: 'usr-sup', name: 'dr. Hendra Wijaya, Sp.PK', email: 'hendra@rsudsmj1.kku.go.id', role: 'supervisor', nip: '19800512 200801 1 008', department: 'Patologi Klinik', isActive: true, password: 'password123' },
+        { id: 'usr-analis', name: 'Siti Rahmawati, S.Tr.Kes', email: 'siti@rsudsmj1.kku.go.id', role: 'analis', nip: '19850914 201001 2 015', department: 'Laboratorium Sentral', isActive: true, password: 'password123' },
+        { id: 'usr-viewer', name: 'Auditor KARS', email: 'auditor@rsudsmj1.kku.go.id', role: 'viewer', nip: '19900220 201503 2 002', department: 'Komite Mutu', isActive: true, password: 'password123' },
+      ];
+    }
+    if (this.roles.length === 0) {
+      this.roles = [
+        { id: 'admin', name: 'Administrator', description: 'Akses penuh seluruh sistem & konfigurasi', permissions: ['input_qc', 'verify_qc', 'view_reports', 'manage_capa', 'manage_nc', 'view_audit', 'manage_users', 'manage_master'], isSystem: true },
+        { id: 'supervisor', name: 'Supervisor / Penanggung Jawab', description: 'Validasi QC, CAPA, & Tinjauan Mutu', permissions: ['input_qc', 'verify_qc', 'view_reports', 'manage_capa', 'manage_nc', 'view_audit'], isSystem: true },
+        { id: 'analis', name: 'Analis / ATLM', description: 'Input harian QC & Pemeriksaan', permissions: ['input_qc', 'view_reports', 'manage_nc'], isSystem: true },
+        { id: 'viewer', name: 'Viewer / Auditor', description: 'Akses baca laporan & grafik', permissions: ['view_reports'], isSystem: true },
+      ];
+    }
+    if (this.instruments.length === 0) {
+      this.instruments = [
+        { id: 'inst-01', name: 'Sysmex XN-550', code: 'HEM-01', brand: 'Sysmex', model: 'XN-550', serialNumber: '12345', unit: 'Hematologi', location: 'Laboratorium Sentral', status: 'active' },
+        { id: 'inst-02', name: 'Mindray BS-240', code: 'BIO-01', brand: 'Mindray', model: 'BS-240', serialNumber: '67890', unit: 'Kimia Klinik', location: 'Laboratorium Sentral', status: 'active' },
+        { id: 'inst-03', name: 'Roche Cobas e411', code: 'IMM-01', brand: 'Roche', model: 'Cobas e411', serialNumber: '54321', unit: 'Imunologi', location: 'Laboratorium Sentral', status: 'active' },
+      ];
+    }
+    if (this.controlMaterials.length === 0) {
+      this.controlMaterials = [
+        { id: 'ctrl-01', name: 'Sysmex e-CHECK (XN)', manufacturer: 'Sysmex', level: 'Level 1', lotNumber: 'E23041', expirationDate: '2026-12-31', storageCondition: '2°C - 8°C', status: 'active' },
+        { id: 'ctrl-02', name: 'Sysmex e-CHECK (XN)', manufacturer: 'Sysmex', level: 'Level 2', lotNumber: 'E23042', expirationDate: '2026-12-31', storageCondition: '2°C - 8°C', status: 'active' },
+        { id: 'ctrl-03', name: 'Mindray Control Normal', manufacturer: 'Mindray', level: 'Normal', lotNumber: 'MC2401N', expirationDate: '2026-10-30', storageCondition: '2°C - 8°C', status: 'active' },
+      ];
+    }
+    if (this.parameters.length === 0) {
+      this.parameters = [
+        { id: 'param-01', code: 'HB', name: 'Hemoglobin', unit: 'g/dL', method: 'SLS-Hemoglobin', instrumentId: 'inst-01', controlMaterialId: 'ctrl-01', targetMean: 14.2, targetSd: 0.35, targetCv: 2.5, minAcceptable: 13.1, maxAcceptable: 15.3, decimalPlaces: 1, isActive: true },
+        { id: 'param-02', code: 'WBC', name: 'Leukosit', unit: '10^3/uL', method: 'Flow Cytometry', instrumentId: 'inst-01', controlMaterialId: 'ctrl-01', targetMean: 7.5, targetSd: 0.40, targetCv: 5.3, minAcceptable: 6.3, maxAcceptable: 8.7, decimalPlaces: 2, isActive: true },
+        { id: 'param-03', code: 'PLT', name: 'Trombosit', unit: '10^3/uL', method: 'Impedance', instrumentId: 'inst-01', controlMaterialId: 'ctrl-01', targetMean: 250, targetSd: 12.5, targetCv: 5.0, minAcceptable: 210, maxAcceptable: 290, decimalPlaces: 0, isActive: true },
+        { id: 'param-04', code: 'GLU', name: 'Glukosa Darah', unit: 'mg/dL', method: 'Hexokinase', instrumentId: 'inst-02', controlMaterialId: 'ctrl-03', targetMean: 100, targetSd: 3.2, targetCv: 3.2, minAcceptable: 90, maxAcceptable: 110, decimalPlaces: 1, isActive: true },
+        { id: 'param-05', code: 'URE', name: 'Ureum', unit: 'mg/dL', method: 'Urease-GLDH', instrumentId: 'inst-02', controlMaterialId: 'ctrl-03', targetMean: 35, targetSd: 1.8, targetCv: 5.1, minAcceptable: 29, maxAcceptable: 41, decimalPlaces: 1, isActive: true },
+        { id: 'param-06', code: 'CRE', name: 'Kreatinin', unit: 'mg/dL', method: 'Jaffe Kinetic', instrumentId: 'inst-02', controlMaterialId: 'ctrl-03', targetMean: 0.9, targetSd: 0.05, targetCv: 5.5, minAcceptable: 0.75, maxAcceptable: 1.05, decimalPlaces: 2, isActive: true },
+      ];
+    }
+  }
+
   static async init(): Promise<void> {
     await this.syncFromSupabase();
   }
@@ -546,6 +589,7 @@ export class StorageService {
     this.deletedInstIds = [];
     this.deletedCtrlIds = [];
     this.deletedParamIds = [];
+    this.initSeedData();
     this.notifyDataChanged('all');
   }
 
@@ -553,7 +597,10 @@ export class StorageService {
   static async syncFromSupabase(onSynced?: () => void): Promise<{ success: boolean; count: number; message: string }> {
     const sb = getSupabase();
     if (!sb) {
-      return { success: false, count: 0, message: 'Supabase belum dikonfigurasi.' };
+      this.initSeedData();
+      this.notifyDataChanged('all');
+      if (onSynced) onSynced();
+      return { success: false, count: 0, message: 'Supabase belum dikonfigurasi. Menggunakan data lokal.' };
     }
 
     try {
@@ -633,13 +680,17 @@ export class StorageService {
         this.notifications = notifData.map(mapDbToNotif);
       }
 
+      this.initSeedData();
       this.notifyDataChanged('all');
       if (onSynced) onSynced();
 
       return { success: true, count: totalCount, message: 'Sinkronisasi dari Supabase berhasil!' };
     } catch (err: any) {
-      console.error('Error in syncFromSupabase:', err);
-      return { success: false, count: 0, message: err.message || 'Gagal sinkronisasi dari Supabase.' };
+      console.warn('Supabase sync warning (using local fallback):', err);
+      this.initSeedData();
+      this.notifyDataChanged('all');
+      if (onSynced) onSynced();
+      return { success: false, count: 0, message: err.message || 'Gagal sinkronisasi dari Supabase (menggunakan data lokal).' };
     }
   }
 

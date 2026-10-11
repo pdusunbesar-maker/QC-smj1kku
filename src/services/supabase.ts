@@ -98,6 +98,253 @@ export async function testSupabaseConnection(url: string, anonKey: string): Prom
   }
 }
 
+export interface DiagnosticStepResult {
+  id: string;
+  title: string;
+  status: 'success' | 'warning' | 'error' | 'pending';
+  message: string;
+  details?: string;
+}
+
+export async function runSupabaseDiagnostics(url: string, anonKey: string): Promise<DiagnosticStepResult[]> {
+  const steps: DiagnosticStepResult[] = [
+    { id: 'format', title: 'Format URL & Kunci API', status: 'pending', message: 'Memeriksa format URL dan Anon Key...' },
+    { id: 'network', title: 'Konektivitas Jaringan & DNS (HTTPS)', status: 'pending', message: 'Menguji akses jaringan ke server Supabase...' },
+    { id: 'auth', title: 'Autentikasi API Key (PostgREST)', status: 'pending', message: 'Memvalidasi kunci API dengan server Supabase...' },
+    { id: 'schema', title: 'Skema Database & Tabel Utama', status: 'pending', message: 'Memeriksa keberadaan tabel database (laboratories, qc_results, dll)...' },
+    { id: 'storage', title: 'Supabase Storage (Bucket struk-qc)', status: 'pending', message: 'Memeriksa konfigurasi storage bucket...' },
+  ];
+
+  const cleanUrl = sanitizeSupabaseUrl(url);
+  const cleanKey = anonKey ? anonKey.trim() : '';
+
+  // Step 1: Format
+  if (!cleanUrl || !cleanKey) {
+    steps[0] = {
+      id: 'format',
+      title: 'Format URL & Kunci API',
+      status: 'error',
+      message: 'URL Project Supabase atau Anon Key masih kosong.',
+      details: 'Harap masukkan Project URL (https://xyz.supabase.co) dan Public/Anon API Key yang valid di form pengaturan.'
+    };
+    steps[1].status = 'error'; steps[1].message = 'Dibatalkan karena format kredensial tidak lengkap.';
+    steps[2].status = 'error'; steps[2].message = 'Dibatalkan karena format kredensial tidak lengkap.';
+    steps[3].status = 'error'; steps[3].message = 'Dibatalkan karena format kredensial tidak lengkap.';
+    steps[4].status = 'error'; steps[4].message = 'Dibatalkan karena format kredensial tidak lengkap.';
+    return steps;
+  }
+
+  if (!cleanUrl.startsWith('https://') || !cleanUrl.includes('.supabase.co')) {
+    steps[0] = {
+      id: 'format',
+      title: 'Format URL & Kunci API',
+      status: 'warning',
+      message: 'Format URL Supabase mungkin tidak biasa (biasanya https://<project-id>.supabase.co).',
+      details: `URL saat ini: ${cleanUrl}`
+    };
+  } else {
+    steps[0] = {
+      id: 'format',
+      title: 'Format URL & Kunci API',
+      status: 'success',
+      message: 'Format URL dan Anon Key valid.',
+      details: `URL: ${cleanUrl} | Key length: ${cleanKey.length} chars`
+    };
+  }
+
+  // Step 2: Network Reachability
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(`${cleanUrl}/rest/v1/`, {
+      method: 'HEAD',
+      headers: {
+        'apikey': cleanKey,
+      },
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    if (res.status === 401 || res.status === 403) {
+      steps[1] = {
+        id: 'network',
+        title: 'Konektivitas Jaringan & DNS (HTTPS)',
+        status: 'success',
+        message: 'Server Supabase merespons dengan baik (HTTP status 401/403 menunjukkan server aktif dan menolak request anon tanpa otorisasi yang valid, atau kunci perlu diperiksa).',
+        details: `HTTP Status: ${res.status} ${res.statusText}`
+      };
+    } else if (res.ok || res.status < 500) {
+      steps[1] = {
+        id: 'network',
+        title: 'Konektivitas Jaringan & DNS (HTTPS)',
+        status: 'success',
+        message: 'Konektivitas jaringan ke server Supabase berhasil dan stabil.',
+        details: `HTTP Status: ${res.status} ${res.statusText}`
+      };
+    } else {
+      steps[1] = {
+        id: 'network',
+        title: 'Konektivitas Jaringan & DNS (HTTPS)',
+        status: 'warning',
+        message: `Server merespons dengan status ${res.status}. Periksa konfigurasi proyek.`,
+        details: res.statusText
+      };
+    }
+  } catch (err: any) {
+    steps[1] = {
+      id: 'network',
+      title: 'Konektivitas Jaringan & DNS (HTTPS)',
+      status: 'error',
+      message: `Gagal terhubung ke jaringan: ${err.message || 'Failed to fetch / Network Error'}`,
+      details: 'Kemungkinan masalah CORS, blokir firewall, koneksi internet terputus, atau URL Project salah.'
+    };
+    steps[2] = { id: 'auth', title: 'Autentikasi API Key (PostgREST)', status: 'error', message: 'Gagal karena koneksi jaringan terputus.' };
+    steps[3] = { id: 'schema', title: 'Skema Database & Tabel Utama', status: 'error', message: 'Gagal karena koneksi jaringan terputus.' };
+    steps[4] = { id: 'storage', title: 'Supabase Storage (Bucket struk-qc)', status: 'error', message: 'Gagal karena koneksi jaringan terputus.' };
+    return steps;
+  }
+
+  // Step 3: Auth & Client Test
+  let client: SupabaseClient;
+  try {
+    client = createClient(cleanUrl, cleanKey);
+    const { error, status } = await client.from('laboratories').select('count', { count: 'exact', head: true });
+
+    if (error) {
+      if (error.code === 'PGRST301' || error.message?.includes('Invalid API key') || error.message?.includes('JWT') || status === 401) {
+        steps[2] = {
+          id: 'auth',
+          title: 'Autentikasi API Key (PostgREST)',
+          status: 'error',
+          message: 'API Key (Anon Key) tidak valid atau salah.',
+          details: error.message
+        };
+      } else if (error.code === '42P01' || error.message?.includes('relation "laboratories" does not exist')) {
+        steps[2] = {
+          id: 'auth',
+          title: 'Autentikasi API Key (PostgREST)',
+          status: 'success',
+          message: 'Autentikasi API Key berhasil! (Catatan: Tabel database belum dibuat).',
+          details: 'Kunci API valid tetapi tabel belum diinisialisasi.'
+        };
+        steps[3] = {
+          id: 'schema',
+          title: 'Skema Database & Tabel Utama',
+          status: 'error',
+          message: 'Tabel database belum dibuat di Supabase.',
+          details: 'Silakan salin dan jalankan skrip SQL skema di SQL Editor dashboard Supabase.'
+        };
+      } else {
+        steps[2] = {
+          id: 'auth',
+          title: 'Autentikasi API Key (PostgREST)',
+          status: 'success',
+          message: 'Autentikasi API Key diterima oleh server.',
+          details: error.message
+        };
+      }
+    } else {
+      steps[2] = {
+        id: 'auth',
+        title: 'Autentikasi API Key (PostgREST)',
+        status: 'success',
+        message: 'Autentikasi API Key berhasil dan memiliki akses penuh ke database.',
+      };
+
+      // Step 4: Schema Tables Check
+      const tablesToCheck = ['laboratories', 'app_users', 'instruments', 'qc_results', 'capa'];
+      let missingTables: string[] = [];
+      for (const tbl of tablesToCheck) {
+        const { error: tblErr } = await client.from(tbl).select('count', { count: 'exact', head: true });
+        if (tblErr && (tblErr.code === '42P01' || tblErr.message?.includes('does not exist'))) {
+          missingTables.push(tbl);
+        }
+      }
+
+      if (missingTables.length === 0) {
+        steps[3] = {
+          id: 'schema',
+          title: 'Skema Database & Tabel Utama',
+          status: 'success',
+          message: 'Semua tabel utama (laboratories, app_users, instruments, qc_results, capa) lengkap dan siap.',
+        };
+      } else if (missingTables.length < tablesToCheck.length) {
+        steps[3] = {
+          id: 'schema',
+          title: 'Skema Database & Tabel Utama',
+          status: 'warning',
+          message: `Beberapa tabel belum lengkap (${missingTables.join(', ')} tidak ditemukan).`,
+          details: 'Jalankan skrip SQL schema lengkap di dashboard Supabase.'
+        };
+      } else {
+        steps[3] = {
+          id: 'schema',
+          title: 'Skema Database & Tabel Utama',
+          status: 'error',
+          message: 'Belum ada tabel database yang dibuat di proyek Supabase ini.',
+          details: 'Gunakan tombol "Salin SQL Schema" di bawah dan jalankan di SQL Editor Supabase.'
+        };
+      }
+    }
+  } catch (err: any) {
+    steps[2] = {
+      id: 'auth',
+      title: 'Autentikasi API Key (PostgREST)',
+      status: 'error',
+      message: `Gagal menginisialisasi klien Supabase: ${err.message}`,
+    };
+    steps[3] = {
+      id: 'schema',
+      title: 'Skema Database & Tabel Utama',
+      status: 'error',
+      message: 'Tidak dapat memeriksa skema karena error autentikasi.',
+    };
+  }
+
+  // Step 5: Storage Bucket Check
+  try {
+    const client = createClient(cleanUrl, cleanKey);
+    const { data: buckets, error: bucketErr } = await client.storage.listBuckets();
+    if (bucketErr) {
+      steps[4] = {
+        id: 'storage',
+        title: 'Supabase Storage (Bucket struk-qc)',
+        status: 'warning',
+        message: `Tidak dapat memverifikasi Storage bucket: ${bucketErr.message}`,
+        details: 'Pastikan fitur Storage diaktifkan di dashboard Supabase.'
+      };
+    } else {
+      const hasStrukQc = buckets?.some(b => b.name === 'struk-qc');
+      if (hasStrukQc) {
+        steps[4] = {
+          id: 'storage',
+          title: 'Supabase Storage (Bucket struk-qc)',
+          status: 'success',
+          message: 'Storage bucket "struk-qc" tersedia dan siap digunakan untuk upload foto/struk QC.',
+        };
+      } else {
+        steps[4] = {
+          id: 'storage',
+          title: 'Supabase Storage (Bucket struk-qc)',
+          status: 'warning',
+          message: 'Bucket "struk-qc" belum dibuat di Supabase Storage.',
+          details: 'Skrip SQL schema sudah menyertakan pembuatan bucket ini, atau Anda dapat membuatnya secara manual di menu Storage Supabase.'
+        };
+      }
+    }
+  } catch (err: any) {
+    steps[4] = {
+      id: 'storage',
+      title: 'Supabase Storage (Bucket struk-qc)',
+      status: 'warning',
+      message: 'Gagal memeriksa Supabase Storage bucket.',
+      details: err.message
+    };
+  }
+
+  return steps;
+}
+
 /**
  * Complete Supabase SQL Script to create all 18+ required tables, indexes, RLS, triggers, and initial data
  */
