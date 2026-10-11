@@ -13,9 +13,9 @@ interface AuthContextType {
   logout: () => void;
   switchRole: (role: string) => void;
   can: (action: string) => boolean;
-  addUser: (newUser: Omit<User, 'id'>) => { success: boolean; message?: string };
-  updateUser: (updatedUser: User) => { success: boolean; message?: string };
-  deleteUser: (userId: string) => { success: boolean; message?: string };
+  addUser: (newUser: Omit<User, 'id'>) => Promise<{ success: boolean; message?: string }> | { success: boolean; message?: string };
+  updateUser: (updatedUser: User) => Promise<{ success: boolean; message?: string }> | { success: boolean; message?: string };
+  deleteUser: (userId: string) => Promise<{ success: boolean; message?: string }> | { success: boolean; message?: string };
   saveRole: (role: RoleDefinition) => Promise<void>;
   deleteRole: (roleId: string) => Promise<{ success: boolean; message?: string }> | { success: boolean; message?: string };
   refreshUsersAndRoles: () => void;
@@ -199,7 +199,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // User Management
-  const addUser = (newUser: Omit<User, 'id'>): { success: boolean; message?: string } => {
+  const addUser = async (newUser: Omit<User, 'id'>): Promise<{ success: boolean; message?: string }> => {
     const emailExists = users.some(u => u.email.toLowerCase() === newUser.email.toLowerCase());
     if (emailExists) {
       return { success: false, message: 'Alamat email sudah digunakan oleh pengguna lain.' };
@@ -214,8 +214,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       password: newUser.password || 'password123',
     };
 
-    StorageService.saveUser(fullUser);
-    StorageService.logAudit(
+    await StorageService.saveUser(fullUser);
+    await StorageService.logAudit(
       'UPDATE_MASTER_DATA',
       `Menambahkan pengguna baru: ${fullUser.name} (${fullUser.email}) dengan peran ${fullUser.role}`,
       fullUser
@@ -225,7 +225,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { success: true };
   };
 
-  const updateUser = (updatedUser: User): { success: boolean; message?: string } => {
+  const updateUser = async (updatedUser: User): Promise<{ success: boolean; message?: string }> => {
     const existing = users.find(u => u.id === updatedUser.id);
     if (!existing) {
       return { success: false, message: 'Pengguna tidak ditemukan.' };
@@ -237,8 +237,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: false, message: 'Tidak dapat mengubah peran admin terakhir pada sistem.' };
     }
 
-    StorageService.saveUser(updatedUser);
-    StorageService.logAudit(
+    await StorageService.saveUser(updatedUser);
+    await StorageService.logAudit(
       'UPDATE_MASTER_DATA',
       `Memperbarui profil & hak akses pengguna: ${updatedUser.name} (${updatedUser.role})`,
       updatedUser,
@@ -253,7 +253,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { success: true };
   };
 
-  const deleteUser = (userId: string): { success: boolean; message?: string } => {
+  const deleteUser = async (userId: string): Promise<{ success: boolean; message?: string }> => {
     if (userId === user.id) {
       return { success: false, message: 'Anda tidak dapat menghapus akun Anda sendiri saat sedang masuk.' };
     }
@@ -268,8 +268,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: false, message: 'Tidak dapat menghapus Administrator utama terakhir.' };
     }
 
-    StorageService.deleteUser(userId);
-    StorageService.logAudit(
+    await StorageService.deleteUser(userId);
+    await StorageService.logAudit(
       'UPDATE_MASTER_DATA',
       `Menghapus pengguna: ${target.name} (${target.email}, Peran: ${target.role})`,
       null,

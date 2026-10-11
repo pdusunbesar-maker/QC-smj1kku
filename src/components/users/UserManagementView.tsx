@@ -134,12 +134,12 @@ export const UserManagementView: React.FC = () => {
     setShowAddUserModal(true);
   };
 
-  const handleSaveUser = (e: React.FormEvent) => {
+  const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setModalError('');
 
     if (editingUser) {
-      const res = updateUser({
+      const res = await updateUser({
         ...editingUser,
         name: formData.name.trim(),
         email: formData.email.trim(),
@@ -156,7 +156,7 @@ export const UserManagementView: React.FC = () => {
         return;
       }
     } else {
-      const res = addUser({
+      const res = await addUser({
         name: formData.name.trim(),
         email: formData.email.trim(),
         password: formData.password,
@@ -176,9 +176,9 @@ export const UserManagementView: React.FC = () => {
     setShowAddUserModal(false);
   };
 
-  const handleConfirmDeleteUser = () => {
+  const handleConfirmDeleteUser = async () => {
     if (!userToDelete) return;
-    const res = deleteUser(userToDelete.id);
+    const res = await deleteUser(userToDelete.id);
     if (!res.success) {
       alert(res.message);
     }
