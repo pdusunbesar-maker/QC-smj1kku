@@ -146,21 +146,21 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
   };
 
   // Save Instrument
-  const handleSaveInstrument = (e: React.FormEvent) => {
+  const handleSaveInstrument = async (e: React.FormEvent) => {
     e.preventDefault();
     const id = editingInstrument?.id || `inst-${Date.now().toString().slice(-4)}`;
     const fullInst: Instrument = {
       ...(instForm as Instrument),
       id,
     };
-    StorageService.saveInstrument(fullInst);
+    await StorageService.saveInstrument(fullInst);
     onInstrumentsUpdated(StorageService.getInstruments());
     setShowInstrumentModal(false);
     setEditingInstrument(null);
   };
 
   // Save Parameter
-  const handleSaveParameter = (e: React.FormEvent) => {
+  const handleSaveParameter = async (e: React.FormEvent) => {
     e.preventDefault();
     const id = editingParameter?.id || `param-${Date.now().toString().slice(-4)}`;
     const mean = Number(paramForm.targetMean) || 0;
@@ -180,21 +180,21 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
       maxAcceptable: maxAcc,
       decimalPlaces: dec,
     };
-    StorageService.saveParameter(fullParam);
+    await StorageService.saveParameter(fullParam);
     onParametersUpdated(StorageService.getParameters());
     setShowParameterModal(false);
     setEditingParameter(null);
   };
 
   // Save Control Material
-  const handleSaveControl = (e: React.FormEvent) => {
+  const handleSaveControl = async (e: React.FormEvent) => {
     e.preventDefault();
     const id = editingControl?.id || `ctrl-${Date.now().toString().slice(-4)}`;
     const fullCtrl: ControlMaterial = {
       ...(controlForm as ControlMaterial),
       id,
     };
-    StorageService.saveControlMaterial(fullCtrl);
+    await StorageService.saveControlMaterial(fullCtrl);
     onControlsUpdated(StorageService.getControlMaterials());
     setShowControlModal(false);
     setEditingControl(null);

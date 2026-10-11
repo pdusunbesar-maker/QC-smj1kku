@@ -142,7 +142,6 @@ function mapInstrumentToDb(i: Instrument) {
     next_calibration_date: i.nextCalibrationDate || null,
     last_maintenance_date: i.lastMaintenanceDate || null,
     next_maintenance_date: i.nextMaintenanceDate || null,
-    deleted_at: i.deletedAt || (i as any).deleted_at || null,
   };
 }
 
@@ -175,7 +174,6 @@ function mapControlToDb(m: ControlMaterial) {
     expiration_date: m.expirationDate,
     storage_condition: m.storageCondition || '2°C - 8°C (Lyophilized)',
     status: m.status || 'active',
-    deleted_at: m.deletedAt || (m as any).deleted_at || null,
   };
 }
 
@@ -209,7 +207,6 @@ function mapParamToDb(p: Parameter) {
     max_acceptable: Number(p.maxAcceptable),
     decimal_places: Number(p.decimalPlaces ?? 1),
     is_active: p.isActive ?? true,
-    deleted_at: p.deletedAt || (p as any).deleted_at || null,
   };
 }
 
@@ -267,7 +264,6 @@ function mapQCResultToDb(r: QCResult) {
     review_comment: r.reviewComment || null,
     linked_non_conformity_id: r.linkedNonConformityId || null,
     linked_capa_id: r.linkedCapaId || null,
-    deleted_at: r.deletedAt || (r as any).deleted_at || null,
   };
 }
 
@@ -331,7 +327,6 @@ function mapNCToDb(n: NonConformity) {
     status: n.status || 'open',
     resolved_at: n.resolvedAt || null,
     linked_capa_id: n.linkedCapaId || null,
-    deleted_at: n.deletedAt || (n as any).deleted_at || null,
   };
 }
 
@@ -389,7 +384,6 @@ function mapCAPAToDb(c: CAPA) {
     closed_at: c.closedAt || null,
     linked_qc_result_id: c.linkedQcResultId || null,
     linked_non_conformity_id: c.linkedNonConformityId || null,
-    deleted_at: c.deletedAt || (c as any).deleted_at || null,
   };
 }
 
@@ -800,8 +794,12 @@ export class StorageService {
 
     const sb = getSupabase();
     if (sb) {
-      const { error } = await sb.from('instruments').upsert(mapInstrumentToDb(instrument));
-      if (error) console.error('Supabase saveInstrument error:', error);
+      try {
+        const { error } = await sb.from('instruments').upsert(mapInstrumentToDb(instrument));
+        if (error) console.error('Supabase saveInstrument error:', error);
+      } catch (err) {
+        console.error('Supabase saveInstrument network error:', err);
+      }
     }
     await this.logAudit('UPDATE_MASTER_DATA', `Menyimpan instrumen: ${instrument.name} (${instrument.code})`);
   }
@@ -814,8 +812,12 @@ export class StorageService {
 
     const sb = getSupabase();
     if (sb) {
-      const { error } = await sb.from('instruments').update({ deleted_at: new Date().toISOString() }).eq('id', id);
-      if (error) console.error('Supabase deleteInstrument error:', error);
+      try {
+        const { error } = await sb.from('instruments').delete().eq('id', id);
+        if (error) console.error('Supabase deleteInstrument error:', error);
+      } catch (err) {
+        console.error('Supabase deleteInstrument network error:', err);
+      }
     }
     if (inst) {
       await this.logAudit('UPDATE_MASTER_DATA', `Menghapus instrumen: ${inst.name} (${inst.code})`);
@@ -835,8 +837,12 @@ export class StorageService {
 
     const sb = getSupabase();
     if (sb) {
-      const { error } = await sb.from('control_materials').upsert(mapControlToDb(material));
-      if (error) console.error('Supabase saveControlMaterial error:', error);
+      try {
+        const { error } = await sb.from('control_materials').upsert(mapControlToDb(material));
+        if (error) console.error('Supabase saveControlMaterial error:', error);
+      } catch (err) {
+        console.error('Supabase saveControlMaterial network error:', err);
+      }
     }
     await this.logAudit('UPDATE_MASTER_DATA', `Menyimpan bahan kontrol: ${material.name} (Lot: ${material.lotNumber})`);
   }
@@ -849,8 +855,12 @@ export class StorageService {
 
     const sb = getSupabase();
     if (sb) {
-      const { error } = await sb.from('control_materials').update({ deleted_at: new Date().toISOString() }).eq('id', id);
-      if (error) console.error('Supabase deleteControlMaterial error:', error);
+      try {
+        const { error } = await sb.from('control_materials').delete().eq('id', id);
+        if (error) console.error('Supabase deleteControlMaterial error:', error);
+      } catch (err) {
+        console.error('Supabase deleteControlMaterial network error:', err);
+      }
     }
     if (mat) {
       await this.logAudit('UPDATE_MASTER_DATA', `Menghapus bahan kontrol: ${mat.name} (Lot: ${mat.lotNumber})`);
@@ -870,8 +880,12 @@ export class StorageService {
 
     const sb = getSupabase();
     if (sb) {
-      const { error } = await sb.from('test_parameters').upsert(mapParamToDb(param));
-      if (error) console.error('Supabase saveParameter error:', error);
+      try {
+        const { error } = await sb.from('test_parameters').upsert(mapParamToDb(param));
+        if (error) console.error('Supabase saveParameter error:', error);
+      } catch (err) {
+        console.error('Supabase saveParameter network error:', err);
+      }
     }
   }
 
@@ -893,8 +907,12 @@ export class StorageService {
 
     const sb = getSupabase();
     if (sb) {
-      const { error } = await sb.from('test_parameters').upsert(this.parameters.map(mapParamToDb));
-      if (error) console.error('Supabase saveParameters bulk error:', error);
+      try {
+        const { error } = await sb.from('test_parameters').upsert(this.parameters.map(mapParamToDb));
+        if (error) console.error('Supabase saveParameters bulk error:', error);
+      } catch (err) {
+        console.error('Supabase saveParameters bulk network error:', err);
+      }
     }
     await this.logAudit('UPDATE_MASTER_DATA', `Mengimpor ${params.length} parameter QC (${createdCount} baru, ${updatedCount} diperbarui).`);
 
@@ -909,8 +927,12 @@ export class StorageService {
 
     const sb = getSupabase();
     if (sb) {
-      const { error } = await sb.from('test_parameters').update({ deleted_at: new Date().toISOString() }).eq('id', id);
-      if (error) console.error('Supabase deleteParameter error:', error);
+      try {
+        const { error } = await sb.from('test_parameters').delete().eq('id', id);
+        if (error) console.error('Supabase deleteParameter error:', error);
+      } catch (err) {
+        console.error('Supabase deleteParameter network error:', err);
+      }
     }
     if (param) {
       await this.logAudit('UPDATE_MASTER_DATA', `Menghapus parameter pemeriksaan: ${param.name} [${param.code}]`);
