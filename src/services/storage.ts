@@ -527,6 +527,10 @@ let realtimeSubscription: any = null;
 export class StorageService {
   // Initialize storage if empty
   static init(): void {
+    const isCleared = localStorage.getItem('lqcms_data_cleared_v1') === 'true';
+    if (isCleared) {
+      return;
+    }
     if (!localStorage.getItem(KEYS.LAB_INFO)) {
       setStored(KEYS.LAB_INFO, INITIAL_LAB_INFO);
     }
@@ -569,8 +573,11 @@ export class StorageService {
   }
 
   static resetToDemo(): void {
+    localStorage.removeItem('lqcms_data_cleared_v1');
     setStored(KEYS.LAB_INFO, INITIAL_LAB_INFO);
     setStored(KEYS.USERS, INITIAL_USERS);
+    setStored(KEYS.ROLES, INITIAL_ROLES);
+    setStored(KEYS.CURRENT_USER, INITIAL_USERS[0]);
     setStored(KEYS.INSTRUMENTS, INITIAL_INSTRUMENTS);
     setStored(KEYS.CONTROL_MATERIALS, INITIAL_CONTROL_MATERIALS);
     setStored(KEYS.PARAMETERS, INITIAL_PARAMETERS);
@@ -580,12 +587,35 @@ export class StorageService {
     setStored(KEYS.CAPA, INITIAL_CAPAS);
     setStored(KEYS.AUDIT_LOGS, INITIAL_AUDIT_LOGS);
     setStored(KEYS.NOTIFICATIONS, INITIAL_NOTIFICATIONS);
+    setStored(KEYS.QC_LOTS, INITIAL_QC_LOTS);
+    setStored(KEYS.QC_HEMATOLOGI, []);
+    this.notifyDataChanged('all');
   }
 
   static clearAllData(): void {
-    Object.values(KEYS).forEach(key => localStorage.removeItem(key));
-    // Re-initialize to default or just let App handle it
-    StorageService.init();
+    localStorage.clear();
+    localStorage.setItem('lqcms_data_cleared_v1', 'true');
+
+    setStored(KEYS.LAB_INFO, { ...INITIAL_LAB_INFO, name: '', hospitalName: '', address: '', phone: '', email: '', regency: '', province: '', roomUnit: '', headOfLab: '', headNip: '' });
+    setStored(KEYS.USERS, []);
+    setStored(KEYS.ROLES, []);
+    setStored(KEYS.CURRENT_USER, { id: 'usr-empty', name: 'Guest', email: '', role: 'Viewer', permissions: [] });
+    setStored(KEYS.INSTRUMENTS, []);
+    setStored(KEYS.CONTROL_MATERIALS, []);
+    setStored(KEYS.PARAMETERS, []);
+    setStored(KEYS.WESTGARD_RULES, DEFAULT_WESTGARD_RULES);
+    setStored(KEYS.QC_RESULTS, []);
+    setStored(KEYS.NON_CONFORMITIES, []);
+    setStored(KEYS.CAPA, []);
+    setStored(KEYS.AUDIT_LOGS, []);
+    setStored(KEYS.NOTIFICATIONS, []);
+    setStored(KEYS.DELETED_QC_IDS, []);
+    setStored(KEYS.DELETED_PARAMETER_IDS, []);
+    setStored(KEYS.DELETED_INSTRUMENT_IDS, []);
+    setStored(KEYS.DELETED_CONTROL_IDS, []);
+    setStored(KEYS.QC_LOTS, []);
+    setStored(KEYS.QC_HEMATOLOGI, []);
+
     this.notifyDataChanged('all');
   }
 
