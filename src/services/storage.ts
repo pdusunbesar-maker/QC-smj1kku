@@ -14,64 +14,28 @@ import {
   QCLot,
   QCHematologi,
 } from '../types';
-import {
-  INITIAL_LAB_INFO,
-  INITIAL_USERS,
-  INITIAL_ROLES,
-  INITIAL_INSTRUMENTS,
-  INITIAL_CONTROL_MATERIALS,
-  INITIAL_PARAMETERS,
-  generateDemoQCResults,
-  INITIAL_NON_CONFORMITIES,
-  INITIAL_CAPAS,
-  INITIAL_AUDIT_LOGS,
-  INITIAL_NOTIFICATIONS,
-  INITIAL_QC_LOTS,
-} from './demoData';
 import { DEFAULT_WESTGARD_RULES } from '../utils/qcCalculations';
 import { getSupabase } from './supabase';
 
-const KEYS = {
-  LAB_INFO: 'lqcms_lab_info_v1',
-  USERS: 'lqcms_users_v1',
-  ROLES: 'lqcms_roles_v1',
-  CURRENT_USER: 'lqcms_current_user_v1',
-  INSTRUMENTS: 'lqcms_instruments_v1',
-  CONTROL_MATERIALS: 'lqcms_controls_v1',
-  PARAMETERS: 'lqcms_params_v1',
-  WESTGARD_RULES: 'lqcms_westgard_rules_v1',
-  QC_RESULTS: 'lqcms_qc_results_v1',
-  NON_CONFORMITIES: 'lqcms_non_conformities_v1',
-  CAPA: 'lqcms_capa_v1',
-  AUDIT_LOGS: 'lqcms_audit_logs_v1',
-  NOTIFICATIONS: 'lqcms_notifications_v1',
-  DELETED_QC_IDS: 'lqcms_deleted_qc_ids_v1',
-  DELETED_PARAMETER_IDS: 'lqcms_deleted_parameter_ids_v1',
-  DELETED_INSTRUMENT_IDS: 'lqcms_deleted_instrument_ids_v1',
-  DELETED_CONTROL_IDS: 'lqcms_deleted_control_ids_v1',
-  QC_LOTS: 'lqcms_qc_lots_v1',
-  QC_HEMATOLOGI: 'lqcms_qc_hematologi_v1',
+const DEFAULT_LAB: LaboratoryInfo = {
+  id: 'lab-rsud-smj1',
+  name: 'INSTALASI PATOLOGI KLINIK & LABORATORIUM TERPADU',
+  hospitalName: 'RSUD SULTAN MUHAMMAD JAMALUDIN I',
+  healthService: 'DINAS KESEHATAN DAN KELUARGA BERENCANA',
+  regency: 'PEMERINTAH KABUPATEN KAYONG UTARA',
+  province: 'Kalimantan Barat',
+  roomUnit: 'Laboratorium Sentral Lantai 1',
+  headOfLab: 'dr. Hendra Wijaya, Sp.PK',
+  headNip: '19800512 200801 1 008',
+  headOfQuality: 'Siti Rahmawati, S.Tr.Kes',
+  qualityNip: '19850914 201001 2 015',
+  address: 'Jl. Provinsi Sukadana - Teluk Batang KM. 3, Desa Harapan Mulia, Kec. Sukadana, Kab. Kayong Utara 78852',
+  phone: '(0534) 770123 / Ext. 108',
+  email: 'rsudsmj1.kku@gmail.com',
+  accreditation: 'KARS Paripurna Bintang 5',
+  logoUrl: '/Lambang_Daerah_Kab._Kayong_Utara.png',
+  logoRightUrl: '',
 };
-
-// Generic safe storage helper
-function getStored<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return fallback;
-    return JSON.parse(raw);
-  } catch (e) {
-    console.error(`Error reading ${key} from storage:`, e);
-    return fallback;
-  }
-}
-
-function setStored<T>(key: string, data: T): void {
-  try {
-    localStorage.setItem(key, JSON.stringify(data));
-  } catch (e) {
-    console.error(`Error writing ${key} to storage:`, e);
-  }
-}
 
 // Data Mappers: TypeScript (camelCase) <-> Supabase PostgreSQL (snake_case)
 function mapLabToDbFull(info: LaboratoryInfo) {
@@ -113,25 +77,24 @@ function mapLabToDbBase(info: LaboratoryInfo) {
 }
 
 function mapDbToLab(row: any): LaboratoryInfo {
-  const current = getStored<LaboratoryInfo>(KEYS.LAB_INFO, INITIAL_LAB_INFO);
   return {
     id: row.id || 'lab-rsud-smj1',
-    name: row.name || current.name,
-    hospitalName: row.hospital_name || row.hospitalName || current.hospitalName,
-    healthService: row.health_service || row.healthService || current.healthService || 'DINAS KESEHATAN DAN KELUARGA BERENCANA',
-    regency: row.regency || current.regency,
-    province: row.province || current.province,
-    roomUnit: row.room_unit || row.roomUnit || current.roomUnit,
-    headOfLab: row.head_of_lab || row.headOfLab || current.headOfLab,
-    headNip: row.head_nip || row.headNip || current.headNip,
-    headOfQuality: row.head_of_quality || row.headOfQuality || current.headOfQuality,
-    qualityNip: row.quality_nip || row.qualityNip || current.qualityNip,
-    address: row.address || current.address,
-    phone: row.phone || current.phone,
-    email: row.email || current.email,
-    accreditation: row.accreditation || current.accreditation,
-    logoUrl: row.logo_url || row.logoUrl || current.logoUrl,
-    logoRightUrl: row.logo_right_url || row.logoRightUrl || current.logoRightUrl || '',
+    name: row.name || DEFAULT_LAB.name,
+    hospitalName: row.hospital_name || row.hospitalName || DEFAULT_LAB.hospitalName,
+    healthService: row.health_service || row.healthService || DEFAULT_LAB.healthService,
+    regency: row.regency || DEFAULT_LAB.regency,
+    province: row.province || DEFAULT_LAB.province,
+    roomUnit: row.room_unit || row.roomUnit || DEFAULT_LAB.roomUnit,
+    headOfLab: row.head_of_lab || row.headOfLab || DEFAULT_LAB.headOfLab,
+    headNip: row.head_nip || row.headNip || DEFAULT_LAB.headNip,
+    headOfQuality: row.head_of_quality || row.headOfQuality || DEFAULT_LAB.headOfQuality,
+    qualityNip: row.quality_nip || row.qualityNip || DEFAULT_LAB.qualityNip,
+    address: row.address || DEFAULT_LAB.address,
+    phone: row.phone || DEFAULT_LAB.phone,
+    email: row.email || DEFAULT_LAB.email,
+    accreditation: row.accreditation || DEFAULT_LAB.accreditation,
+    logoUrl: row.logo_url || row.logoUrl || DEFAULT_LAB.logoUrl,
+    logoRightUrl: row.logo_right_url || row.logoRightUrl || '',
   };
 }
 
@@ -150,20 +113,17 @@ function mapUserToDb(u: User) {
 }
 
 function mapDbToUser(row: any): User {
-  const currentUsers = getStored<User[]>(KEYS.USERS, INITIAL_USERS);
-  const localMatch = currentUsers.find(u => u.id === row.id || u.email === row.email);
-
   return {
     id: row.id,
-    name: row.name || localMatch?.name || '',
-    email: row.email || localMatch?.email || '',
-    role: row.role || localMatch?.role || 'analis',
-    nip: row.nip || localMatch?.nip || '',
-    department: row.department || localMatch?.department || 'Instalasi Patologi Klinik',
-    avatar: row.avatar || localMatch?.avatar,
-    isActive: row.is_active ?? row.isActive ?? localMatch?.isActive ?? true,
-    password: row.password || row.pass || localMatch?.password || 'password123',
-    createdAt: row.created_at || row.createdAt || localMatch?.createdAt,
+    name: row.name || '',
+    email: row.email || '',
+    role: row.role || 'analis',
+    nip: row.nip || '',
+    department: row.department || 'Instalasi Patologi Klinik',
+    avatar: row.avatar,
+    isActive: row.is_active ?? row.isActive ?? true,
+    password: row.password || row.pass || 'password123',
+    createdAt: row.created_at || row.createdAt,
   };
 }
 
@@ -205,17 +165,17 @@ function mapDbToInstrument(row: any): Instrument {
   };
 }
 
-function mapControlToDb(c: ControlMaterial) {
+function mapControlToDb(m: ControlMaterial) {
   return {
-    id: c.id,
-    name: c.name,
-    manufacturer: c.manufacturer,
-    level: c.level,
-    lot_number: c.lotNumber,
-    expiration_date: c.expirationDate,
-    storage_condition: c.storageCondition,
-    status: c.status,
-    deleted_at: c.deletedAt || (c as any).deleted_at || null,
+    id: m.id,
+    name: m.name,
+    manufacturer: m.manufacturer,
+    level: m.level,
+    lot_number: m.lotNumber,
+    expiration_date: m.expirationDate,
+    storage_condition: m.storageCondition || '2°C - 8°C (Lyophilized)',
+    status: m.status || 'active',
+    deleted_at: m.deletedAt || (m as any).deleted_at || null,
   };
 }
 
@@ -227,8 +187,8 @@ function mapDbToControl(row: any): ControlMaterial {
     level: row.level,
     lotNumber: row.lot_number || row.lotNumber,
     expirationDate: row.expiration_date || row.expirationDate,
-    storageCondition: row.storage_condition || row.storageCondition,
-    status: row.status,
+    storageCondition: row.storage_condition || row.storageCondition || '2°C - 8°C (Lyophilized)',
+    status: row.status || 'active',
     deletedAt: row.deleted_at || row.deletedAt || undefined,
   };
 }
@@ -242,12 +202,13 @@ function mapParamToDb(p: Parameter) {
     method: p.method,
     instrument_id: p.instrumentId || null,
     control_material_id: p.controlMaterialId || null,
-    target_mean: p.targetMean,
-    target_sd: p.targetSD,
-    target_cv: p.targetCV,
-    min_acceptable: p.minAcceptable,
-    max_acceptable: p.maxAcceptable,
-    decimal_places: p.decimalPlaces,
+    target_mean: Number(p.targetMean),
+    target_sd: Number(p.targetSd),
+    target_cv: Number(p.targetCv),
+    min_acceptable: Number(p.minAcceptable),
+    max_acceptable: Number(p.maxAcceptable),
+    decimal_places: Number(p.decimalPlaces ?? 1),
+    is_active: p.isActive ?? true,
     deleted_at: p.deletedAt || (p as any).deleted_at || null,
   };
 }
@@ -259,14 +220,16 @@ function mapDbToParam(row: any): Parameter {
     name: row.name,
     unit: row.unit,
     method: row.method,
-    instrumentId: row.instrument_id || row.instrumentId || '',
-    controlMaterialId: row.control_material_id || row.controlMaterialId || '',
+    instrumentId: row.instrument_id || row.instrumentId,
+    controlMaterialId: row.control_material_id || row.controlMaterialId,
     targetMean: Number(row.target_mean ?? row.targetMean),
-    targetSD: Number(row.target_sd ?? row.targetSD),
-    targetCV: Number(row.target_cv ?? row.targetCV),
+    targetSd: Number(row.target_sd ?? row.targetSd),
+    targetCv: Number(row.target_cv ?? row.targetCv),
     minAcceptable: Number(row.min_acceptable ?? row.minAcceptable),
     maxAcceptable: Number(row.max_acceptable ?? row.maxAcceptable),
-    decimalPlaces: Number(row.decimal_places ?? row.decimalPlaces ?? 1),
+    decimal_places: row.decimal_places,
+    decimalPlaces: row.decimal_places ?? row.decimalPlaces ?? 1,
+    isActive: row.is_active ?? row.isActive ?? true,
     deletedAt: row.deleted_at || row.deletedAt || undefined,
   };
 }
@@ -278,26 +241,25 @@ function mapQCResultToDb(r: QCResult) {
     time: r.time,
     timestamp: r.timestamp || Date.now(),
     operator_id: r.operatorId || null,
-    operator_name: r.operatorName || 'Petugas ATLM',
+    operator_name: r.operatorName,
     instrument_id: r.instrumentId || null,
-    instrument_name: r.instrumentName || 'Instrumen Lab',
+    instrument_name: r.instrumentName,
     parameter_id: r.parameterId,
     parameter_name: r.parameterName,
     parameter_code: r.parameterCode,
     control_level: r.controlLevel,
     lot_number: r.lotNumber,
-    value: r.value,
+    value: Number(r.value),
     unit: r.unit,
-    mean: r.mean,
-    sd: r.sd,
-    z_score: r.zScore,
+    mean: Number(r.mean),
+    sd: Number(r.sd),
+    z_score: Number(r.zScore),
     sd_position: r.sdPosition,
     status: r.status,
     violations: r.violations || [],
     notes: r.notes || null,
     is_demo: r.isDemo || false,
     is_deleted: r.isDeleted || false,
-    deleted_at: r.deletedAt || (r as any).deleted_at || null,
     review_status: r.reviewStatus || 'pending',
     reviewed_by: r.reviewedBy || null,
     reviewed_by_name: r.reviewedByName || null,
@@ -305,6 +267,7 @@ function mapQCResultToDb(r: QCResult) {
     review_comment: r.reviewComment || null,
     linked_non_conformity_id: r.linkedNonConformityId || null,
     linked_capa_id: r.linkedCapaId || null,
+    deleted_at: r.deletedAt || (r as any).deleted_at || null,
   };
 }
 
@@ -313,11 +276,11 @@ function mapDbToQCResult(row: any): QCResult {
     id: row.id,
     date: row.date,
     time: row.time,
-    timestamp: Number(row.timestamp) || Date.now(),
-    operatorId: row.operator_id || row.operatorId || '',
-    operatorName: row.operator_name || row.operatorName || '',
-    instrumentId: row.instrument_id || row.instrumentId || '',
-    instrumentName: row.instrument_name || row.instrumentName || '',
+    timestamp: row.timestamp || Date.now(),
+    operatorId: row.operator_id || row.operatorId,
+    operatorName: row.operator_name || row.operatorName,
+    instrumentId: row.instrument_id || row.instrumentId,
+    instrumentName: row.instrument_name || row.instrumentName,
     parameterId: row.parameter_id || row.parameterId,
     parameterName: row.parameter_name || row.parameterName,
     parameterCode: row.parameter_code || row.parameterCode,
@@ -331,10 +294,9 @@ function mapDbToQCResult(row: any): QCResult {
     sdPosition: row.sd_position || row.sdPosition,
     status: row.status,
     violations: Array.isArray(row.violations) ? row.violations : [],
-    notes: row.notes || undefined,
+    notes: row.notes,
     isDemo: row.is_demo ?? row.isDemo ?? false,
-    isDeleted: row.is_deleted ?? row.isDeleted ?? (Boolean(row.deleted_at)),
-    deletedAt: row.deleted_at || row.deletedAt || undefined,
+    isDeleted: row.is_deleted ?? row.isDeleted ?? false,
     reviewStatus: row.review_status || row.reviewStatus || 'pending',
     reviewedBy: row.reviewed_by || row.reviewedBy,
     reviewedByName: row.reviewed_by_name || row.reviewedByName,
@@ -342,33 +304,34 @@ function mapDbToQCResult(row: any): QCResult {
     reviewComment: row.review_comment || row.reviewComment,
     linkedNonConformityId: row.linked_non_conformity_id || row.linkedNonConformityId,
     linkedCapaId: row.linked_capa_id || row.linkedCapaId,
+    deletedAt: row.deleted_at || row.deletedAt || undefined,
   };
 }
 
-function mapNCToDb(nc: NonConformity) {
+function mapNCToDb(n: NonConformity) {
   return {
-    id: nc.id,
-    date: nc.date,
-    time: nc.time,
-    unit: nc.unit,
-    instrument_id: nc.instrumentId || null,
-    instrument_name: nc.instrumentName,
-    parameter_id: nc.parameterId || null,
-    parameter_name: nc.parameterName,
-    qc_result_id: nc.qcResultId || null,
-    westgard_rule: nc.westgardRule || null,
-    severity: nc.severity,
-    category: nc.category,
-    description: nc.description,
-    impact: nc.impact,
-    initial_analysis: nc.initialAnalysis,
-    immediate_action: nc.immediateAction,
-    reported_by: nc.reportedBy || null,
-    reported_by_name: nc.reportedByName,
-    status: nc.status,
-    resolved_at: nc.resolvedAt || null,
-    linked_capa_id: nc.linkedCapaId || null,
-    deleted_at: nc.deletedAt || (nc as any).deleted_at || null,
+    id: n.id,
+    date: n.date,
+    time: n.time,
+    unit: n.unit,
+    instrument_id: n.instrumentId || null,
+    instrument_name: n.instrumentName,
+    parameter_id: n.parameterId || null,
+    parameter_name: n.parameterName,
+    qc_result_id: n.qcResultId || null,
+    westgard_rule: n.westgardRule || null,
+    severity: n.severity,
+    category: n.category,
+    description: n.description,
+    impact: n.impact,
+    initial_analysis: n.initialAnalysis,
+    immediate_action: n.immediateAction,
+    reported_by: n.reportedBy || null,
+    reported_by_name: n.reportedByName,
+    status: n.status || 'open',
+    resolved_at: n.resolvedAt || null,
+    linked_capa_id: n.linkedCapaId || null,
+    deleted_at: n.deletedAt || (n as any).deleted_at || null,
   };
 }
 
@@ -378,10 +341,10 @@ function mapDbToNC(row: any): NonConformity {
     date: row.date,
     time: row.time,
     unit: row.unit,
-    instrumentId: row.instrument_id || row.instrumentId || '',
-    instrumentName: row.instrument_name || row.instrumentName || '',
-    parameterId: row.parameter_id || row.parameterId || '',
-    parameterName: row.parameter_name || row.parameterName || '',
+    instrumentId: row.instrument_id || row.instrumentId,
+    instrumentName: row.instrument_name || row.instrumentName,
+    parameterId: row.parameter_id || row.parameterId,
+    parameterName: row.parameter_name || row.parameterName,
     qcResultId: row.qc_result_id || row.qcResultId,
     westgardRule: row.westgard_rule || row.westgardRule,
     severity: row.severity,
@@ -392,7 +355,7 @@ function mapDbToNC(row: any): NonConformity {
     immediateAction: row.immediate_action || row.immediateAction,
     reportedBy: row.reported_by || row.reportedBy,
     reportedByName: row.reported_by_name || row.reportedByName,
-    status: row.status,
+    status: row.status || 'open',
     resolvedAt: row.resolved_at || row.resolvedAt,
     linkedCapaId: row.linked_capa_id || row.linkedCapaId,
     deletedAt: row.deleted_at || row.deletedAt || undefined,
@@ -473,36 +436,7 @@ function mapAuditToDb(a: AuditLog) {
     previous_data: a.previousData || null,
     new_data: a.newData || null,
     ip_address: a.ipAddress || '127.0.0.1',
-    user_agent: a.userAgent || navigator.userAgent,
-  };
-}
-
-function mapQCHematologiToDb(q: QCHematologi) {
-  return {
-    id: q.id,
-    tanggal: q.tanggal,
-    item: q.item,
-    hasil: Number(q.hasil),
-    flag: q.flag || null,
-    unit: q.unit,
-    foto_url: q.fotoUrl || q.foto_url || null,
-    atlm_id: q.atlmId || q.atlm_id || null,
-  };
-}
-
-function mapDbToQCHematologi(row: any): QCHematologi {
-  return {
-    id: row.id,
-    tanggal: row.tanggal,
-    item: row.item,
-    hasil: Number(row.hasil),
-    flag: row.flag || null,
-    unit: row.unit || '',
-    fotoUrl: row.foto_url || row.fotoUrl || '',
-    foto_url: row.foto_url || row.fotoUrl || '',
-    atlmId: row.atlm_id || row.atlmId || '',
-    atlm_id: row.atlm_id || row.atlmId || '',
-    createdAt: row.created_at || row.createdAt,
+    user_agent: a.userAgent || (typeof navigator !== 'undefined' ? navigator.userAgent : 'Server'),
   };
 }
 
@@ -522,100 +456,82 @@ function mapDbToAudit(row: any): AuditLog {
   };
 }
 
+function mapNotifToDb(n: AppNotification) {
+  return {
+    id: n.id,
+    timestamp: n.timestamp,
+    type: n.type,
+    title: n.title,
+    message: n.message,
+    link_tab: n.linkTab || null,
+    link_id: n.linkId || null,
+    read: n.read ?? false,
+  };
+}
+
+function mapDbToNotif(row: any): AppNotification {
+  return {
+    id: row.id,
+    timestamp: row.timestamp || row.created_at,
+    type: row.type,
+    title: row.title,
+    message: row.message,
+    linkTab: row.link_tab || row.linkTab,
+    linkId: row.link_id || row.linkId,
+    read: row.read ?? false,
+  };
+}
+
 let realtimeSubscription: any = null;
 
 export class StorageService {
-  // Initialize storage if empty
-  static init(): void {
-    const isCleared = localStorage.getItem('lqcms_data_cleared_v1') === 'true';
-    if (isCleared) {
-      return;
-    }
-    if (!localStorage.getItem(KEYS.LAB_INFO)) {
-      setStored(KEYS.LAB_INFO, INITIAL_LAB_INFO);
-    }
-    if (!localStorage.getItem(KEYS.USERS)) {
-      setStored(KEYS.USERS, INITIAL_USERS);
-    }
-    if (!localStorage.getItem(KEYS.ROLES)) {
-      setStored(KEYS.ROLES, INITIAL_ROLES);
-    }
-    if (!localStorage.getItem(KEYS.CURRENT_USER)) {
-      setStored(KEYS.CURRENT_USER, INITIAL_USERS[0]); // default admin
-    }
-    if (!localStorage.getItem(KEYS.INSTRUMENTS)) {
-      setStored(KEYS.INSTRUMENTS, INITIAL_INSTRUMENTS);
-    }
-    if (!localStorage.getItem(KEYS.CONTROL_MATERIALS)) {
-      setStored(KEYS.CONTROL_MATERIALS, INITIAL_CONTROL_MATERIALS);
-    }
-    if (!localStorage.getItem(KEYS.PARAMETERS)) {
-      setStored(KEYS.PARAMETERS, INITIAL_PARAMETERS);
-    }
-    if (!localStorage.getItem(KEYS.WESTGARD_RULES)) {
-      setStored(KEYS.WESTGARD_RULES, DEFAULT_WESTGARD_RULES);
-    }
-    if (!localStorage.getItem(KEYS.QC_RESULTS)) {
-      setStored(KEYS.QC_RESULTS, generateDemoQCResults());
-    }
-    if (!localStorage.getItem(KEYS.NON_CONFORMITIES)) {
-      setStored(KEYS.NON_CONFORMITIES, INITIAL_NON_CONFORMITIES);
-    }
-    if (!localStorage.getItem(KEYS.CAPA)) {
-      setStored(KEYS.CAPA, INITIAL_CAPAS);
-    }
-    if (!localStorage.getItem(KEYS.AUDIT_LOGS)) {
-      setStored(KEYS.AUDIT_LOGS, INITIAL_AUDIT_LOGS);
-    }
-    if (!localStorage.getItem(KEYS.NOTIFICATIONS)) {
-      setStored(KEYS.NOTIFICATIONS, INITIAL_NOTIFICATIONS);
-    }
+  // In-memory cache synced directly with Supabase (Zero local storage/mock reliance)
+  private static labInfo: LaboratoryInfo = DEFAULT_LAB;
+  private static users: User[] = [];
+  private static roles: RoleDefinition[] = [];
+  private static currentUser: User = { id: 'usr-admin', name: 'Admin Lab', email: 'admin@rsudsmj1.kku.go.id', role: 'admin', permissions: [] };
+  private static instruments: Instrument[] = [];
+  private static controlMaterials: ControlMaterial[] = [];
+  private static parameters: Parameter[] = [];
+  private static westgardRules: WestgardRuleConfig[] = DEFAULT_WESTGARD_RULES;
+  private static qcResults: QCResult[] = [];
+  private static nonConformities: NonConformity[] = [];
+  private static capas: CAPA[] = [];
+  private static auditLogs: AuditLog[] = [];
+  private static notifications: AppNotification[] = [];
+  private static qcLots: QCLot[] = [];
+  private static qcHematologi: QCHematologi[] = [];
+  private static deletedQcIds: string[] = [];
+  private static deletedInstIds: string[] = [];
+  private static deletedCtrlIds: string[] = [];
+  private static deletedParamIds: string[] = [];
+
+  static async init(): Promise<void> {
+    await this.syncFromSupabase();
   }
 
-  static resetToDemo(): void {
-    localStorage.removeItem('lqcms_data_cleared_v1');
-    setStored(KEYS.LAB_INFO, INITIAL_LAB_INFO);
-    setStored(KEYS.USERS, INITIAL_USERS);
-    setStored(KEYS.ROLES, INITIAL_ROLES);
-    setStored(KEYS.CURRENT_USER, INITIAL_USERS[0]);
-    setStored(KEYS.INSTRUMENTS, INITIAL_INSTRUMENTS);
-    setStored(KEYS.CONTROL_MATERIALS, INITIAL_CONTROL_MATERIALS);
-    setStored(KEYS.PARAMETERS, INITIAL_PARAMETERS);
-    setStored(KEYS.WESTGARD_RULES, DEFAULT_WESTGARD_RULES);
-    setStored(KEYS.QC_RESULTS, generateDemoQCResults());
-    setStored(KEYS.NON_CONFORMITIES, INITIAL_NON_CONFORMITIES);
-    setStored(KEYS.CAPA, INITIAL_CAPAS);
-    setStored(KEYS.AUDIT_LOGS, INITIAL_AUDIT_LOGS);
-    setStored(KEYS.NOTIFICATIONS, INITIAL_NOTIFICATIONS);
-    setStored(KEYS.QC_LOTS, INITIAL_QC_LOTS);
-    setStored(KEYS.QC_HEMATOLOGI, []);
-    this.notifyDataChanged('all');
+  static async resetToDemo(): Promise<void> {
+    await this.clearAllData();
   }
 
-  static clearAllData(): void {
-    localStorage.clear();
-    localStorage.setItem('lqcms_data_cleared_v1', 'true');
-
-    setStored(KEYS.LAB_INFO, { ...INITIAL_LAB_INFO, name: '', hospitalName: '', address: '', phone: '', email: '', regency: '', province: '', roomUnit: '', headOfLab: '', headNip: '' });
-    setStored(KEYS.USERS, []);
-    setStored(KEYS.ROLES, []);
-    setStored(KEYS.CURRENT_USER, { id: 'usr-empty', name: 'Guest', email: '', role: 'Viewer', permissions: [] });
-    setStored(KEYS.INSTRUMENTS, []);
-    setStored(KEYS.CONTROL_MATERIALS, []);
-    setStored(KEYS.PARAMETERS, []);
-    setStored(KEYS.WESTGARD_RULES, DEFAULT_WESTGARD_RULES);
-    setStored(KEYS.QC_RESULTS, []);
-    setStored(KEYS.NON_CONFORMITIES, []);
-    setStored(KEYS.CAPA, []);
-    setStored(KEYS.AUDIT_LOGS, []);
-    setStored(KEYS.NOTIFICATIONS, []);
-    setStored(KEYS.DELETED_QC_IDS, []);
-    setStored(KEYS.DELETED_PARAMETER_IDS, []);
-    setStored(KEYS.DELETED_INSTRUMENT_IDS, []);
-    setStored(KEYS.DELETED_CONTROL_IDS, []);
-    setStored(KEYS.QC_LOTS, []);
-    setStored(KEYS.QC_HEMATOLOGI, []);
-
+  static async clearAllData(): Promise<void> {
+    this.labInfo = DEFAULT_LAB;
+    this.users = [];
+    this.roles = [];
+    this.instruments = [];
+    this.controlMaterials = [];
+    this.parameters = [];
+    this.qcResults = [];
+    this.nonConformities = [];
+    this.capas = [];
+    this.auditLogs = [];
+    this.notifications = [];
+    this.qcLots = [];
+    this.qcHematologi = [];
+    this.deletedQcIds = [];
+    this.deletedInstIds = [];
+    this.deletedCtrlIds = [];
+    this.deletedParamIds = [];
     this.notifyDataChanged('all');
   }
 
@@ -627,184 +543,107 @@ export class StorageService {
     }
 
     try {
-      // 1. Fetch QC Results with soft delete filter and data validation check
-      let { data: qcData, error: qcErr } = await sb.from('qc_results').select('*').is('deleted_at', null).eq('is_deleted', false).order('date', { ascending: false });
-      if (qcErr && (qcErr.message?.includes('deleted_at') || qcErr.code === '42703')) {
-        const res = await sb.from('qc_results').select('*').eq('is_deleted', false).order('date', { ascending: false });
-        qcData = res.data;
-        qcErr = res.error;
-      }
-      if (!qcErr && qcData && qcData.length > 0) {
-        const deletedIds = new Set(this.getDeletedQCIds());
-        const mapped = qcData
-          .map(mapDbToQCResult)
-          .filter(r => !deletedIds.has(r.id) && !r.isDeleted && !(r as any).is_deleted && !r.deletedAt && !(r as any).deleted_at);
-        setStored(KEYS.QC_RESULTS, mapped);
+      let totalCount = 0;
+
+      // 1. QC Results
+      const { data: qcData, error: qcErr } = await sb.from('qc_results').select('*').is('deleted_at', null).order('date', { ascending: false });
+      if (!qcErr && qcData) {
+        this.qcResults = qcData.map(mapDbToQCResult);
+        totalCount += this.qcResults.length;
       }
 
-      // 2. Fetch Instruments
-      let { data: instData, error: instErr } = await sb.from('instruments').select('*').is('deleted_at', null);
-      if (instErr && (instErr.message?.includes('deleted_at') || instErr.code === '42703')) {
-        const res = await sb.from('instruments').select('*');
-        instData = res.data;
-        instErr = res.error;
-      }
-      if (!instErr && instData && instData.length > 0) {
-        const deletedInsts = new Set(this.getDeletedInstrumentIds());
-        const mapped = instData
-          .map(mapDbToInstrument)
-          .filter(i => !deletedInsts.has(i.id) && !i.deletedAt && !(i as any).deleted_at && i.id !== 'inst-chem-a' && !i.name.toLowerCase().includes('cobas c311'));
-        setStored(KEYS.INSTRUMENTS, mapped);
+      // 2. Instruments
+      const { data: instData, error: instErr } = await sb.from('instruments').select('*').is('deleted_at', null);
+      if (!instErr && instData) {
+        this.instruments = instData.map(mapDbToInstrument);
+        totalCount += this.instruments.length;
       }
 
-      // 3. Fetch Control Materials
-      let { data: ctrlData, error: ctrlErr } = await sb.from('control_materials').select('*').is('deleted_at', null);
-      if (ctrlErr && (ctrlErr.message?.includes('deleted_at') || ctrlErr.code === '42703')) {
-        const res = await sb.from('control_materials').select('*');
-        ctrlData = res.data;
-        ctrlErr = res.error;
-      }
-      if (!ctrlErr && ctrlData && ctrlData.length > 0) {
-        const deletedControls = new Set(this.getDeletedControlIds());
-        const mapped = ctrlData
-          .map(mapDbToControl)
-          .filter(c => !deletedControls.has(c.id) && !c.deletedAt && !(c as any).deleted_at && c.id !== 'ctrl-pnu-1' && !c.name.toLowerCase().includes('precinorm'));
-        setStored(KEYS.CONTROL_MATERIALS, mapped);
+      // 3. Control Materials
+      const { data: ctrlData, error: ctrlErr } = await sb.from('control_materials').select('*').is('deleted_at', null);
+      if (!ctrlErr && ctrlData) {
+        this.controlMaterials = ctrlData.map(mapDbToControl);
+        totalCount += this.controlMaterials.length;
       }
 
-      // 4. Fetch Test Parameters
-      let { data: paramData, error: paramErr } = await sb.from('test_parameters').select('*').is('deleted_at', null);
-      if (paramErr && (paramErr.message?.includes('deleted_at') || paramErr.code === '42703')) {
-        const res = await sb.from('test_parameters').select('*');
-        paramData = res.data;
-        paramErr = res.error;
-      }
-      if (!paramErr && paramData && paramData.length > 0) {
-        const deletedParamIds = new Set(this.getDeletedParameterIds());
-        const mapped = paramData
-          .map(mapDbToParam)
-          .filter(p => !deletedParamIds.has(p.id) && !p.deletedAt && !(p as any).deleted_at && p.instrumentId !== 'inst-chem-a' && !p.name.toLowerCase().includes('cobas c311'));
-        setStored(KEYS.PARAMETERS, mapped);
+      // 4. Parameters
+      const { data: paramData, error: paramErr } = await sb.from('test_parameters').select('*').is('deleted_at', null);
+      if (!paramErr && paramData) {
+        this.parameters = paramData.map(mapDbToParam);
+        totalCount += this.parameters.length;
       }
 
-      // 5. Fetch Non Conformities
-      let { data: ncData, error: ncErr } = await sb.from('non_conformities').select('*').is('deleted_at', null).order('date', { ascending: false });
-      if (ncErr && (ncErr.message?.includes('deleted_at') || ncErr.code === '42703')) {
-        const res = await sb.from('non_conformities').select('*').order('date', { ascending: false });
-        ncData = res.data;
-        ncErr = res.error;
-      }
-      if (!ncErr && ncData && ncData.length > 0) {
-        const mapped = ncData.map(mapDbToNC).filter(n => !n.deletedAt && !(n as any).deleted_at);
-        setStored(KEYS.NON_CONFORMITIES, mapped);
+      // 5. Non-Conformities
+      const { data: ncData, error: ncErr } = await sb.from('non_conformities').select('*').is('deleted_at', null);
+      if (!ncErr && ncData) {
+        this.nonConformities = ncData.map(mapDbToNC);
+        totalCount += this.nonConformities.length;
       }
 
-      // 6. Fetch CAPA
-      let { data: capaData, error: capaErr } = await sb.from('capa').select('*').is('deleted_at', null).order('created_at', { ascending: false });
-      if (capaErr && (capaErr.message?.includes('deleted_at') || capaErr.code === '42703')) {
-        const res = await sb.from('capa').select('*').order('created_at', { ascending: false });
-        capaData = res.data;
-        capaErr = res.error;
-      }
-      if (!capaErr && capaData && capaData.length > 0) {
-        const mapped = capaData.map(mapDbToCAPA).filter(c => !c.deletedAt && !(c as any).deleted_at);
-        setStored(KEYS.CAPA, mapped);
+      // 6. CAPA
+      const { data: capaData, error: capaErr } = await sb.from('capa').select('*').is('deleted_at', null);
+      if (!capaErr && capaData) {
+        this.capas = capaData.map(mapDbToCAPA);
+        totalCount += this.capas.length;
       }
 
-      // 7. Fetch Lab Profile
-      const { data: labData, error: labErr } = await sb.from('laboratories').select('*').limit(1);
-      if (!labErr && labData && labData[0]) {
-        setStored(KEYS.LAB_INFO, mapDbToLab(labData[0]));
-      }
-
-      // 8. Fetch App Users
+      // 7. Users
       const { data: userData, error: userErr } = await sb.from('app_users').select('*');
-      if (!userErr && userData && userData.length > 0) {
-        const mapped = userData.map(mapDbToUser);
-        setStored(KEYS.USERS, mapped);
+      if (!userErr && userData) {
+        this.users = userData.map(mapDbToUser);
+        totalCount += this.users.length;
       }
 
-      // 9. Fetch Audit Logs
-      const { data: auditData, error: auditErr } = await sb.from('audit_logs').select('*').order('timestamp', { ascending: false }).limit(200);
-      if (!auditErr && auditData && auditData.length > 0) {
-        const mapped = auditData.map(mapDbToAudit);
-        setStored(KEYS.AUDIT_LOGS, mapped);
+      // 8. Laboratories
+      const { data: labData, error: labErr } = await sb.from('laboratories').select('*').limit(1);
+      if (!labErr && labData && labData.length > 0) {
+        this.labInfo = mapDbToLab(labData[0]);
       }
 
-      // 10. Fetch QC Hematologi (Dirui Dimih 3980 OCR)
-      const { data: hemaData, error: hemaErr } = await sb.from('qc_hematologi').select('*').order('created_at', { ascending: false }).limit(200);
-      if (!hemaErr && hemaData && hemaData.length > 0) {
-        const mapped = hemaData.map(mapDbToQCHematologi);
-        setStored(KEYS.QC_HEMATOLOGI, mapped);
+      // 9. Audit Logs
+      const { data: auditData, error: auditErr } = await sb.from('audit_logs').select('*').order('timestamp', { ascending: false }).limit(100);
+      if (!auditErr && auditData) {
+        this.auditLogs = auditData.map(mapDbToAudit);
       }
 
+      // 10. Notifications
+      const { data: notifData, error: notifErr } = await sb.from('notifications').select('*').order('timestamp', { ascending: false });
+      if (!notifErr && notifData) {
+        this.notifications = notifData.map(mapDbToNotif);
+      }
+
+      this.notifyDataChanged('all');
       if (onSynced) onSynced();
-      return { 
-        success: true, 
-        count: (qcData?.length || 0), 
-        message: 'Sinkronisasi data dari database Supabase berhasil!' 
-      };
+
+      return { success: true, count: totalCount, message: 'Sinkronisasi dari Supabase berhasil!' };
     } catch (err: any) {
-      console.error('Error syncing from Supabase:', err);
-      return { success: false, count: 0, message: err.message || 'Gagal sinkronisasi data dari Supabase.' };
+      console.error('Error in syncFromSupabase:', err);
+      return { success: false, count: 0, message: err.message || 'Gagal sinkronisasi dari Supabase.' };
     }
   }
 
-  // --- Push All Local Data to Supabase ---
   static async pushAllToSupabase(): Promise<{ success: boolean; message: string }> {
     const sb = getSupabase();
-    if (!sb) {
-      return { success: false, message: 'Koneksi Supabase belum dikonfigurasi.' };
-    }
+    if (!sb) return { success: false, message: 'Supabase belum dikonfigurasi.' };
 
     try {
-      // 1. Lab Profile
-      const labInfo = this.getLabInfo();
-      const { error: labFullErr } = await sb.from('laboratories').upsert(mapLabToDbFull(labInfo));
-      if (labFullErr && (labFullErr.code === 'PGRST204' || labFullErr.message?.includes('head_of_quality'))) {
-        await sb.from('laboratories').upsert(mapLabToDbBase(labInfo));
-      }
+      await sb.from('laboratories').upsert(mapLabToDbFull(this.labInfo));
+      if (this.users.length > 0) await sb.from('app_users').upsert(this.users.map(mapUserToDb));
+      if (this.instruments.length > 0) await sb.from('instruments').upsert(this.instruments.map(mapInstrumentToDb));
+      if (this.controlMaterials.length > 0) await sb.from('control_materials').upsert(this.controlMaterials.map(mapControlToDb));
+      if (this.parameters.length > 0) await sb.from('test_parameters').upsert(this.parameters.map(mapParamToDb));
+      if (this.qcResults.length > 0) await sb.from('qc_results').upsert(this.qcResults.map(mapQCResultToDb));
+      if (this.nonConformities.length > 0) await sb.from('non_conformities').upsert(this.nonConformities.map(mapNCToDb));
+      if (this.capas.length > 0) await sb.from('capa').upsert(this.capas.map(mapCAPAToDb));
+      if (this.auditLogs.length > 0) await sb.from('audit_logs').upsert(this.auditLogs.slice(0, 50).map(mapAuditToDb));
 
-      // 2. Users & Roles
-      const users = this.getUsers().map(mapUserToDb);
-      if (users.length > 0) await sb.from('app_users').upsert(users);
-
-      // 3. Instruments
-      const instruments = this.getInstruments().map(mapInstrumentToDb);
-      if (instruments.length > 0) await sb.from('instruments').upsert(instruments);
-
-      // 4. Control Materials
-      const controls = this.getControlMaterials().map(mapControlToDb);
-      if (controls.length > 0) await sb.from('control_materials').upsert(controls);
-
-      // 5. Parameters
-      const params = this.getParameters().map(mapParamToDb);
-      if (params.length > 0) await sb.from('test_parameters').upsert(params);
-
-      // 6. QC Results
-      const qcResults = this.getQCResults().map(mapQCResultToDb);
-      if (qcResults.length > 0) await sb.from('qc_results').upsert(qcResults);
-
-      // 7. Non-Conformities
-      const ncs = this.getNonConformities().map(mapNCToDb);
-      if (ncs.length > 0) await sb.from('non_conformities').upsert(ncs);
-
-      // 8. CAPA
-      const capas = this.getCAPAs().map(mapCAPAToDb);
-      if (capas.length > 0) await sb.from('capa').upsert(capas);
-
-      // 9. Audit Logs
-      const logs = this.getAuditLogs().slice(0, 100).map(mapAuditToDb);
-      if (logs.length > 0) await sb.from('audit_logs').upsert(logs);
-
-      return { success: true, message: 'Seluruh data laboratorium berhasil diunggah dan disinkronkan ke Supabase!' };
+      return { success: true, message: 'Seluruh data berhasil diunggah ke Supabase!' };
     } catch (err: any) {
-      console.error('Error pushing data to Supabase:', err);
+      console.error('pushAllToSupabase error:', err);
       return { success: false, message: err.message || 'Gagal mengunggah data ke Supabase.' };
     }
   }
 
-  // --- Real-time Subscription Listener ---
   static subscribeToRealtime(onDataChanged: () => void): () => void {
     const sb = getSupabase();
     if (!sb) return () => {};
@@ -819,108 +658,8 @@ export class StorageService {
         .on(
           'postgres_changes',
           { event: '*', schema: 'public' },
-          async (payload) => {
-            const table = payload.table;
-            const eventType = payload.eventType; // 'INSERT' | 'UPDATE' | 'DELETE'
-
-            if (table === 'qc_results') {
-              const deletedIds = new Set(StorageService.getDeletedQCIds());
-              if (eventType === 'DELETE' || (payload.new as any)?.isDeleted || (payload.old as any)?.isDeleted) {
-                const targetId = (payload.old as any)?.id || (payload.new as any)?.id;
-                if (targetId) {
-                  StorageService.trackDeletedQCId(targetId);
-                  const list = getStored<QCResult[]>(KEYS.QC_RESULTS, []).filter(r => r.id !== targetId);
-                  setStored(KEYS.QC_RESULTS, list);
-                }
-              } else if (payload.new) {
-                const item = mapDbToQCResult(payload.new);
-                if (!deletedIds.has(item.id) && !item.isDeleted) {
-                  const list = getStored<QCResult[]>(KEYS.QC_RESULTS, []);
-                  const idx = list.findIndex(r => r.id === item.id);
-                  if (idx >= 0) list[idx] = item;
-                  else list.unshift(item);
-                  setStored(KEYS.QC_RESULTS, list);
-                }
-              }
-            } else if (table === 'instruments') {
-              if (eventType === 'DELETE' && payload.old?.id) {
-                const list = getStored<Instrument[]>(KEYS.INSTRUMENTS, []).filter(i => i.id !== payload.old.id);
-                setStored(KEYS.INSTRUMENTS, list);
-              } else if (payload.new) {
-                const item = mapDbToInstrument(payload.new);
-                const list = getStored<Instrument[]>(KEYS.INSTRUMENTS, []);
-                const idx = list.findIndex(i => i.id === item.id);
-                if (idx >= 0) list[idx] = item;
-                else list.push(item);
-                setStored(KEYS.INSTRUMENTS, list);
-              }
-            } else if (table === 'test_parameters') {
-              if (eventType === 'DELETE' && payload.old?.id) {
-                const list = getStored<Parameter[]>(KEYS.PARAMETERS, []).filter(p => p.id !== payload.old.id);
-                setStored(KEYS.PARAMETERS, list);
-              } else if (payload.new) {
-                const item = mapDbToParam(payload.new);
-                const list = getStored<Parameter[]>(KEYS.PARAMETERS, []);
-                const idx = list.findIndex(p => p.id === item.id);
-                if (idx >= 0) list[idx] = item;
-                else list.push(item);
-                setStored(KEYS.PARAMETERS, list);
-              }
-            } else if (table === 'control_materials') {
-              if (eventType === 'DELETE' && payload.old?.id) {
-                const list = getStored<ControlMaterial[]>(KEYS.CONTROL_MATERIALS, []).filter(c => c.id !== payload.old.id);
-                setStored(KEYS.CONTROL_MATERIALS, list);
-              } else if (payload.new) {
-                const item = mapDbToControl(payload.new);
-                const list = getStored<ControlMaterial[]>(KEYS.CONTROL_MATERIALS, []);
-                const idx = list.findIndex(c => c.id === item.id);
-                if (idx >= 0) list[idx] = item;
-                else list.push(item);
-                setStored(KEYS.CONTROL_MATERIALS, list);
-              }
-            } else if (table === 'non_conformities') {
-              if (eventType === 'DELETE' && payload.old?.id) {
-                const list = getStored<NonConformity[]>(KEYS.NON_CONFORMITIES, []).filter(n => n.id !== payload.old.id);
-                setStored(KEYS.NON_CONFORMITIES, list);
-              } else if (payload.new) {
-                const item = mapDbToNC(payload.new);
-                const list = getStored<NonConformity[]>(KEYS.NON_CONFORMITIES, []);
-                const idx = list.findIndex(n => n.id === item.id);
-                if (idx >= 0) list[idx] = item;
-                else list.unshift(item);
-                setStored(KEYS.NON_CONFORMITIES, list);
-              }
-            } else if (table === 'capa') {
-              if (eventType === 'DELETE' && payload.old?.id) {
-                const list = getStored<CAPA[]>(KEYS.CAPA, []).filter(c => c.id !== payload.old.id);
-                setStored(KEYS.CAPA, list);
-              } else if (payload.new) {
-                const item = mapDbToCAPA(payload.new);
-                const list = getStored<CAPA[]>(KEYS.CAPA, []);
-                const idx = list.findIndex(c => c.id === item.id);
-                if (idx >= 0) list[idx] = item;
-                else list.unshift(item);
-                setStored(KEYS.CAPA, list);
-              }
-            } else if (table === 'laboratories') {
-              if (payload.new) {
-                setStored(KEYS.LAB_INFO, mapDbToLab(payload.new));
-              }
-            } else if (table === 'app_users') {
-              if (eventType === 'DELETE' && payload.old?.id) {
-                const list = getStored<User[]>(KEYS.USERS, []).filter(u => u.id !== payload.old.id);
-                setStored(KEYS.USERS, list);
-              } else if (payload.new) {
-                const item = mapDbToUser(payload.new);
-                const list = getStored<User[]>(KEYS.USERS, []);
-                const idx = list.findIndex(u => u.id === item.id);
-                if (idx >= 0) list[idx] = item;
-                else list.push(item);
-                setStored(KEYS.USERS, list);
-              }
-            }
-
-            onDataChanged();
+          async () => {
+            await StorageService.syncFromSupabase(onDataChanged);
           }
         )
         .subscribe();
@@ -931,7 +670,7 @@ export class StorageService {
         }
       };
     } catch (e) {
-      console.error('Failed to subscribe to realtime changes:', e);
+      console.error('Failed to subscribe to realtime:', e);
       return () => {};
     }
   }
@@ -944,455 +683,271 @@ export class StorageService {
 
   // --- Laboratory Info ---
   static getLabInfo(): LaboratoryInfo {
-    const stored = getStored<LaboratoryInfo>(KEYS.LAB_INFO, INITIAL_LAB_INFO);
-    return {
-      ...INITIAL_LAB_INFO,
-      ...stored,
-    };
+    return this.labInfo;
   }
 
-  static updateLabInfo(info: LaboratoryInfo): void {
-    const completeInfo: LaboratoryInfo = {
-      ...INITIAL_LAB_INFO,
-      ...info,
-    };
-    setStored(KEYS.LAB_INFO, completeInfo);
+  static async updateLabInfo(info: LaboratoryInfo): Promise<void> {
+    this.labInfo = { ...DEFAULT_LAB, ...info };
     this.notifyDataChanged('lab_info');
 
     const sb = getSupabase();
     if (sb) {
-      Promise.resolve(sb.from('laboratories').upsert(mapLabToDbFull(completeInfo)))
-        .then(({ error }: { error: any }) => {
-          if (error) {
-            if (error.code === 'PGRST204' || error.message?.includes('head_of_quality') || error.message?.includes('quality_nip')) {
-              // Remote table does not have head_of_quality column yet -> save base columns to remote, keep local values intact
-              Promise.resolve(sb.from('laboratories').upsert(mapLabToDbBase(completeInfo)))
-                .catch(() => {});
-            } else {
-              console.warn('Supabase updateLabInfo notice:', error.message);
-            }
-          }
-        })
-        .catch(() => {});
+      const { error } = await sb.from('laboratories').upsert(mapLabToDbFull(this.labInfo));
+      if (error) console.error('Supabase updateLabInfo error:', error);
     }
   }
 
-  // --- Users & Current Auth ---
+  // --- Users & Roles ---
   static getUsers(): User[] {
-    return getStored<User[]>(KEYS.USERS, INITIAL_USERS);
+    return this.users;
   }
 
-  static saveAllUsersLocally(users: User[]): void {
-    setStored(KEYS.USERS, users);
-    this.notifyDataChanged('users');
-  }
-
-  static saveUser(user: User): void {
-    const list = this.getUsers();
-    const idx = list.findIndex(u => u.id === user.id);
-    if (idx >= 0) {
-      list[idx] = user;
-    } else {
-      list.push(user);
-    }
-    setStored(KEYS.USERS, list);
+  static async saveUser(user: User): Promise<void> {
+    const idx = this.users.findIndex(u => u.id === user.id);
+    if (idx >= 0) this.users[idx] = user;
+    else this.users.push(user);
     this.notifyDataChanged('users');
 
     const sb = getSupabase();
     if (sb) {
-      Promise.resolve(sb.from('app_users').upsert(mapUserToDb(user)))
-        .then(({ error }: { error: any }) => {
-          if (error) {
-            if (error.code === 'PGRST204' || error.message?.includes('password')) {
-              const baseUser = { ...mapUserToDb(user) };
-              delete (baseUser as any).password;
-              Promise.resolve(sb.from('app_users').upsert(baseUser)).catch(() => {});
-            } else {
-              console.warn('Supabase saveUser notice:', error.message);
-            }
-          }
-        })
-        .catch(() => {});
+      const { error } = await sb.from('app_users').upsert(mapUserToDb(user));
+      if (error) console.error('Supabase saveUser error:', error);
     }
   }
 
-  static deleteUser(id: string): void {
-    const list = this.getUsers().filter(u => u.id !== id);
-    setStored(KEYS.USERS, list);
+  static async deleteUser(userId: string): Promise<void> {
+    this.users = this.users.filter(u => u.id !== userId);
     this.notifyDataChanged('users');
 
     const sb = getSupabase();
     if (sb) {
-      Promise.resolve(sb.from('app_users').delete().eq('id', id))
-        .then(({ error }: { error: any }) => {
-          if (error) console.error('Supabase deleteUser error:', error);
-        })
-        .catch(() => {});
+      const { error } = await sb.from('app_users').delete().eq('id', userId);
+      if (error) console.error('Supabase deleteUser error:', error);
     }
   }
 
-  // --- Roles & Permissions ---
   static getRoles(): RoleDefinition[] {
-    const roles = getStored<RoleDefinition[]>(KEYS.ROLES, INITIAL_ROLES);
-    const analisRole = roles.find(r => r.id === 'analis');
-    if (analisRole && analisRole.name !== 'Ahli Teknologi Laboratorium Medik (ATLM)') {
-      analisRole.name = 'Ahli Teknologi Laboratorium Medik (ATLM)';
-      setStored(KEYS.ROLES, roles);
-    }
-    return roles;
+    return this.roles.length > 0 ? this.roles : [
+      { id: 'admin', name: 'Administrator', description: 'Akses penuh seluruh sistem & konfigurasi' },
+      { id: 'supervisor', name: 'Supervisor / Penanggung Jawab', description: 'Validasi QC, CAPA, & Tinjauan Mutu' },
+      { id: 'analis', name: 'Analis / ATLM', description: 'Input harian QC & Pemeriksaan' },
+      { id: 'viewer', name: 'Viewer / Auditor', description: 'Akses baca laporan & grafik' },
+    ];
   }
 
-  static saveRole(role: RoleDefinition): void {
-    const list = this.getRoles();
-    const idx = list.findIndex(r => r.id === role.id);
-    if (idx >= 0) {
-      list[idx] = role;
-    } else {
-      list.push(role);
-    }
-    setStored(KEYS.ROLES, list);
+  static async saveRole(role: RoleDefinition): Promise<void> {
+    const idx = this.roles.findIndex(r => r.id === role.id);
+    if (idx >= 0) this.roles[idx] = role;
+    else this.roles.push(role);
+    this.notifyDataChanged('roles');
 
     const sb = getSupabase();
     if (sb) {
-      sb.from('roles')
-        .upsert({
-          id: role.id,
-          name: role.name,
-          description: role.description,
-        })
-        .then(({ error }) => {
-          if (error) console.error('Supabase saveRole error:', error);
-        });
+      const { error } = await sb.from('roles').upsert({ id: role.id, name: role.name, description: role.description });
+      if (error) console.error('Supabase saveRole error:', error);
     }
   }
 
-  static deleteRole(id: string): void {
-    const list = this.getRoles().filter(r => r.id !== id);
-    setStored(KEYS.ROLES, list);
+  static async deleteRole(id: string): Promise<void> {
+    this.roles = this.roles.filter(r => r.id !== id);
+    this.notifyDataChanged('roles');
 
     const sb = getSupabase();
     if (sb) {
-      sb.from('roles')
-        .delete()
-        .eq('id', id)
-        .then(({ error }) => {
-          if (error) console.error('Supabase deleteRole error:', error);
-        });
+      const { error } = await sb.from('roles').delete().eq('id', id);
+      if (error) console.error('Supabase deleteRole error:', error);
     }
   }
 
   static getCurrentUser(): User {
-    return getStored<User>(KEYS.CURRENT_USER, INITIAL_USERS[0]);
+    return this.currentUser;
   }
 
   static setCurrentUser(user: User): void {
-    setStored(KEYS.CURRENT_USER, user);
+    this.currentUser = user;
   }
 
   // --- Instruments ---
   static getInstruments(): Instrument[] {
-    const list = getStored<Instrument[]>(KEYS.INSTRUMENTS, INITIAL_INSTRUMENTS);
-    const deletedIds = new Set(this.getDeletedInstrumentIds());
-    // Sanitize: Purge any deleted instruments (e.g. Cobas c311 / inst-chem-a)
-    const cleaned = list.filter(i => i.id !== 'inst-chem-a' && !i.name.toLowerCase().includes('cobas c311') && !deletedIds.has(i.id) && !i.deletedAt);
-    if (cleaned.length !== list.length) {
-      setStored(KEYS.INSTRUMENTS, cleaned);
-      const sb = getSupabase();
-      if (sb) {
-        sb.from('instruments').delete().eq('id', 'inst-chem-a').then();
-      }
-    }
-    return cleaned;
+    return this.instruments.filter(i => !this.deletedInstIds.includes(i.id) && !i.deletedAt);
   }
 
-  static saveInstrument(instrument: Instrument): void {
-    const list = this.getInstruments();
-    const idx = list.findIndex(i => i.id === instrument.id);
-    if (idx >= 0) {
-      list[idx] = instrument;
-    } else {
-      list.push(instrument);
-    }
-    setStored(KEYS.INSTRUMENTS, list);
+  static async saveInstrument(instrument: Instrument): Promise<void> {
+    const idx = this.instruments.findIndex(i => i.id === instrument.id);
+    if (idx >= 0) this.instruments[idx] = instrument;
+    else this.instruments.push(instrument);
+    this.notifyDataChanged('instruments');
 
     const sb = getSupabase();
     if (sb) {
-      sb.from('instruments')
-        .upsert(mapInstrumentToDb(instrument))
-        .then(({ error }) => {
-          if (error) {
-            console.error('Supabase saveInstrument error:', error);
-            if (error.message === 'TypeError: Failed to fetch') {
-              alert('Gagal terhubung ke Supabase. Pastikan URL Supabase benar dan tidak ada masalah CORS. Coba periksa pengaturan database Anda.');
-            }
-          }
-        });
+      const { error } = await sb.from('instruments').upsert(mapInstrumentToDb(instrument));
+      if (error) console.error('Supabase saveInstrument error:', error);
     }
+    await this.logAudit('UPDATE_MASTER_DATA', `Menyimpan instrumen: ${instrument.name} (${instrument.code})`);
   }
 
-  static deleteInstrument(id: string): void {
-    const list = this.getInstruments();
-    const idx = list.findIndex(i => i.id === id);
-    if (idx >= 0) {
-      list[idx] = { ...list[idx], deletedAt: new Date().toISOString() };
-      setStored(KEYS.INSTRUMENTS, list);
-      this.trackDeletedInstrumentId(id);
-      
-      const sb = getSupabase();
-      if (sb) {
-        sb.from('instruments')
-          .update({ deleted_at: new Date().toISOString() })
-          .eq('id', id)
-          .then();
-      }
-      this.logAudit('UPDATE_MASTER_DATA', `Menghapus instrumen: ${list[idx].name} (${list[idx].code})`);
+  static async deleteInstrument(id: string): Promise<void> {
+    const inst = this.instruments.find(i => i.id === id);
+    this.instruments = this.instruments.filter(i => i.id !== id);
+    if (!this.deletedInstIds.includes(id)) this.deletedInstIds.push(id);
+    this.notifyDataChanged('instruments');
+
+    const sb = getSupabase();
+    if (sb) {
+      const { error } = await sb.from('instruments').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+      if (error) console.error('Supabase deleteInstrument error:', error);
+    }
+    if (inst) {
+      await this.logAudit('UPDATE_MASTER_DATA', `Menghapus instrumen: ${inst.name} (${inst.code})`);
     }
   }
 
   // --- Control Materials ---
   static getControlMaterials(): ControlMaterial[] {
-    const list = getStored<ControlMaterial[]>(KEYS.CONTROL_MATERIALS, INITIAL_CONTROL_MATERIALS);
-    const deletedIds = new Set(this.getDeletedControlIds());
-    const cleaned = list.filter(m => m.id !== 'ctrl-pnu-1' && !m.name.toLowerCase().includes('precinorm') && !deletedIds.has(m.id) && !m.deletedAt);
-    if (cleaned.length !== list.length) {
-      setStored(KEYS.CONTROL_MATERIALS, cleaned);
-      const sb = getSupabase();
-      if (sb) {
-        sb.from('control_materials').delete().eq('id', 'ctrl-pnu-1').then();
-      }
-    }
-    return cleaned;
+    return this.controlMaterials.filter(m => !this.deletedCtrlIds.includes(m.id) && !m.deletedAt);
   }
 
-  static saveControlMaterial(material: ControlMaterial): void {
-    const list = this.getControlMaterials();
-    const idx = list.findIndex(m => m.id === material.id);
-    if (idx >= 0) list[idx] = material;
-    else list.push(material);
-    setStored(KEYS.CONTROL_MATERIALS, list);
+  static async saveControlMaterial(material: ControlMaterial): Promise<void> {
+    const idx = this.controlMaterials.findIndex(m => m.id === material.id);
+    if (idx >= 0) this.controlMaterials[idx] = material;
+    else this.controlMaterials.push(material);
+    this.notifyDataChanged('controls');
 
     const sb = getSupabase();
     if (sb) {
-      sb.from('control_materials')
-        .upsert(mapControlToDb(material))
-        .then(({ error }) => {
-          if (error) console.error('Supabase saveControlMaterial error:', error);
-        });
+      const { error } = await sb.from('control_materials').upsert(mapControlToDb(material));
+      if (error) console.error('Supabase saveControlMaterial error:', error);
     }
+    await this.logAudit('UPDATE_MASTER_DATA', `Menyimpan bahan kontrol: ${material.name} (Lot: ${material.lotNumber})`);
   }
 
-  static deleteControlMaterial(id: string): void {
-    const list = this.getControlMaterials();
-    const idx = list.findIndex(m => m.id === id);
-    if (idx >= 0) {
-      list[idx] = { ...list[idx], deletedAt: new Date().toISOString() };
-      setStored(KEYS.CONTROL_MATERIALS, list);
-      this.trackDeletedControlId(id);
+  static async deleteControlMaterial(id: string): Promise<void> {
+    const mat = this.controlMaterials.find(m => m.id === id);
+    this.controlMaterials = this.controlMaterials.filter(m => m.id !== id);
+    if (!this.deletedCtrlIds.includes(id)) this.deletedCtrlIds.push(id);
+    this.notifyDataChanged('controls');
 
-      const sb = getSupabase();
-      if (sb) {
-        sb.from('control_materials')
-          .update({ deleted_at: new Date().toISOString() })
-          .eq('id', id)
-          .then();
-      }
-      this.logAudit('UPDATE_MASTER_DATA', `Menghapus bahan kontrol: ${list[idx].name} (Lot: ${list[idx].lotNumber})`);
+    const sb = getSupabase();
+    if (sb) {
+      const { error } = await sb.from('control_materials').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+      if (error) console.error('Supabase deleteControlMaterial error:', error);
+    }
+    if (mat) {
+      await this.logAudit('UPDATE_MASTER_DATA', `Menghapus bahan kontrol: ${mat.name} (Lot: ${mat.lotNumber})`);
     }
   }
 
   // --- Parameters ---
   static getParameters(): Parameter[] {
-    const list = getStored<Parameter[]>(KEYS.PARAMETERS, INITIAL_PARAMETERS);
-    const deletedIds = new Set(this.getDeletedParameterIds());
-    const activeInsts = new Set(this.getInstruments().map(i => i.id));
-    let cleaned = list.filter(p => !deletedIds.has(p.id) && p.instrumentId !== 'inst-chem-a' && activeInsts.has(p.instrumentId) && !p.name.toLowerCase().includes('cobas c311') && !p.deletedAt);
-
-    // Pastikan seluruh parameter hematologi Dirui Dimih 3980 dari master data bawaan selalu disertakan (jika belum dihapus)
-    const existingIds = new Set(cleaned.map(p => p.id));
-    const missingDimih = INITIAL_PARAMETERS.filter(p => p.instrumentId === 'inst-dirui-3980' && !existingIds.has(p.id) && !deletedIds.has(p.id));
-    if (missingDimih.length > 0) {
-      cleaned = [...cleaned, ...missingDimih];
-      setStored(KEYS.PARAMETERS, cleaned);
-    } else if (cleaned.length !== list.length) {
-      setStored(KEYS.PARAMETERS, cleaned);
-      const sb = getSupabase();
-      if (sb) {
-        sb.from('test_parameters').delete().eq('instrument_id', 'inst-chem-a').then();
-      }
-    }
-    return cleaned;
+    return this.parameters.filter(p => !this.deletedParamIds.includes(p.id) && !p.deletedAt);
   }
 
-  static saveParameter(param: Parameter): void {
-    const list = this.getParameters();
-    const idx = list.findIndex(p => p.id === param.id);
-    if (idx >= 0) list[idx] = param;
-    else list.push(param);
-    setStored(KEYS.PARAMETERS, list);
+  static async saveParameter(param: Parameter): Promise<void> {
+    const idx = this.parameters.findIndex(p => p.id === param.id);
+    if (idx >= 0) this.parameters[idx] = param;
+    else this.parameters.push(param);
+    this.notifyDataChanged('parameters');
 
     const sb = getSupabase();
     if (sb) {
-      sb.from('test_parameters')
-        .upsert(mapParamToDb(param))
-        .then(({ error }) => {
-          if (error) console.error('Supabase saveParameter error:', error);
-        });
+      const { error } = await sb.from('test_parameters').upsert(mapParamToDb(param));
+      if (error) console.error('Supabase saveParameter error:', error);
     }
   }
 
-  static saveParameters(params: Parameter[]): { updatedCount: number; createdCount: number } {
-    const list = [...this.getParameters()];
+  static async saveParameters(params: Parameter[]): Promise<{ updatedCount: number; createdCount: number }> {
     let updatedCount = 0;
     let createdCount = 0;
 
     params.forEach(param => {
-      const idx = list.findIndex(
-        p => p.id === param.id || (p.code.toLowerCase() === param.code.toLowerCase() && p.instrumentId === param.instrumentId)
-      );
+      const idx = this.parameters.findIndex(p => p.id === param.id || (p.code.toLowerCase() === param.code.toLowerCase() && p.instrumentId === param.instrumentId));
       if (idx >= 0) {
-        list[idx] = { ...list[idx], ...param, id: list[idx].id };
+        this.parameters[idx] = { ...this.parameters[idx], ...param, id: this.parameters[idx].id };
         updatedCount++;
       } else {
-        list.push(param);
+        this.parameters.push(param);
         createdCount++;
       }
     });
-
-    setStored(KEYS.PARAMETERS, list);
+    this.notifyDataChanged('parameters');
 
     const sb = getSupabase();
     if (sb) {
-      const dbParams = list.map(mapParamToDb);
-      sb.from('test_parameters')
-        .upsert(dbParams)
-        .then(({ error }) => {
-          if (error) console.error('Supabase saveParameters bulk error:', error);
-        });
+      const { error } = await sb.from('test_parameters').upsert(this.parameters.map(mapParamToDb));
+      if (error) console.error('Supabase saveParameters bulk error:', error);
     }
-
-    this.logAudit('UPDATE_MASTER_DATA', `Mengimpor ${params.length} data parameter QC via CSV (${createdCount} baru, ${updatedCount} diperbarui).`);
+    await this.logAudit('UPDATE_MASTER_DATA', `Mengimpor ${params.length} parameter QC (${createdCount} baru, ${updatedCount} diperbarui).`);
 
     return { updatedCount, createdCount };
   }
 
-  static deleteParameter(id: string): void {
-    const list = this.getParameters();
-    const idx = list.findIndex(p => p.id === id);
-    if (idx >= 0) {
-      list[idx] = { ...list[idx], deletedAt: new Date().toISOString() };
-      setStored(KEYS.PARAMETERS, list);
-      
-      const sb = getSupabase();
-      if (sb) {
-        sb.from('test_parameters')
-          .update({ deleted_at: new Date().toISOString() })
-          .eq('id', id)
-          .then();
-      }
-      this.logAudit('UPDATE_MASTER_DATA', `Menghapus parameter pemeriksaan: ${list[idx].name} [${list[idx].code}]`);
+  static async deleteParameter(id: string): Promise<void> {
+    const param = this.parameters.find(p => p.id === id);
+    this.parameters = this.parameters.filter(p => p.id !== id);
+    if (!this.deletedParamIds.includes(id)) this.deletedParamIds.push(id);
+    this.notifyDataChanged('parameters');
+
+    const sb = getSupabase();
+    if (sb) {
+      const { error } = await sb.from('test_parameters').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+      if (error) console.error('Supabase deleteParameter error:', error);
+    }
+    if (param) {
+      await this.logAudit('UPDATE_MASTER_DATA', `Menghapus parameter pemeriksaan: ${param.name} [${param.code}]`);
     }
   }
 
   // --- Westgard Rules ---
   static getWestgardRules(): WestgardRuleConfig[] {
-    return getStored<WestgardRuleConfig[]>(KEYS.WESTGARD_RULES, DEFAULT_WESTGARD_RULES);
+    return this.westgardRules;
   }
 
   static saveWestgardRules(rules: WestgardRuleConfig[]): void {
-    setStored(KEYS.WESTGARD_RULES, rules);
+    this.westgardRules = rules;
+    this.notifyDataChanged('westgard');
   }
 
   static getDeletedQCIds(): string[] {
-    return getStored<string[]>(KEYS.DELETED_QC_IDS, []);
+    return this.deletedQcIds;
   }
 
   static trackDeletedQCId(id: string): void {
-    const list = this.getDeletedQCIds();
-    if (!list.includes(id)) {
-      list.push(id);
-      setStored(KEYS.DELETED_QC_IDS, list);
-    }
+    if (!this.deletedQcIds.includes(id)) this.deletedQcIds.push(id);
   }
 
   static getDeletedInstrumentIds(): string[] {
-    return getStored<string[]>(KEYS.DELETED_INSTRUMENT_IDS, []);
+    return this.deletedInstIds;
   }
 
   static trackDeletedInstrumentId(id: string): void {
-    const list = this.getDeletedInstrumentIds();
-    if (!list.includes(id)) {
-      list.push(id);
-      setStored(KEYS.DELETED_INSTRUMENT_IDS, list);
-    }
+    if (!this.deletedInstIds.includes(id)) this.deletedInstIds.push(id);
   }
 
   static getDeletedControlIds(): string[] {
-    return getStored<string[]>(KEYS.DELETED_CONTROL_IDS, []);
+    return this.deletedCtrlIds;
   }
 
   static trackDeletedControlId(id: string): void {
-    const list = this.getDeletedControlIds();
-    if (!list.includes(id)) {
-      list.push(id);
-      setStored(KEYS.DELETED_CONTROL_IDS, list);
-    }
+    if (!this.deletedCtrlIds.includes(id)) this.deletedCtrlIds.push(id);
   }
 
   static getDeletedParameterIds(): string[] {
-    return getStored<string[]>(KEYS.DELETED_PARAMETER_IDS, []);
+    return this.deletedParamIds;
   }
 
   static trackDeletedParameterId(id: string): void {
-    const list = this.getDeletedParameterIds();
-    if (!list.includes(id)) {
-      list.push(id);
-      setStored(KEYS.DELETED_PARAMETER_IDS, list);
-    }
+    if (!this.deletedParamIds.includes(id)) this.deletedParamIds.push(id);
   }
 
   // --- QC Results ---
   static getQCResults(): QCResult[] {
-    const deletedIds = new Set(this.getDeletedQCIds());
-    const rawList = getStored<QCResult[]>(KEYS.QC_RESULTS, []);
-    let list = rawList.filter(r => 
-      r.instrumentId !== 'inst-chem-a' && 
-      !r.instrumentName?.toLowerCase().includes('cobas c311') && 
-      !deletedIds.has(r.id) &&
-      !r.isDeleted &&
-      !(r as any).is_deleted &&
-      !r.deletedAt
-    );
-    if (list.length !== rawList.length) {
-      setStored(KEYS.QC_RESULTS, list);
-      const sb = getSupabase();
-      if (sb) {
-        sb.from('qc_results').delete().eq('instrument_id', 'inst-chem-a').then();
-      }
-    }
-
-    if (list.length === 0 && !localStorage.getItem(KEYS.QC_RESULTS)) {
-      const demo = generateDemoQCResults();
-      const activeDemo = demo.filter(d => !deletedIds.has(d.id) && !d.isDeleted && !(d as any).is_deleted);
-      if (activeDemo.length > 0) {
-        setStored(KEYS.QC_RESULTS, activeDemo);
-        return activeDemo;
-      }
-      return [];
-    }
-
-    return list;
+    return this.qcResults.filter(r => !this.deletedQcIds.includes(r.id) && !r.isDeleted && !(r as any).is_deleted && !r.deletedAt);
   }
 
-  static saveQCResult(result: QCResult): void {
-    const list = this.getQCResults();
-    // 1. Direct ID match
-    let idx = list.findIndex(r => r.id === result.id);
-
-    // 2. Anti-double input & duplicate result guard:
-    // If IDs differ but same parameter, instrument, level, date, time/recent timestamp, and value exist,
-    // update the existing record instead of inserting an accidental duplicate.
+  static async saveQCResult(result: QCResult): Promise<void> {
+    let idx = this.qcResults.findIndex(r => r.id === result.id);
     if (idx < 0) {
-      idx = list.findIndex(r => 
+      idx = this.qcResults.findIndex(r =>
         r.parameterId === result.parameterId &&
         r.instrumentId === result.instrumentId &&
         r.controlLevel === result.controlLevel &&
@@ -1403,324 +958,180 @@ export class StorageService {
     }
 
     if (idx >= 0) {
-      // Keep existing ID or update
-      list[idx] = { ...list[idx], ...result, id: list[idx].id };
+      this.qcResults[idx] = { ...this.qcResults[idx], ...result, id: this.qcResults[idx].id };
     } else {
-      list.unshift(result);
+      this.qcResults.unshift(result);
     }
-    setStored(KEYS.QC_RESULTS, list);
+    this.notifyDataChanged('qc_results');
 
     const sb = getSupabase();
     if (sb) {
-      const targetResult = idx >= 0 ? list[idx] : result;
-      sb.from('qc_results')
-        .upsert(mapQCResultToDb(targetResult))
-        .then(({ error }) => {
-          if (error) {
-            console.error('Supabase saveQCResult error:', error);
-          }
-        });
+      const target = idx >= 0 ? this.qcResults[idx] : result;
+      const { error } = await sb.from('qc_results').upsert(mapQCResultToDb(target));
+      if (error) console.error('Supabase saveQCResult error:', error);
     }
   }
 
-  static deleteQCResult(id: string): void {
-    const list = this.getQCResults();
-    const idx = list.findIndex(r => r.id === id);
-    if (idx >= 0) {
-      list[idx] = { ...list[idx], deletedAt: new Date().toISOString() };
-      setStored(KEYS.QC_RESULTS, list);
-      
-      const sb = getSupabase();
-      if (sb) {
-        sb.from('qc_results')
-          .update({ deleted_at: new Date().toISOString() })
-          .eq('id', id)
-          .then();
-      }
-      this.logAudit('DELETE_QC_RESULT', `Menghapus data hasil QC ${list[idx].parameterName} (${list[idx].value} ${list[idx].unit}) tanggal ${list[idx].date}`, null, list[idx]);
-      this.notifyDataChanged('qc_results');
+  static async deleteQCResult(id: string): Promise<void> {
+    this.qcResults = this.qcResults.filter(r => r.id !== id);
+    if (!this.deletedQcIds.includes(id)) this.deletedQcIds.push(id);
+    this.notifyDataChanged('qc_results');
+
+    const sb = getSupabase();
+    if (sb) {
+      const { error } = await sb.from('qc_results').update({ deleted_at: new Date().toISOString(), is_deleted: true }).eq('id', id);
+      if (error) console.error('Supabase deleteQCResult error:', error);
     }
   }
 
   // --- Non-Conformities ---
   static getNonConformities(): NonConformity[] {
-    const list = getStored<NonConformity[]>(KEYS.NON_CONFORMITIES, INITIAL_NON_CONFORMITIES);
-    return list.filter(n => !n.deletedAt);
+    return this.nonConformities.filter(n => !n.deletedAt);
   }
 
-  static deleteNonConformity(id: string): void {
-    const list = this.getNonConformities();
-    const idx = list.findIndex(n => n.id === id);
-    if (idx >= 0) {
-      list[idx] = { ...list[idx], deletedAt: new Date().toISOString() };
-      setStored(KEYS.NON_CONFORMITIES, list);
-
-      const sb = getSupabase();
-      if (sb) {
-        sb.from('non_conformities')
-          .update({ deleted_at: new Date().toISOString() })
-          .eq('id', id)
-          .then();
-      }
-      this.logAudit('DELETE_NC', `Menghapus laporan ketidaksesuaian ${list[idx].id} (${list[idx].parameterName})`, null, list[idx]);
-    }
-  }
-
-  static saveNonConformity(nc: NonConformity): void {
-    const list = this.getNonConformities();
-    const idx = list.findIndex(n => n.id === nc.id);
-    if (idx >= 0) list[idx] = nc;
-    else list.unshift(nc);
-    setStored(KEYS.NON_CONFORMITIES, list);
+  static async saveNonConformity(nc: NonConformity): Promise<void> {
+    const idx = this.nonConformities.findIndex(n => n.id === nc.id);
+    if (idx >= 0) this.nonConformities[idx] = nc;
+    else this.nonConformities.unshift(nc);
+    this.notifyDataChanged('non_conformities');
 
     const sb = getSupabase();
     if (sb) {
-      sb.from('non_conformities')
-        .upsert(mapNCToDb(nc))
-        .then(({ error }) => {
-          if (error) console.error('Supabase saveNonConformity error:', error);
-        });
+      const { error } = await sb.from('non_conformities').upsert(mapNCToDb(nc));
+      if (error) console.error('Supabase saveNonConformity error:', error);
+    }
+  }
+
+  static async deleteNonConformity(id: string): Promise<void> {
+    this.nonConformities = this.nonConformities.filter(n => n.id !== id);
+    this.notifyDataChanged('non_conformities');
+
+    const sb = getSupabase();
+    if (sb) {
+      const { error } = await sb.from('non_conformities').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+      if (error) console.error('Supabase deleteNonConformity error:', error);
     }
   }
 
   // --- CAPA ---
   static getCAPAs(): CAPA[] {
-    const list = getStored<CAPA[]>(KEYS.CAPA, INITIAL_CAPAS);
-    return list.filter(c => !c.deletedAt);
+    return this.capas.filter(c => !c.deletedAt);
   }
 
-  static saveCAPA(capa: CAPA): void {
-    const list = this.getCAPAs();
-    const idx = list.findIndex(c => c.id === capa.id);
-    if (idx >= 0) list[idx] = capa;
-    else list.unshift(capa);
-    setStored(KEYS.CAPA, list);
+  static async saveCAPA(capa: CAPA): Promise<void> {
+    const idx = this.capas.findIndex(c => c.id === capa.id);
+    if (idx >= 0) this.capas[idx] = capa;
+    else this.capas.unshift(capa);
+    this.notifyDataChanged('capa');
 
     const sb = getSupabase();
     if (sb) {
-      sb.from('capa')
-        .upsert(mapCAPAToDb(capa))
-        .then(({ error }) => {
-          if (error) console.error('Supabase saveCAPA error:', error);
-        });
+      const { error } = await sb.from('capa').upsert(mapCAPAToDb(capa));
+      if (error) console.error('Supabase saveCAPA error:', error);
     }
   }
 
-  static deleteCAPA(id: string): void {
-    const list = this.getCAPAs();
-    const idx = list.findIndex(c => c.id === id);
-    if (idx >= 0) {
-      list[idx] = { ...list[idx], deletedAt: new Date().toISOString() };
-      setStored(KEYS.CAPA, list);
+  static async deleteCAPA(id: string): Promise<void> {
+    this.capas = this.capas.filter(c => c.id !== id);
+    this.notifyDataChanged('capa');
 
-      const sb = getSupabase();
-      if (sb) {
-        sb.from('capa')
-          .update({ deleted_at: new Date().toISOString() })
-          .eq('id', id)
-          .then();
-      }
-      this.logAudit('DELETE_CAPA', `Menghapus dokumen CAPA ${list[idx].id} (${list[idx].problemStatement.substring(0, 40)}...)`, null, list[idx]);
+    const sb = getSupabase();
+    if (sb) {
+      const { error } = await sb.from('capa').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+      if (error) console.error('Supabase deleteCAPA error:', error);
     }
   }
 
+  // --- QC Lots ---
   static getQCLots(): QCLot[] {
-    return getStored(KEYS.QC_LOTS, INITIAL_QC_LOTS);
+    return this.qcLots;
   }
 
-  static saveQCLot(lot: QCLot): void {
-    const list = this.getQCLots();
-    const index = list.findIndex(l => l.id === lot.id);
-    if (index >= 0) {
-      list[index] = lot;
-    } else {
-      list.push(lot);
-    }
-    setStored(KEYS.QC_LOTS, list);
+  static async saveQCLot(lot: QCLot): Promise<void> {
+    const idx = this.qcLots.findIndex(l => l.id === lot.id);
+    if (idx >= 0) this.qcLots[idx] = lot;
+    else this.qcLots.push(lot);
+    this.notifyDataChanged('qc_lots');
   }
 
-  static deleteQCLot(id: string): void {
-    const list = this.getQCLots().filter(l => l.id !== id);
-    setStored(KEYS.QC_LOTS, list);
-  }
-
-  // --- QC Hematologi (Dirui Dimih 3980 OCR) ---
+  // --- QC Hematologi ---
   static getQCHematologi(): QCHematologi[] {
-    return getStored<QCHematologi[]>(KEYS.QC_HEMATOLOGI, []);
+    return this.qcHematologi;
   }
 
-  static async uploadStrukPhoto(blob: Blob, customName?: string): Promise<string | null> {
-    const sb = getSupabase();
-    if (!sb) return null;
-    try {
-      const fileName = customName || `struk-${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
-      const { error } = await sb.storage
-        .from('struk-qc')
-        .upload(fileName, blob, { contentType: 'image/jpeg', upsert: true });
-
-      if (error) {
-        console.warn('Supabase uploadStrukPhoto warning:', error.message);
-        return null;
-      }
-
-      const { data } = sb.storage.from('struk-qc').getPublicUrl(fileName);
-      return data?.publicUrl || null;
-    } catch (e) {
-      console.error('Error in uploadStrukPhoto:', e);
-      return null;
-    }
-  }
-
-  static async saveQCHematologiBatch(
-    items: Array<{
-      item: string;
-      hasil: number;
-      flag: 'L' | 'H' | null | string;
-      unit: string;
-      tanggal?: string;
-    }>,
-    photoBlobOrUrl?: Blob | string,
-    targetDate?: string
-  ): Promise<{ success: boolean; records: QCHematologi[]; fotoUrl?: string; error?: string }> {
-    try {
-      let fotoUrl = typeof photoBlobOrUrl === 'string' ? photoBlobOrUrl : '';
-      if (photoBlobOrUrl && typeof photoBlobOrUrl !== 'string') {
-        const uploaded = await this.uploadStrukPhoto(photoBlobOrUrl);
-        if (uploaded) fotoUrl = uploaded;
-      }
-
-      const currentUser = this.getCurrentUser();
-      const tanggalDefault = targetDate || new Date().toISOString().split('T')[0];
-
-      const newRecords: QCHematologi[] = items.map(item => ({
-        id: `QCH-${Date.now()}-${Math.random().toString(36).substring(7)}`,
-        tanggal: item.tanggal || tanggalDefault,
-        item: item.item,
-        hasil: Number(item.hasil),
-        flag: item.flag || null,
-        unit: item.unit,
-        fotoUrl: fotoUrl || undefined,
-        foto_url: fotoUrl || undefined,
-        atlmId: currentUser.id,
-        atlm_id: currentUser.id,
-        createdAt: new Date().toISOString(),
-      }));
-
-      // Store locally
-      const existing = this.getQCHematologi();
-      const updated = [...newRecords, ...existing];
-      setStored(KEYS.QC_HEMATOLOGI, updated);
-
-      // Save to Supabase
-      const sb = getSupabase();
-      if (sb) {
-        const dbPayload = newRecords.map(mapQCHematologiToDb);
-        const { error } = await sb.from('qc_hematologi').insert(dbPayload);
-        if (error) {
-          console.warn('Supabase saveQCHematologi error:', error.message);
-        }
-      }
-
-      // Also create audit log
-      this.logAudit(
-        'INPUT_QC',
-        `Menyimpan hasil Scan Struk Hematologi Dirui Dimih 3980 (${newRecords.length} parameter: ${newRecords.map(r => r.item).join(', ')})`,
-        newRecords
-      );
-
-      this.notifyDataChanged('qc_hematologi');
-      return { success: true, records: newRecords, fotoUrl };
-    } catch (err: any) {
-      console.error('saveQCHematologiBatch failed:', err);
-      return { success: false, records: [], error: err.message };
-    }
-  }
-
-  static deleteQCHematologi(id: string): void {
-    const list = this.getQCHematologi().filter(item => item.id !== id);
-    setStored(KEYS.QC_HEMATOLOGI, list);
+  static async saveQCHematologi(item: QCHematologi): Promise<void> {
+    this.qcHematologi.unshift(item);
+    this.notifyDataChanged('qc_hematologi');
 
     const sb = getSupabase();
     if (sb) {
-      sb.from('qc_hematologi')
-        .delete()
-        .eq('id', id)
-        .then(({ error }) => {
-          if (error) console.error('Supabase deleteQCHematologi error:', error);
-        });
+      const { error } = await sb.from('qc_hematologi').upsert(mapQCHematologiToDb(item));
+      if (error) console.error('Supabase saveQCHematologi error:', error);
     }
-
-    this.notifyDataChanged('qc_hematologi');
   }
 
   // --- Audit Logs ---
   static getAuditLogs(): AuditLog[] {
-    return getStored<AuditLog[]>(KEYS.AUDIT_LOGS, INITIAL_AUDIT_LOGS);
+    return this.auditLogs;
   }
 
-  static logAudit(
-    action: AuditLog['action'],
-    details: string,
-    newData?: any,
-    previousData?: any
-  ): void {
-    const currentUser = this.getCurrentUser();
+  static async logAudit(action: string, details: string, prevData?: any, newData?: any): Promise<void> {
+    const user = this.getCurrentUser();
     const newLog: AuditLog = {
-      id: `AUD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
-      userId: currentUser.id,
-      userName: currentUser.name,
-      userRole: currentUser.role,
+      id: 'AUD-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
+      timestamp: new Date().toISOString(),
+      userId: user.id || 'usr-admin',
+      userName: user.name || 'Admin Lab',
+      userRole: user.role || 'admin',
       action,
       details,
-      previousData,
+      previousData: prevData,
       newData,
-      ipAddress: '127.0.0.1 (Client Session)',
-      userAgent: navigator.userAgent,
+      ipAddress: '127.0.0.1',
+      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'App',
     };
 
-    const logs = this.getAuditLogs();
-    logs.unshift(newLog);
-    if (logs.length > 500) logs.pop();
-    setStored(KEYS.AUDIT_LOGS, logs);
+    this.auditLogs.unshift(newLog);
+    if (this.auditLogs.length > 200) this.auditLogs.pop();
+    this.notifyDataChanged('audit_logs');
 
     const sb = getSupabase();
     if (sb) {
-      sb.from('audit_logs')
-        .insert(mapAuditToDb(newLog))
-        .then(({ error }) => {
-          if (error) console.error('Supabase logAudit error:', error);
-        });
+      const { error } = await sb.from('audit_logs').insert(mapAuditToDb(newLog));
+      if (error) console.error('Supabase logAudit error:', error);
     }
   }
 
   // --- Notifications ---
   static getNotifications(): AppNotification[] {
-    return getStored<AppNotification[]>(KEYS.NOTIFICATIONS, INITIAL_NOTIFICATIONS);
+    return this.notifications;
   }
 
-  static addNotification(notif: Omit<AppNotification, 'id' | 'timestamp' | 'read'>): void {
-    const list = this.getNotifications();
-    const item: AppNotification = {
-      ...notif,
-      id: `notif-${Date.now()}`,
-      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
-      read: false,
-    };
-    list.unshift(item);
-    setStored(KEYS.NOTIFICATIONS, list);
+  static async addNotification(notification: AppNotification): Promise<void> {
+    this.notifications.unshift(notification);
+    this.notifyDataChanged('notifications');
+
+    const sb = getSupabase();
+    if (sb) {
+      const { error } = await sb.from('notifications').upsert(mapNotifToDb(notification));
+      if (error) console.error('Supabase addNotification error:', error);
+    }
   }
 
-  static markNotificationRead(id: string): void {
-    const list = this.getNotifications().map(n => n.id === id ? { ...n, read: true } : n);
-    setStored(KEYS.NOTIFICATIONS, list);
-  }
+  static async markNotificationAsRead(id: string): Promise<void> {
+    const idx = this.notifications.findIndex(n => n.id === id);
+    if (idx >= 0) {
+      this.notifications[idx].read = true;
+      this.notifyDataChanged('notifications');
 
-  static markAllNotificationsRead(): void {
-    const list = this.getNotifications().map(n => ({ ...n, read: true }));
-    setStored(KEYS.NOTIFICATIONS, list);
+      const sb = getSupabase();
+      if (sb) {
+        const { error } = await sb.from('notifications').update({ read: true }).eq('id', id);
+        if (error) console.error('Supabase markNotificationAsRead error:', error);
+      }
+    }
   }
 }
 
-// Auto init once
+// Auto-initialize storage service
 StorageService.init();
