@@ -492,7 +492,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
               type="button"
               onClick={() => setIsDownloadDropdownOpen(!isDownloadDropdownOpen)}
               disabled={isGeneratingPDF}
-              className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 disabled:bg-emerald-400 rounded-lg shadow-xs transition-colors"
+              className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-[#0F9D91] hover:bg-[#0B8279] disabled:bg-[#0F9D91]/60 rounded-lg shadow-xs transition-colors cursor-pointer"
               title="Unduh Laporan Mutu (PDF atau Excel)"
             >
               {isGeneratingPDF ? (
@@ -510,7 +510,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             </button>
 
             {isDownloadDropdownOpen && (
-              <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50 animate-in fade-in zoom-in-95 duration-100">
+              <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-[#DDE4EA] py-2 z-50 animate-in fade-in zoom-in-95 duration-100">
                 <div className="px-3.5 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
                   Pilih Format Unduhan Laporan
                 </div>

@@ -163,7 +163,7 @@ function AppContent() {
   const activeViolationsCount = qcResults.reduce((acc, r) => acc + (r.violations?.length || 0), 0);
 
   return (
-    <div className="h-screen min-h-[100dvh] w-full bg-[#F5F7FA] flex flex-col antialiased overflow-hidden print:bg-white print:h-auto print:min-h-0 print:overflow-visible print:block font-sans text-[#172033]">
+    <div className="h-screen min-h-[100dvh] w-full bg-[#F4F7FA] flex flex-col antialiased overflow-hidden print:bg-white print:h-auto print:min-h-0 print:overflow-visible print:block font-sans text-[#172B3A]">
       {/* Top Navbar */}
       <div className="shrink-0 w-full print:hidden">
         <Navbar

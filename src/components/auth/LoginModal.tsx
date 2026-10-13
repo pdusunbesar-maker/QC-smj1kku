@@ -40,8 +40,19 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   const passwordInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setAvailableUsers(StorageService.getUsers());
-  }, []);
+    const updateUsers = () => {
+      setAvailableUsers(StorageService.getUsers());
+    };
+    updateUsers();
+
+    window.addEventListener('lqcms_data_updated', updateUsers);
+    window.addEventListener('storage', updateUsers);
+
+    return () => {
+      window.removeEventListener('lqcms_data_updated', updateUsers);
+      window.removeEventListener('storage', updateUsers);
+    };
+  }, [isOpen]);
 
   const getUserUsername = (u: { name: string; role: string; email?: string }) => {
     if (u.role === 'admin') return 'admin';

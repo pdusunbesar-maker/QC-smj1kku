@@ -13,23 +13,18 @@ import {
   AlertCircle,
   KeyRound,
   Eye,
-  EyeOff
+  EyeOff,
+  Loader2
 } from 'lucide-react';
 import { User as UserType } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { StorageService } from '../../services/storage';
+import { PRESET_MODEL_AVATARS, compressAvatarImage } from '../../utils/imageUtils';
 
 interface UserProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
-
-const PRESET_AVATARS = [
-  { label: 'Dokter Pria', url: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=150&auto=format&fit=crop&q=80' },
-  { label: 'Dokter Wanita', url: 'https://images.unsplash.com/photo-1594824813572-132d733737b3?w=150&auto=format&fit=crop&q=80' },
-  { label: 'Petugas ATLM Pria', url: 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?w=150&auto=format&fit=crop&q=80' },
-  { label: 'Petugas ATLM Wanita', url: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=150&auto=format&fit=crop&q=80' },
-];
 
 export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onClose }) => {
   const { user: currentUser, updateUser, roles } = useAuth();
@@ -38,6 +33,8 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
   const [password, setPassword] = useState(currentUser.password || 'password123');
   const [showPassword, setShowPassword] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
@@ -53,28 +50,31 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
 
   const currentRoleObj = roles.find(r => r.id === currentUser.role);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 3 * 1024 * 1024) {
-      setErrorMsg('Ukuran file foto terlalu besar. Maksimal 3MB.');
+    if (file.size > 8 * 1024 * 1024) {
+      setErrorMsg('Ukuran file foto terlalu besar. Maksimal 8MB.');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      if (evt.target?.result) {
-        setForm(prev => ({ ...prev, avatar: evt.target!.result as string }));
-        setErrorMsg('');
-      }
-    };
-    reader.readAsDataURL(file);
+    try {
+      setIsProcessingPhoto(true);
+      setErrorMsg('');
+      const compressedDataUrl = await compressAvatarImage(file, 256, 0.85);
+      setForm(prev => ({ ...prev, avatar: compressedDataUrl }));
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Gagal memproses gambar foto profil.');
+    } finally {
+      setIsProcessingPhoto(false);
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
+    setIsSubmitting(true);
 
     const updatedUser: UserType = {
       ...form,
@@ -85,17 +85,24 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
       department: (form.department || '').trim(),
     };
 
-    const res = updateUser(updatedUser);
-    if (!res.success) {
-      setErrorMsg(res.message || 'Gagal memperbarui profil.');
-      return;
-    }
+    try {
+      const res = await updateUser(updatedUser);
+      if (!res.success) {
+        setErrorMsg(res.message || 'Gagal memperbarui profil.');
+        setIsSubmitting(false);
+        return;
+      }
 
-    setIsSuccess(true);
-    setTimeout(() => {
-      setIsSuccess(false);
-      onClose();
-    }, 1000);
+      setIsSuccess(true);
+      setTimeout(() => {
+        setIsSuccess(false);
+        onClose();
+      }, 1000);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Terjadi kesalahan saat menyimpan profil.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -217,22 +224,25 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
             {/* Preset Avatars */}
             <div className="pt-2 border-t border-slate-200/80">
               <span className="text-[10px] text-slate-500 font-medium block mb-1.5">
-                Atau pilih dari foto sampel siap pakai:
+                Atau pilih dari foto model medis & laboratorium siap pakai:
               </span>
-              <div className="flex items-center justify-center gap-2 flex-wrap">
-                {PRESET_AVATARS.map((p, idx) => (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                {PRESET_MODEL_AVATARS.map((p) => (
                   <button
-                    key={idx}
+                    key={p.id}
                     type="button"
                     onClick={() => setForm({ ...form, avatar: p.url })}
-                    className={`flex items-center gap-1.5 p-1 rounded-lg border transition-all ${
+                    className={`flex items-center gap-1.5 p-1.5 rounded-lg border text-left transition-all cursor-pointer ${
                       form.avatar === p.url 
-                        ? 'border-emerald-600 bg-emerald-50/80 ring-2 ring-emerald-500/20' 
+                        ? 'border-emerald-600 bg-emerald-50/80 ring-2 ring-emerald-500/20 shadow-xs' 
                         : 'border-slate-200 bg-white hover:bg-slate-100'
                     }`}
                   >
-                    <img src={p.url} alt={p.label} className="h-6 w-6 rounded-md object-cover" />
-                    <span className="text-[10px] text-slate-700 font-medium">{p.label}</span>
+                    <img src={p.url} alt={p.label} className="h-7 w-7 rounded-md object-cover shrink-0" />
+                    <div className="overflow-hidden min-w-0">
+                      <span className="text-[10px] text-slate-800 font-semibold block truncate leading-tight">{p.label}</span>
+                      <span className="text-[9px] text-slate-400 block">{p.category}</span>
+                    </div>
                   </button>
                 ))}
               </div>
@@ -343,10 +353,25 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
             </button>
             <button
               type="submit"
-              className="flex items-center gap-1.5 px-5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-semibold shadow-xs transition-colors"
+              disabled={isSubmitting || isProcessingPhoto}
+              className="flex items-center gap-1.5 px-5 py-2 bg-[#0F9D91] hover:bg-[#0B8279] disabled:bg-[#0F9D91]/60 text-white rounded-lg font-semibold shadow-xs transition-colors cursor-pointer disabled:cursor-not-allowed"
             >
-              <Save className="h-4 w-4" />
-              <span>Simpan Foto & Profil</span>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Menyimpan ke Supabase...</span>
+                </>
+              ) : isProcessingPhoto ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Memproses Foto...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4" />
+                  <span>Simpan Foto & Profil</span>
+                </>
+              )}
             </button>
           </div>
         </form>

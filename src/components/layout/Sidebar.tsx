@@ -176,17 +176,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Sidebar Container */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-50 flex h-full max-h-[100dvh] md:max-h-full min-h-0 flex-col bg-[#082B49] text-white transition-all duration-200 ease-in-out md:static md:translate-x-0 border-r border-[#0E3D66] shadow-xl md:shadow-none select-none ${
+        className={`fixed top-0 bottom-0 left-0 z-50 flex h-full max-h-[100dvh] md:max-h-full min-h-0 flex-col bg-[#142536] text-white transition-all duration-200 ease-in-out md:static md:translate-x-0 border-r border-[#20384C] shadow-xl md:shadow-none select-none ${
           isCollapsed ? 'md:w-[72px]' : 'md:w-64'
         } ${isOpenMobile ? 'w-64 translate-x-0' : '-translate-x-full md:translate-x-0'}`}
       >
         {/* Top Header: Logo & Branding */}
-        <div className={`shrink-0 flex items-center justify-between border-b border-[#0E3D66] ${
+        <div className={`shrink-0 flex items-center justify-between border-b border-[#20384C] ${
           isCollapsed ? 'h-16 px-3 justify-center' : 'h-16 px-4'
         }`}>
           {/* Logo & Text (When expanded or mobile) */}
           <div className="flex items-center gap-3 overflow-hidden min-w-0">
-            <div className="h-9 w-9 rounded-xl bg-white/10 border border-white/20 p-1.5 flex items-center justify-center shrink-0 shadow-xs">
+            <div className="h-9 w-9 rounded-xl bg-white/10 border border-white/15 p-1.5 flex items-center justify-center shrink-0 shadow-xs">
               <img
                 src="/logo_kayong_utara.png"
                 alt="Logo RSUD SMJ I"
@@ -202,11 +202,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <span className="font-extrabold text-white tracking-tight text-sm leading-none">
                     L-QCMS
                   </span>
-                  <span className="text-[9px] px-1 py-0.2 rounded bg-cyan-500/20 text-cyan-300 font-mono font-semibold">
+                  <span className="text-[9px] px-1 py-0.2 rounded bg-[#0F9D91]/20 text-[#0F9D91] font-mono font-semibold">
                     v2.5
                   </span>
                 </div>
-                <p className="text-[10px] text-cyan-200/80 leading-tight mt-0.5 truncate font-medium">
+                <p className="text-[10px] text-slate-300 leading-tight mt-0.5 truncate font-medium">
                   RSUD S.M. Jamaludin I
                 </p>
               </div>
@@ -244,7 +244,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div key={idx} className="space-y-1">
               {/* Group Heading (only when expanded or mobile) */}
               {(!isCollapsed || isOpenMobile) ? (
-                <div className="px-2.5 pb-1.5 text-[10px] font-mono font-bold tracking-wider text-cyan-200/50 uppercase">
+                <div className="px-2.5 pb-1.5 text-[10px] font-mono font-bold tracking-wider text-slate-400 uppercase">
                   {section.group}
                 </div>
               ) : (
@@ -271,16 +271,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           : 'justify-between px-3 py-2.5'
                       } ${
                         isActive
-                          ? 'bg-white/10 text-white font-semibold border-l-[3px] border-[#22B8CF] shadow-xs'
-                          : 'text-slate-300 hover:text-white hover:bg-white/5 font-normal'
+                          ? 'bg-[#20384C] text-white font-semibold border-l-[3px] border-[#0F9D91] shadow-xs'
+                          : 'text-slate-300 hover:text-white hover:bg-[#20384C]/50 font-normal'
                       }`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <Icon
                           className={`h-4 w-4 shrink-0 transition-colors ${
                             isActive
-                              ? 'text-[#22B8CF]'
-                              : 'text-slate-400 group-hover:text-cyan-300'
+                              ? 'text-[#0F9D91]'
+                              : 'text-slate-400 group-hover:text-teal-300'
                           }`}
                         />
                         {(!isCollapsed || isOpenMobile) && (
@@ -300,7 +300,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                               {item.badge}
                             </span>
                           ) : (
-                            <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-rose-500 ring-2 ring-[#082B49]" />
+                            <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-rose-500 ring-2 ring-[#142536]" />
                           )}
                         </>
                       )}
@@ -313,7 +313,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* User Card & Logout (Fixed at Bottom) */}
-        <div className={`shrink-0 border-t border-[#0E3D66] bg-[#06213A] p-3 space-y-2 select-none ${
+        <div className={`shrink-0 border-t border-[#20384C] bg-[#0D1926] p-3 space-y-2 select-none ${
           isCollapsed && !isOpenMobile ? 'p-2 flex flex-col items-center' : ''
         }`}>
           {(!isCollapsed || isOpenMobile) ? (
@@ -327,18 +327,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       className="h-8 w-8 rounded-lg object-cover border border-white/20"
                     />
                   ) : (
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-700 text-white font-bold text-xs">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0F9D91] text-white font-bold text-xs">
                       {user.name.charAt(0)}
                     </div>
                   )}
-                  <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-400 border border-[#06213A]" />
+                  <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-400 border border-[#0D1926]" />
                 </div>
 
                 <div className="flex-1 overflow-hidden min-w-0">
                   <p className="text-xs font-bold text-white truncate leading-tight">
                     {user.name}
                   </p>
-                  <p className="text-[10px] text-cyan-200/70 truncate capitalize font-mono">
+                  <p className="text-[10px] text-teal-200/80 truncate capitalize font-mono">
                     {user.role}
                   </p>
                 </div>
@@ -353,7 +353,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </button>
               </div>
 
-              <div className="flex items-center justify-between text-[10px] text-cyan-200/50 font-mono pt-1 border-t border-white/5">
+              <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono pt-1 border-t border-white/5">
                 <span className="truncate">Laboratorium Patologi Klinik</span>
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shrink-0" />
               </div>
@@ -371,11 +371,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     className="h-8 w-8 rounded-lg object-cover border border-white/20"
                   />
                 ) : (
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-700 text-white font-bold text-xs">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0F9D91] text-white font-bold text-xs">
                     {user.name.charAt(0)}
                   </div>
                 )}
-                <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-400 border border-[#06213A]" />
+                <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-400 border border-[#0D1926]" />
               </div>
 
               {onToggleCollapse && (

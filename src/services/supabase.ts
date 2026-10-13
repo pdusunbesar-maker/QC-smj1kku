@@ -731,4 +731,19 @@ CREATE POLICY "Public audit_logs" ON audit_logs FOR ALL USING (true) WITH CHECK 
 
 DROP POLICY IF EXISTS "Public notifications" ON notifications;
 CREATE POLICY "Public notifications" ON notifications FOR ALL USING (true) WITH CHECK (true);
+
+-- REALTIME PUBLICATION CONFIGURATION (SAFE & IDEMPOTENT)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE app_users;
+    ALTER PUBLICATION supabase_realtime ADD TABLE roles;
+    ALTER PUBLICATION supabase_realtime ADD TABLE qc_results;
+    ALTER PUBLICATION supabase_realtime ADD TABLE capa;
+    ALTER PUBLICATION supabase_realtime ADD TABLE non_conformities;
+    ALTER PUBLICATION supabase_realtime ADD TABLE laboratories;
+  END IF;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 `;

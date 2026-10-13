@@ -17,11 +17,13 @@ import {
   Plus,
   ShieldAlert,
   Camera,
-  Upload
+  Upload,
+  Loader2
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { User, RoleDefinition } from '../../types';
 import { SYSTEM_PERMISSIONS } from '../../services/demoData';
+import { PRESET_MODEL_AVATARS, compressAvatarImage } from '../../utils/imageUtils';
 
 export const UserManagementView: React.FC = () => {
   const { 
@@ -59,20 +61,24 @@ export const UserManagementView: React.FC = () => {
     isActive: true,
   });
 
-  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const [isProcessingAvatar, setIsProcessingAvatar] = useState(false);
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 3 * 1024 * 1024) {
-      alert('Ukuran file foto terlalu besar. Maksimal 3MB.');
+    if (file.size > 8 * 1024 * 1024) {
+      alert('Ukuran file foto terlalu besar. Maksimal 8MB.');
       return;
     }
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      if (evt.target?.result) {
-        setFormData(prev => ({ ...prev, avatar: evt.target!.result as string }));
-      }
-    };
-    reader.readAsDataURL(file);
+    try {
+      setIsProcessingAvatar(true);
+      const compressed = await compressAvatarImage(file, 256, 0.85);
+      setFormData(prev => ({ ...prev, avatar: compressed }));
+    } catch (err: any) {
+      alert(err.message || 'Gagal memproses gambar foto profil.');
+    } finally {
+      setIsProcessingAvatar(false);
+    }
   };
 
   // Custom Role Modal State
@@ -236,30 +242,30 @@ export const UserManagementView: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Top Header */}
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between border-b border-slate-200 pb-4">
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between border-b border-[#DDE4EA] pb-4">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-xl font-bold text-[#172B3A] tracking-tight">
               Manajemen Pengguna & Hak Akses (RBAC)
             </h1>
-            <span className="font-mono text-xs px-2 py-0.5 rounded bg-purple-50 text-purple-700 font-bold border border-purple-200">
+            <span className="font-mono text-xs px-2 py-0.5 rounded bg-teal-50 text-[#0F9D91] font-semibold border border-teal-200">
               Role-Based Access
             </span>
           </div>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-xs text-[#647586] mt-1">
             Pengaturan akun staf laboratorium, peran otentikasi, dan konfigurasi matriks izin akses sistem L-QCMS.
           </p>
         </div>
 
         {/* Tab Selection */}
-        <div className="flex items-center rounded-lg bg-slate-100 p-1 text-xs font-medium text-slate-600">
+        <div className="flex items-center rounded-lg bg-[#F4F7FA] p-1 text-xs font-medium text-[#647586] border border-[#DDE4EA]">
           <button
             type="button"
             onClick={() => setActiveTab('users')}
-            className={`px-3 py-1.5 rounded-md transition-colors ${
+            className={`px-3 py-1.5 rounded-md transition-colors cursor-pointer ${
               activeTab === 'users'
-                ? 'bg-white text-slate-900 shadow-xs font-semibold'
-                : 'hover:text-slate-900'
+                ? 'bg-white text-[#172B3A] shadow-xs font-semibold'
+                : 'hover:text-[#172B3A]'
             }`}
           >
             Daftar Pengguna ({users.length})
@@ -267,10 +273,10 @@ export const UserManagementView: React.FC = () => {
           <button
             type="button"
             onClick={() => setActiveTab('roles')}
-            className={`px-3 py-1.5 rounded-md transition-colors ${
+            className={`px-3 py-1.5 rounded-md transition-colors cursor-pointer ${
               activeTab === 'roles'
-                ? 'bg-white text-slate-900 shadow-xs font-semibold'
-                : 'hover:text-slate-900'
+                ? 'bg-white text-[#172B3A] shadow-xs font-semibold'
+                : 'hover:text-[#172B3A]'
             }`}
           >
             Matriks Hak Akses Peran ({roles.length})
@@ -280,7 +286,7 @@ export const UserManagementView: React.FC = () => {
 
       {!canManage && (
         <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-center gap-2">
-          <ShieldAlert className="h-4 w-4 text-amber-600 shrink-0" />
+          <ShieldAlert className="h-4 w-4 text-[#D99118] shrink-0" />
           <span>
             Mode Peninjauan: Hanya pengguna dengan peran <strong>Administrator</strong> yang memiliki izin menambahkan, mengubah, atau menghapus pengguna dan konfigurasi izin.
           </span>
@@ -297,7 +303,7 @@ export const UserManagementView: React.FC = () => {
               <select
                 value={roleFilter}
                 onChange={(e) => setRoleFilter(e.target.value)}
-                className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs bg-white font-medium focus:outline-none"
+                className="rounded-lg border border-[#DDE4EA] px-3 py-1.5 text-xs bg-white text-[#172B3A] font-medium focus:outline-none focus:border-[#0F9D91]"
               >
                 <option value="all">Semua Peran</option>
                 {roles.map(r => (
@@ -313,7 +319,7 @@ export const UserManagementView: React.FC = () => {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Cari nama, email, NIP..."
-                  className="w-full rounded-lg border border-slate-200 pl-8 pr-3 py-1.5 text-xs focus:border-emerald-500 focus:outline-none"
+                  className="w-full rounded-lg border border-[#DDE4EA] pl-8 pr-3 py-1.5 text-xs text-[#172B3A] placeholder:text-slate-400 focus:border-[#0F9D91] focus:outline-none"
                 />
               </div>
             </div>
@@ -322,7 +328,7 @@ export const UserManagementView: React.FC = () => {
               <button
                 type="button"
                 onClick={handleOpenAddUser}
-                className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-xs transition-colors"
+                className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-[#0F9D91] hover:bg-[#0B8279] rounded-lg shadow-xs transition-colors cursor-pointer"
               >
                 <UserPlus className="h-4 w-4" />
                 <span>Tambah Pengguna Baru</span>
@@ -331,10 +337,10 @@ export const UserManagementView: React.FC = () => {
           </div>
 
           {/* Users Table */}
-          <div className="rounded-xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+          <div className="rounded-xl border border-[#DDE4EA] bg-white shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50/80 border-b border-slate-200 font-semibold text-slate-600">
+                <thead className="bg-[#F4F7FA] border-b border-[#DDE4EA] font-semibold text-[#647586]">
                   <tr>
                     <th className="px-4 py-3">Nama Lengkap & NIP</th>
                     <th className="px-4 py-3">Email Pengguna</th>
@@ -465,24 +471,24 @@ export const UserManagementView: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowAddRoleModal(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-800 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-colors whitespace-nowrap"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#172B3A] bg-white hover:bg-slate-50 border border-[#DDE4EA] rounded-lg shadow-xs transition-colors whitespace-nowrap cursor-pointer"
               >
-                <Plus className="h-3.5 w-3.5" />
+                <Plus className="h-3.5 w-3.5 text-[#0F9D91]" />
                 <span>Tambah Peran Kustom</span>
               </button>
             )}
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+          <div className="rounded-xl border border-[#DDE4EA] bg-white shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50/80 border-b border-slate-200 font-semibold text-slate-700">
+                <thead className="bg-[#F4F7FA] border-b border-[#DDE4EA] font-semibold text-[#172B3A]">
                   <tr>
                     <th className="px-4 py-3 min-w-[220px]">Fungsi / Izin Akses Sistem</th>
                     {roles.map(r => (
                       <th key={r.id} className="px-4 py-3 text-center whitespace-nowrap min-w-[120px]">
                         <div>{r.name}</div>
-                        <span className="font-mono text-[10px] text-slate-400 font-normal">
+                        <span className="font-mono text-[10px] text-[#647586] font-normal">
                           {r.isSystem ? '(Bawaan)' : '(Kustom)'}
                         </span>
                       </th>
@@ -493,8 +499,8 @@ export const UserManagementView: React.FC = () => {
                   {SYSTEM_PERMISSIONS.map(perm => (
                     <tr key={perm.key} className="hover:bg-slate-50/40 transition-colors">
                       <td className="px-4 py-3">
-                        <span className="font-bold text-slate-900 block">{perm.name}</span>
-                        <span className="text-[11px] text-slate-500 block leading-tight">{perm.description}</span>
+                        <span className="font-bold text-[#172B3A] block">{perm.name}</span>
+                        <span className="text-[11px] text-[#647586] block leading-tight">{perm.description}</span>
                       </td>
 
                       {roles.map(r => {
@@ -510,7 +516,7 @@ export const UserManagementView: React.FC = () => {
                               onClick={() => handleToggleRolePermission(r, perm.key)}
                               className={`inline-flex h-6 w-6 items-center justify-center rounded-md border transition-all ${
                                 hasPerm
-                                  ? 'bg-emerald-600 border-emerald-600 text-white'
+                                  ? 'bg-[#0F9D91] border-[#0F9D91] text-white shadow-2xs'
                                   : 'bg-white border-slate-300 text-transparent hover:border-slate-400'
                               } ${(!canManage || isLockedAdmin) ? 'cursor-default opacity-85' : 'cursor-pointer hover:scale-105'}`}
                             >
@@ -526,7 +532,7 @@ export const UserManagementView: React.FC = () => {
             </div>
 
             {/* Custom roles list with delete options */}
-            <div className="p-4 border-t border-slate-100 bg-slate-50/50 space-y-2">
+            <div className="p-4 border-t border-[#DDE4EA] bg-[#F4F7FA]/70 space-y-2">
               <span className="text-xs font-bold text-slate-800 block">Daftar Peran Kustom:</span>
               <div className="flex flex-wrap gap-2">
                 {roles.filter(r => !r.isSystem).length === 0 ? (
@@ -586,42 +592,79 @@ export const UserManagementView: React.FC = () => {
 
             <form onSubmit={handleSaveUser} className="space-y-3 text-xs">
               {/* Foto Profil Field */}
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center gap-3">
-                {formData.avatar ? (
-                  <img
-                    src={formData.avatar}
-                    alt="Preview Foto"
-                    className="h-12 w-12 rounded-lg object-cover border border-slate-200 shrink-0"
-                  />
-                ) : (
-                  <div className="h-12 w-12 rounded-lg bg-slate-800 text-white font-bold text-base flex items-center justify-center shrink-0">
-                    {formData.name ? formData.name.charAt(0) : '?'}
-                  </div>
-                )}
-                <div className="flex-1 space-y-1">
-                  <label className="block font-semibold text-slate-800">
-                    Foto Profil Pengguna
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <label className="flex items-center gap-1 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-900 text-white font-semibold text-[11px] cursor-pointer transition-colors">
-                      <Upload className="h-3 w-3" />
-                      <span>Unggah Foto</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleAvatarUpload}
-                        className="hidden"
-                      />
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
+                <div className="flex items-center gap-3">
+                  {formData.avatar ? (
+                    <img
+                      src={formData.avatar}
+                      alt="Preview Foto"
+                      className="h-12 w-12 rounded-lg object-cover border border-slate-200 shrink-0"
+                    />
+                  ) : (
+                    <div className="h-12 w-12 rounded-lg bg-slate-800 text-white font-bold text-base flex items-center justify-center shrink-0">
+                      {formData.name ? formData.name.charAt(0) : '?'}
+                    </div>
+                  )}
+                  <div className="flex-1 space-y-1">
+                    <label className="block font-semibold text-slate-800">
+                      Foto Profil Pengguna
                     </label>
-                    {formData.avatar && (
+                    <div className="flex items-center gap-2">
+                      <label className="flex items-center gap-1 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-900 text-white font-semibold text-[11px] cursor-pointer transition-colors">
+                        {isProcessingAvatar ? (
+                          <>
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                            <span>Memproses...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="h-3 w-3" />
+                            <span>Unggah Foto</span>
+                          </>
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleAvatarUpload}
+                          disabled={isProcessingAvatar}
+                          className="hidden"
+                        />
+                      </label>
+                      {formData.avatar && (
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, avatar: '' })}
+                          className="text-[11px] text-rose-600 hover:underline font-semibold"
+                        >
+                          Hapus Foto
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Preset Avatars for quick selection */}
+                <div className="pt-2 border-t border-slate-200/70">
+                  <span className="text-[10px] text-slate-500 font-medium block mb-1">
+                    Pilih Foto Model Medis/ATLM:
+                  </span>
+                  <div className="grid grid-cols-4 gap-1">
+                    {PRESET_MODEL_AVATARS.map((p) => (
                       <button
+                        key={p.id}
                         type="button"
-                        onClick={() => setFormData({ ...formData, avatar: '' })}
-                        className="text-[11px] text-rose-600 hover:underline font-semibold"
+                        onClick={() => setFormData({ ...formData, avatar: p.url })}
+                        className={`flex items-center gap-1 p-1 rounded-md border text-left transition-all cursor-pointer ${
+                          formData.avatar === p.url
+                            ? 'border-emerald-600 bg-emerald-50 ring-1 ring-emerald-500'
+                            : 'border-slate-200 bg-white hover:bg-slate-100'
+                        }`}
+                        title={p.label}
                       >
-                        Hapus Foto
+                        <img src={p.url} alt={p.label} className="h-5 w-5 rounded object-cover shrink-0" />
+                        <span className="text-[9px] text-slate-700 truncate block">{p.label}</span>
                       </button>
-                    )}
+                    ))}
                   </div>
                 </div>
               </div>

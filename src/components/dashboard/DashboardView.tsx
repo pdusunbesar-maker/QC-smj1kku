@@ -545,32 +545,32 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* ========================================================================= */}
       {/* 1. COMMAND CENTER HEADER & WELCOME AREA                                   */}
       {/* ========================================================================= */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#E2E8F0] pb-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#DDE4EA] pb-4">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#172033] tracking-tight">
-              Dashboard
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#172B3A] tracking-tight">
+              Dashboard Mutu
             </h1>
-            <span className="font-mono text-xs px-2.5 py-0.5 rounded-md bg-blue-50 text-[#0B5FA5] font-semibold border border-blue-200">
-              Command Center
+            <span className="font-mono text-xs px-2.5 py-0.5 rounded-md bg-teal-50 text-[#0F9D91] font-semibold border border-teal-200/80">
+              Lab Sentral
             </span>
           </div>
-          <p className="text-xs sm:text-sm text-[#64748B] mt-0.5">
-            Selamat datang kembali, <strong className="text-slate-800">{user.name}</strong> · Ringkasan kontrol mutu laboratorium hari ini.
+          <p className="text-xs sm:text-sm text-[#647586] mt-0.5">
+            Selamat datang kembali, <strong className="text-[#172B3A]">{user.name}</strong> · Pemantauan kontrol mutu klinis harian terpadu.
           </p>
         </div>
 
         {/* Period Selector & Quick Actions */}
         <div className="flex flex-wrap items-center gap-2.5">
           {/* Functional Period Filter */}
-          <div className="flex items-center rounded-lg border border-[#E2E8F0] bg-white p-0.5 shadow-2xs text-xs font-medium">
+          <div className="flex items-center rounded-lg border border-[#DDE4EA] bg-white p-1 shadow-2xs text-xs font-medium">
             <button
               type="button"
               onClick={() => setSelectedPeriod('today')}
               className={`px-3 py-1.5 rounded-md transition-colors cursor-pointer ${
                 selectedPeriod === 'today'
-                  ? 'bg-[#0B5FA5] text-white font-semibold shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-[#142536] text-white font-semibold shadow-xs'
+                  : 'text-[#647586] hover:text-[#172B3A]'
               }`}
             >
               Hari Ini
@@ -580,8 +580,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               onClick={() => setSelectedPeriod('7d')}
               className={`px-3 py-1.5 rounded-md transition-colors cursor-pointer ${
                 selectedPeriod === '7d'
-                  ? 'bg-[#0B5FA5] text-white font-semibold shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-[#142536] text-white font-semibold shadow-xs'
+                  : 'text-[#647586] hover:text-[#172B3A]'
               }`}
             >
               7 Hari
@@ -591,8 +591,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               onClick={() => setSelectedPeriod('30d')}
               className={`px-3 py-1.5 rounded-md transition-colors cursor-pointer ${
                 selectedPeriod === '30d'
-                  ? 'bg-[#0B5FA5] text-white font-semibold shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-[#142536] text-white font-semibold shadow-xs'
+                  : 'text-[#647586] hover:text-[#172B3A]'
               }`}
             >
               30 Hari
@@ -602,8 +602,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               onClick={() => setSelectedPeriod('all')}
               className={`px-3 py-1.5 rounded-md transition-colors cursor-pointer ${
                 selectedPeriod === 'all'
-                  ? 'bg-[#0B5FA5] text-white font-semibold shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-[#142536] text-white font-semibold shadow-xs'
+                  : 'text-[#647586] hover:text-[#172B3A]'
               }`}
             >
               Semua
@@ -615,23 +615,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <button
               type="button"
               onClick={() => setIsPrintPreviewOpen(true)}
-              className="flex items-center gap-1.5 h-9 px-3.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 rounded-lg shadow-2xs transition-all active:scale-[0.98] cursor-pointer"
+              className="flex items-center gap-1.5 h-9 px-3.5 text-xs font-semibold text-[#172B3A] bg-white border border-[#DDE4EA] hover:bg-[#F4F7FA] rounded-lg shadow-2xs transition-all active:scale-[0.98] cursor-pointer"
             >
-              <Printer className="h-4 w-4" />
-              <span>Ekspor PDF Summary</span>
+              <Printer className="h-4 w-4 text-[#647586]" />
+              <span>Ekspor PDF</span>
             </button>
             <button
               type="button"
               onClick={() => onNavigateToTab('qc-scan')}
-              className="flex items-center gap-1.5 h-9 px-3.5 text-xs font-bold text-[#0B5FA5] bg-blue-50 border border-blue-200 hover:bg-blue-100 rounded-lg shadow-2xs transition-all active:scale-[0.98] cursor-pointer"
+              className="flex items-center gap-1.5 h-9 px-3.5 text-xs font-semibold text-[#0F9D91] bg-teal-50/50 border border-teal-200/80 hover:bg-teal-50 rounded-lg shadow-2xs transition-all active:scale-[0.98] cursor-pointer"
             >
-              <Camera className="h-4 w-4" />
-              <span>Scan QC Baru</span>
+              <Camera className="h-4 w-4 text-[#0F9D91]" />
+              <span>Scan QC</span>
             </button>
             <button
               type="button"
               onClick={() => onNavigateToTab('qc-input')}
-              className="flex items-center gap-1.5 h-9 px-3.5 text-xs font-bold text-white bg-[#0B5FA5] hover:bg-[#084B83] rounded-lg shadow-xs transition-all active:scale-[0.98] cursor-pointer"
+              className="flex items-center gap-1.5 h-9 px-3.5 text-xs font-semibold text-white bg-[#0F9D91] hover:bg-[#0B8279] rounded-lg shadow-xs transition-all active:scale-[0.98] cursor-pointer"
             >
               <Plus className="h-4 w-4" />
               <span>Input QC</span>
@@ -723,7 +723,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <button
                 type="button"
                 onClick={() => onNavigateToTab('levey-jennings')}
-                className="text-xs font-semibold text-[#0B5FA5] hover:text-[#084B83] flex items-center gap-1 cursor-pointer"
+                className="text-xs font-semibold text-[#0F9D91] hover:text-[#0B8279] flex items-center gap-1 cursor-pointer"
               >
                 <span>Lihat Semua Grafik</span>
                 <ArrowRight className="h-3.5 w-3.5" />
@@ -740,21 +740,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <div
                     key={param.id}
                     onClick={() => onNavigateToTab('levey-jennings', { parameterId: param.id })}
-                    className="p-3 rounded-lg border border-slate-200/90 hover:border-[#0B5FA5]/50 bg-slate-50/50 hover:bg-slate-50 transition-all cursor-pointer space-y-2"
+                    className="p-3 rounded-lg border border-[#DDE4EA] hover:border-[#0F9D91]/50 bg-white hover:bg-slate-50/50 transition-all cursor-pointer space-y-2"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-xs sm:text-sm text-[#172033]">
+                        <span className="font-bold text-xs sm:text-sm text-[#172B3A]">
                           {param.name}
                         </span>
-                        <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-white border border-slate-200 text-slate-700 font-semibold">
+                        <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-slate-100 border border-[#DDE4EA] text-[#647586] font-semibold">
                           {param.code}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 text-xs font-mono">
-                        <span className="text-emerald-700 font-bold">{passes} OK</span>
-                        {warnings > 0 && <span className="text-amber-600 font-bold">{warnings} Warn</span>}
-                        {fails > 0 && <span className="text-rose-600 font-bold">{fails} Rej</span>}
+                        <span className="text-[#16845B] font-bold">{passes} OK</span>
+                        {warnings > 0 && <span className="text-[#D99118] font-bold">{warnings} Warn</span>}
+                        {fails > 0 && <span className="text-[#D64545] font-bold">{fails} Rej</span>}
                       </div>
                     </div>
 
@@ -920,25 +920,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         {/* Left Column (7 cols): Control Chart (Levey-Jennings Preview Widget) */}
-        <div className="lg:col-span-7 rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-2xs space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E2E8F0] pb-3">
+        <div className="lg:col-span-7 rounded-xl border border-[#DDE4EA] bg-white p-5 shadow-2xs space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#DDE4EA] pb-3">
             <div className="flex items-center gap-2">
-              <LineChart className="h-4 w-4 text-[#0B5FA5]" />
-              <h3 className="font-bold text-[#172033] text-sm sm:text-base">
+              <LineChart className="h-4 w-4 text-[#0F9D91]" />
+              <h3 className="font-bold text-[#172B3A] text-sm sm:text-base">
                 Control Chart (Levey-Jennings)
               </h3>
             </div>
 
             {/* Parameter Selector Dropdown */}
             <div className="flex items-center gap-2">
-              <label htmlFor="preview-param-select" className="text-xs text-slate-500 font-medium hidden sm:inline">
+              <label htmlFor="preview-param-select" className="text-xs text-[#647586] font-medium hidden sm:inline">
                 Parameter:
               </label>
               <select
                 id="preview-param-select"
                 value={selectedPreviewParamId}
                 onChange={(e) => setSelectedPreviewParamId(e.target.value)}
-                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-800 focus:outline-none focus:border-[#0B5FA5]"
+                className="rounded-lg border border-[#DDE4EA] bg-white px-2.5 py-1 text-xs font-semibold text-[#172B3A] focus:outline-none focus:border-[#0F9D91]"
               >
                 {parameters.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -950,7 +950,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <button
                 type="button"
                 onClick={() => onNavigateToTab('levey-jennings', { parameterId: selectedPreviewParamId })}
-                className="p-1 rounded-md text-slate-400 hover:text-[#0B5FA5] hover:bg-slate-100"
+                className="p-1 rounded-md text-[#647586] hover:text-[#0F9D91] hover:bg-slate-100"
                 title="Buka Grafik Penuh"
               >
                 <ExternalLink className="h-4 w-4" />
@@ -959,36 +959,36 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           {/* Clean Real SVG Levey-Jennings Chart */}
-          <div className="relative w-full h-56 bg-slate-50/60 rounded-xl border border-slate-200 p-3 flex flex-col justify-between overflow-hidden">
+          <div className="relative w-full h-56 bg-[#F4F7FA] rounded-xl border border-[#DDE4EA] p-3 flex flex-col justify-between overflow-hidden">
             {previewParam ? (
               <>
                 <svg className="w-full h-44 overflow-visible" viewBox="0 0 500 160">
                   <defs>
                     <linearGradient id="chartWaveGrad" x1="0" y1="0" x2="1" y2="0">
-                      <stop offset="0%" stopColor="#0B5FA5" />
-                      <stop offset="100%" stopColor="#0F8B8D" />
+                      <stop offset="0%" stopColor="#0F9D91" />
+                      <stop offset="100%" stopColor="#142536" />
                     </linearGradient>
                   </defs>
 
                   {/* Horizontal Guideline: +3SD (Red) */}
-                  <line x1="40" y1="15" x2="480" y2="15" stroke="#EF4444" strokeWidth="1" strokeDasharray="3 3" opacity="0.6" />
-                  <text x="35" y="18" textAnchor="end" fontSize="9" fill="#EF4444" fontFamily="monospace">+3SD</text>
+                  <line x1="40" y1="15" x2="480" y2="15" stroke="#D64545" strokeWidth="1" strokeDasharray="3 3" opacity="0.6" />
+                  <text x="35" y="18" textAnchor="end" fontSize="9" fill="#D64545" fontFamily="monospace">+3SD</text>
 
                   {/* Horizontal Guideline: +2SD (Amber) */}
-                  <line x1="40" y1="40" x2="480" y2="40" stroke="#F59E0B" strokeWidth="1" strokeDasharray="3 3" opacity="0.5" />
-                  <text x="35" y="43" textAnchor="end" fontSize="9" fill="#D97706" fontFamily="monospace">+2SD</text>
+                  <line x1="40" y1="40" x2="480" y2="40" stroke="#D99118" strokeWidth="1" strokeDasharray="3 3" opacity="0.5" />
+                  <text x="35" y="43" textAnchor="end" fontSize="9" fill="#D99118" fontFamily="monospace">+2SD</text>
 
                   {/* Horizontal Guideline: Target Mean Line (Cyan/Teal) */}
-                  <line x1="40" y1="80" x2="480" y2="80" stroke="#0F8B8D" strokeWidth="1.5" />
-                  <text x="35" y="83" textAnchor="end" fontSize="9" fontWeight="bold" fill="#0F8B8D" fontFamily="monospace">MEAN</text>
+                  <line x1="40" y1="80" x2="480" y2="80" stroke="#0F9D91" strokeWidth="1.5" />
+                  <text x="35" y="83" textAnchor="end" fontSize="9" fontWeight="bold" fill="#0F9D91" fontFamily="monospace">MEAN</text>
 
                   {/* Horizontal Guideline: -2SD (Amber) */}
-                  <line x1="40" y1="120" x2="480" y2="120" stroke="#F59E0B" strokeWidth="1" strokeDasharray="3 3" opacity="0.5" />
-                  <text x="35" y="123" textAnchor="end" fontSize="9" fill="#D97706" fontFamily="monospace">-2SD</text>
+                  <line x1="40" y1="120" x2="480" y2="120" stroke="#D99118" strokeWidth="1" strokeDasharray="3 3" opacity="0.5" />
+                  <text x="35" y="123" textAnchor="end" fontSize="9" fill="#D99118" fontFamily="monospace">-2SD</text>
 
                   {/* Horizontal Guideline: -3SD (Red) */}
-                  <line x1="40" y1="145" x2="480" y2="145" stroke="#EF4444" strokeWidth="1" strokeDasharray="3 3" opacity="0.6" />
-                  <text x="35" y="148" textAnchor="end" fontSize="9" fill="#EF4444" fontFamily="monospace">-3SD</text>
+                  <line x1="40" y1="145" x2="480" y2="145" stroke="#D64545" strokeWidth="1" strokeDasharray="3 3" opacity="0.6" />
+                  <text x="35" y="148" textAnchor="end" fontSize="9" fill="#D64545" fontFamily="monospace">-3SD</text>
 
                   {/* Plot Real Data Line & Points */}
                   {previewPoints.length > 1 && (
@@ -1041,7 +1041,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           cx={x}
                           cy={y}
                           r={isOut ? 5 : isWarn ? 4 : 3.5}
-                          fill={isOut ? '#EF4444' : isWarn ? '#F59E0B' : '#0B5FA5'}
+                          fill={isOut ? '#D64545' : isWarn ? '#D99118' : '#0F9D91'}
                           stroke="#FFFFFF"
                           strokeWidth="1.5"
                         />
@@ -1065,9 +1065,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   </div>
                 )}
 
-                <div className="flex items-center justify-between text-[10px] font-mono text-slate-500 pt-1 border-t border-slate-200">
+                <div className="flex items-center justify-between text-[10px] font-mono text-[#647586] pt-1 border-t border-[#DDE4EA]">
                   <span>Target: {previewParam.targetMean} {previewParam.unit} (SD: ±{previewParam.targetSD})</span>
-                  <span className="text-[#0B5FA5] font-semibold">{previewPoints.length} Data Terbaru</span>
+                  <span className="text-[#0F9D91] font-semibold">{previewPoints.length} Data Terbaru</span>
                 </div>
               </>
             ) : (
@@ -1079,19 +1079,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* Right Column (5 cols): Recent Activity (Audit Log stream) */}
-        <div className="lg:col-span-5 rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-2xs flex flex-col justify-between">
+        <div className="lg:col-span-5 rounded-xl border border-[#DDE4EA] bg-white p-5 shadow-2xs flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-3">
+            <div className="flex items-center justify-between border-b border-[#DDE4EA] pb-3">
               <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-[#0B5FA5]" />
-                <h3 className="font-bold text-[#172033] text-sm sm:text-base">
+                <Clock className="h-4 w-4 text-[#0F9D91]" />
+                <h3 className="font-bold text-[#172B3A] text-sm sm:text-base">
                   Recent Activity
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => onNavigateToTab('audit-trail')}
-                className="text-xs font-semibold text-[#0B5FA5] hover:text-[#084B83] cursor-pointer"
+                className="text-xs font-semibold text-[#0F9D91] hover:text-[#0B8279] cursor-pointer"
               >
                 Audit Trail
               </button>
@@ -1100,15 +1100,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="mt-3.5 space-y-3">
               {logs.slice(0, 5).map((log) => (
                 <div key={log.id} className="flex items-start gap-2.5 text-xs">
-                  <div className="h-6 w-6 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0 mt-0.5 text-slate-600">
+                  <div className="h-6 w-6 rounded-full bg-slate-100 border border-[#DDE4EA] flex items-center justify-center shrink-0 mt-0.5 text-[#647586]">
                     <Activity className="h-3 w-3" />
                   </div>
                   <div className="flex-1 overflow-hidden min-w-0">
-                    <p className="text-slate-800 font-semibold truncate leading-tight">
+                    <p className="text-[#172B3A] font-semibold truncate leading-tight">
                       {log.details || log.action}
                     </p>
-                    <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mt-0.5">
-                      <span className="text-slate-600 font-medium">{log.userName}</span>
+                    <div className="flex items-center gap-1.5 text-[11px] text-[#647586] mt-0.5">
+                      <span className="text-[#172B3A] font-medium">{log.userName}</span>
                       <span>•</span>
                       <span className="font-mono">{formatTimeAgo(log.timestamp)}</span>
                     </div>
@@ -1122,7 +1122,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <button
               type="button"
               onClick={() => onNavigateToTab('audit-trail')}
-              className="text-xs font-semibold text-slate-600 hover:text-[#0B5FA5] transition-colors"
+              className="text-xs font-semibold text-[#647586] hover:text-[#0F9D91] transition-colors"
             >
               Lihat Riwayat Log Lengkap ({logs.length} catatan)
             </button>
@@ -1137,20 +1137,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         {/* Left Column (8 cols): Recent QC Results Table */}
-        <div className="lg:col-span-8 rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-2xs space-y-4">
-          <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-3">
+        <div className="lg:col-span-8 rounded-xl border border-[#DDE4EA] bg-white p-5 shadow-2xs space-y-4">
+          <div className="flex items-center justify-between border-b border-[#DDE4EA] pb-3">
             <div>
-              <h3 className="font-bold text-[#172033] text-sm sm:text-base">
+              <h3 className="font-bold text-[#172B3A] text-sm sm:text-base">
                 Hasil Pemeriksaan QC Terbaru
               </h3>
-              <p className="text-xs text-[#64748B] mt-0.5">
+              <p className="text-xs text-[#647586] mt-0.5">
                 Pemeriksaan kontrol analitik terakhir yang dicatat oleh petugas
               </p>
             </div>
             <button
               type="button"
               onClick={() => onNavigateToTab('qc-review')}
-              className="text-xs font-semibold text-[#0B5FA5] hover:text-[#084B83] flex items-center gap-1 cursor-pointer"
+              className="text-xs font-semibold text-[#0F9D91] hover:text-[#0B8279] flex items-center gap-1 cursor-pointer"
             >
               <span>Lihat Semua</span>
               <ArrowRight className="h-3.5 w-3.5" />
@@ -1220,18 +1220,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* Right Column (4 cols): Equipment Status */}
-        <div className="lg:col-span-4 rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-2xs space-y-4">
-          <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-3">
+        <div className="lg:col-span-4 rounded-xl border border-[#DDE4EA] bg-white p-5 shadow-2xs space-y-4">
+          <div className="flex items-center justify-between border-b border-[#DDE4EA] pb-3">
             <div className="flex items-center gap-2">
-              <Wrench className="h-4 w-4 text-[#0B5FA5]" />
-              <h3 className="font-bold text-[#172033] text-sm sm:text-base">
+              <Wrench className="h-4 w-4 text-[#0F9D91]" />
+              <h3 className="font-bold text-[#172B3A] text-sm sm:text-base">
                 Equipment Status
               </h3>
             </div>
             <button
               type="button"
               onClick={() => onNavigateToTab('master-data')}
-              className="text-xs font-semibold text-[#0B5FA5] hover:text-[#084B83] cursor-pointer"
+              className="text-xs font-semibold text-[#0F9D91] hover:text-[#0B8279] cursor-pointer"
             >
               Master Alat
             </button>
@@ -1241,10 +1241,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             {instruments.map((inst) => (
               <div
                 key={inst.id}
-                className="p-3 rounded-lg border border-slate-200 bg-slate-50/70 space-y-1.5 text-xs"
+                className="p-3 rounded-lg border border-[#DDE4EA] bg-[#F4F7FA] space-y-1.5 text-xs"
               >
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-900">{inst.name}</span>
+                  <span className="font-bold text-[#172B3A]">{inst.name}</span>
                   <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${
                     inst.status === 'active'
                       ? 'bg-emerald-100 text-emerald-800'
@@ -1255,18 +1255,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     {inst.status === 'active' ? 'Aktif' : inst.status === 'maintenance' ? 'Maintenance' : 'Non-Aktif'}
                   </span>
                 </div>
-                <div className="text-[11px] text-slate-500 font-mono space-y-0.5">
+                <div className="text-[11px] text-[#647586] font-mono space-y-0.5">
                   <p>SN: {inst.serialNumber} · {inst.location}</p>
-                  <p>Kalibrasi: <strong className="text-slate-800">{inst.nextCalibrationDate}</strong></p>
+                  <p>Kalibrasi: <strong className="text-[#172B3A]">{inst.nextCalibrationDate}</strong></p>
                 </div>
               </div>
             ))}
           </div>
 
           <div className="pt-2 border-t border-slate-100">
-            <div className="p-2.5 rounded-lg bg-blue-50/80 border border-blue-200 text-xs text-[#0B5FA5] flex items-center justify-between">
+            <div className="p-2.5 rounded-lg bg-teal-50/80 border border-teal-200 text-xs text-[#0F9D91] flex items-center justify-between">
               <span className="font-semibold">Kalibrasi Sesuai Jadwal</span>
-              <span className="text-[10px] font-mono font-bold text-emerald-700">100% Siap</span>
+              <span className="text-[10px] font-mono font-bold text-[#16845B]">100% Siap</span>
             </div>
           </div>
         </div>

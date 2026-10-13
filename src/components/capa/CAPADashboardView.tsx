@@ -38,30 +38,30 @@ export const CAPADashboardView: React.FC<CAPADashboardViewProps> = ({ capas, onN
   }, [capas]);
 
   const cards = [
-    { title: 'Total Dokumen', value: stats.total, filterKey: 'all', icon: ClipboardList, color: 'text-slate-700 bg-slate-50 border-slate-200' },
-    { title: 'Open / Baru', value: stats.open, filterKey: 'open', icon: FileText, color: 'text-slate-800 bg-slate-50 border-slate-200' },
-    { title: 'Investigasi / RCA', value: stats.investigation, filterKey: 'investigation', icon: Search, color: 'text-indigo-800 bg-indigo-50 border-indigo-200' },
-    { title: 'Dalam Proses', value: stats.in_progress, filterKey: 'action_in_progress', icon: Clock, color: 'text-amber-800 bg-amber-50 border-amber-200' },
-    { title: 'Menunggu Review', value: stats.waiting, filterKey: 'pending_verification', icon: CheckCircle, color: 'text-blue-800 bg-blue-50 border-blue-200' },
-    { title: 'Efektivitas', value: stats.effectiveness, filterKey: 'effectiveness_check', icon: ShieldCheck, color: 'text-purple-800 bg-purple-50 border-purple-200' },
-    { title: 'Terlambat (Overdue)', value: stats.overdue, filterKey: 'overdue', icon: AlertTriangle, color: 'text-rose-800 bg-rose-50 border-rose-200' },
-    { title: 'Selesai (Closed)', value: stats.closed, filterKey: 'closed', icon: CheckCircle2, color: 'text-emerald-800 bg-emerald-50 border-emerald-200' },
+    { title: 'Total Dokumen', value: stats.total, filterKey: 'all', icon: ClipboardList, color: 'text-[#647586] bg-white border-[#DDE4EA]' },
+    { title: 'Open / Baru', value: stats.open, filterKey: 'open', icon: FileText, color: 'text-[#172B3A] bg-white border-[#DDE4EA]' },
+    { title: 'Investigasi / RCA', value: stats.investigation, filterKey: 'investigation', icon: Search, color: 'text-[#3478C7] bg-white border-[#DDE4EA]' },
+    { title: 'Dalam Proses', value: stats.in_progress, filterKey: 'action_in_progress', icon: Clock, color: 'text-[#D99118] bg-white border-[#DDE4EA]' },
+    { title: 'Menunggu Review', value: stats.waiting, filterKey: 'pending_verification', icon: CheckCircle, color: 'text-[#0F9D91] bg-white border-[#DDE4EA]' },
+    { title: 'Efektivitas', value: stats.effectiveness, filterKey: 'effectiveness_check', icon: ShieldCheck, color: 'text-[#20384C] bg-white border-[#DDE4EA]' },
+    { title: 'Terlambat (Overdue)', value: stats.overdue, filterKey: 'overdue', icon: AlertTriangle, color: 'text-[#D64545] bg-white border-[#DDE4EA]' },
+    { title: 'Selesai (Closed)', value: stats.closed, filterKey: 'closed', icon: CheckCircle2, color: 'text-[#16845B] bg-white border-[#DDE4EA]' },
   ];
 
   return (
     <div className="space-y-6">
       {/* Header with Quick Action to Management */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl border border-[#DDE4EA] shadow-xs">
         <div>
-          <div className="flex items-center gap-2">
-            <div className="h-9 w-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <div className="h-9 w-9 rounded-xl bg-[#0F9D91] flex items-center justify-center text-white shadow-xs">
               <ShieldCheck className="h-5 w-5" />
             </div>
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold text-[#172B3A] tracking-tight">
               CAPA Intelligence Dashboard & Integrasi Manajemen
             </h1>
           </div>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">
+          <p className="text-xs sm:text-sm text-[#647586] mt-1">
             Pantau status investigasi, tindakan korektif & preventif (CAPA), serta analisis akar masalah secara terintegrasi dengan menu CAPA Management.
           </p>
         </div>
@@ -69,7 +69,7 @@ export const CAPADashboardView: React.FC<CAPADashboardViewProps> = ({ capas, onN
         <button
           type="button"
           onClick={() => onNavigateToTab('capa')}
-          className="flex items-center gap-2 px-4 py-2.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm transition-colors self-start sm:self-auto cursor-pointer"
+          className="flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-white bg-[#0F9D91] hover:bg-[#0B8279] rounded-xl shadow-xs transition-colors self-start sm:self-auto cursor-pointer"
         >
           <span>Buka CAPA Management</span>
           <ArrowRight className="h-4 w-4" />
@@ -84,15 +84,15 @@ export const CAPADashboardView: React.FC<CAPADashboardViewProps> = ({ capas, onN
             <div
               key={i}
               onClick={() => onNavigateToTab('capa', { prefill: { statusFilter: card.filterKey } })}
-              className={`p-4 rounded-xl border ${card.color} shadow-2xs hover:shadow-md cursor-pointer transition-all group bg-white`}
+              className={`p-4 rounded-xl border ${card.color} shadow-2xs hover:border-[#0F9D91]/50 cursor-pointer transition-all group bg-white`}
               title={`Klik untuk melihat data ${card.title} di CAPA Management`}
             >
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-bold uppercase tracking-wide text-slate-600">{card.title}</span>
+                <span className="text-[11px] font-mono font-semibold uppercase tracking-wide text-[#647586]">{card.title}</span>
                 <Icon className="h-4 w-4 opacity-70 group-hover:scale-110 transition-transform" />
               </div>
-              <div className="text-2xl font-extrabold text-slate-900">{card.value}</div>
-              <div className="text-[10px] text-indigo-600 font-semibold mt-1 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="text-2xl font-extrabold font-mono tabular-nums text-[#172B3A]">{card.value}</div>
+              <div className="text-[10px] text-[#0F9D91] font-semibold mt-1 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                 <span>Lihat Data</span>
                 <ArrowRight className="h-3 w-3" />
               </div>
@@ -102,16 +102,16 @@ export const CAPADashboardView: React.FC<CAPADashboardViewProps> = ({ capas, onN
       </div>
 
       {/* Recent CAPA Documents Integrated List */}
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+      <div className="rounded-2xl border border-[#DDE4EA] bg-white shadow-xs overflow-hidden">
+        <div className="px-6 py-4 border-b border-[#DDE4EA] flex items-center justify-between bg-[#F4F7FA]/70">
           <div>
-            <h3 className="font-bold text-slate-900 text-sm">Dokumen CAPA Terbaru & Status Penanganan</h3>
-            <p className="text-xs text-slate-500">Klik dokumen untuk dikelola langsung di menu CAPA Management</p>
+            <h3 className="font-bold text-[#172B3A] text-sm">Dokumen CAPA Terbaru & Status Penanganan</h3>
+            <p className="text-xs text-[#647586]">Klik dokumen untuk dikelola langsung di menu CAPA Management</p>
           </div>
           <button
             type="button"
             onClick={() => onNavigateToTab('capa')}
-            className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer"
+            className="text-xs font-semibold text-[#0F9D91] hover:text-[#0B8279] flex items-center gap-1 cursor-pointer"
           >
             <span>Kelola Semua ({capas.length})</span>
             <ArrowRight className="h-3 w-3" />
@@ -120,7 +120,7 @@ export const CAPADashboardView: React.FC<CAPADashboardViewProps> = ({ capas, onN
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
+            <thead className="bg-[#F4F7FA] text-[#647586] font-semibold border-b border-[#DDE4EA]">
               <tr>
                 <th className="px-4 py-3">ID CAPA</th>
                 <th className="px-4 py-3">Tanggal</th>
@@ -134,28 +134,28 @@ export const CAPADashboardView: React.FC<CAPADashboardViewProps> = ({ capas, onN
             <tbody className="divide-y divide-slate-100">
               {capas.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-slate-500">
+                  <td colSpan={7} className="p-8 text-center text-[#647586]">
                     Belum ada dokumen CAPA yang tercatat dalam sistem.
                   </td>
                 </tr>
               ) : (
                 capas.slice(0, 6).map((c) => (
                   <tr key={c.id} className="hover:bg-slate-50/60 transition-colors">
-                    <td className="px-4 py-3 font-mono font-bold text-indigo-600">{c.id}</td>
-                    <td className="px-4 py-3 font-mono text-slate-600">{c.createdAt.substring(0, 10)}</td>
+                    <td className="px-4 py-3 font-mono font-bold text-[#0F9D91]">{c.id}</td>
+                    <td className="px-4 py-3 font-mono text-[#647586]">{c.createdAt.substring(0, 10)}</td>
                     <td className="px-4 py-3">
-                      <div className="font-semibold text-slate-900">{c.pic}</div>
-                      <div className="text-[10px] text-slate-500">{c.department}</div>
+                      <div className="font-semibold text-[#172B3A]">{c.pic}</div>
+                      <div className="text-[10px] text-[#647586]">{c.department}</div>
                     </td>
-                    <td className="px-4 py-3 max-w-xs truncate text-slate-700 font-medium">{c.problemStatement}</td>
-                    <td className="px-4 py-3 text-center font-mono text-slate-600">{c.overallDueDate}</td>
+                    <td className="px-4 py-3 max-w-xs truncate text-[#172B3A] font-medium">{c.problemStatement}</td>
+                    <td className="px-4 py-3 text-center font-mono text-[#647586]">{c.overallDueDate}</td>
                     <td className="px-4 py-3 text-center">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase font-mono ${
                         c.status === 'closed' || c.status === 'CLOSED'
-                          ? 'bg-emerald-100 text-emerald-800'
+                          ? 'bg-emerald-50 text-[#16845B] border border-emerald-200'
                           : c.status === 'overdue'
-                          ? 'bg-rose-100 text-rose-800'
-                          : 'bg-amber-100 text-amber-800'
+                          ? 'bg-rose-50 text-[#D64545] border border-rose-200'
+                          : 'bg-amber-50 text-[#D99118] border border-amber-200'
                       }`}>
                         {c.status}
                       </span>
@@ -164,7 +164,7 @@ export const CAPADashboardView: React.FC<CAPADashboardViewProps> = ({ capas, onN
                       <button
                         type="button"
                         onClick={() => onNavigateToTab('capa', { prefill: { selectedCapaId: c.id } })}
-                        className="px-2.5 py-1 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold text-[11px] transition-colors inline-flex items-center gap-1 cursor-pointer"
+                        className="px-2.5 py-1 rounded bg-teal-50 hover:bg-teal-100 text-[#0F9D91] font-semibold text-[11px] transition-colors inline-flex items-center gap-1 cursor-pointer"
                       >
                         <span>Kelola</span>
                         <ArrowRight className="h-3 w-3" />

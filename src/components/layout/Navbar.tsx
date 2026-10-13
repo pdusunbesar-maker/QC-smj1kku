@@ -70,7 +70,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-[#E2E8F0] bg-white px-4 md:px-6 shadow-2xs select-none">
+    <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-[#DDE4EA] bg-[#FFFFFF] px-4 md:px-6 shadow-2xs select-none">
       
       {/* Zone 1: Navigation Toggle & Breadcrumb */}
       <div className="flex items-center gap-3">
@@ -78,7 +78,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         <button
           type="button"
           onClick={onToggleSidebarMobile}
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 md:hidden cursor-pointer"
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE4EA] text-[#647586] hover:text-[#172B3A] hover:bg-slate-50 md:hidden cursor-pointer"
           aria-label="Buka menu navigasi"
         >
           <Menu className="h-5 w-5" />
@@ -89,7 +89,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             type="button"
             onClick={onToggleSidebarCollapse}
-            className="hidden md:flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors cursor-pointer"
+            className="hidden md:flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE4EA] text-[#647586] hover:text-[#172B3A] hover:bg-slate-50 transition-colors cursor-pointer"
             title={isSidebarCollapsed ? "Perluas menu samping" : "Persempit menu samping"}
             aria-label="Toggle sidebar collapse"
           >
@@ -103,15 +103,15 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Page Breadcrumb */}
         <div className="flex items-center gap-2 text-xs">
-          <span className="font-bold text-[#0B5FA5] hidden sm:inline">
+          <span className="font-bold text-[#0F9D91] hidden sm:inline">
             L-QCMS
           </span>
-          <ChevronRight className="h-3.5 w-3.5 text-slate-300 hidden sm:inline" />
-          <span className="text-slate-500 hidden md:inline">
+          <ChevronRight className="h-3.5 w-3.5 text-[#DDE4EA] hidden sm:inline" />
+          <span className="text-[#647586] hidden md:inline">
             {currentCrumb.group}
           </span>
-          <ChevronRight className="h-3.5 w-3.5 text-slate-300 hidden md:inline" />
-          <h2 className="font-bold text-[#172033] text-sm sm:text-base leading-none">
+          <ChevronRight className="h-3.5 w-3.5 text-[#DDE4EA] hidden md:inline" />
+          <h2 className="font-bold text-[#172B3A] text-sm sm:text-base leading-none">
             {currentCrumb.title}
           </h2>
         </div>
@@ -119,11 +119,11 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Zone 2: Realtime Telemetry Indicator */}
       <div className="hidden xl:flex items-center gap-3 text-xs">
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200/80">
-          <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="font-semibold text-slate-700">Lab Sentral Terpadu</span>
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#F4F7FA] border border-[#DDE4EA]">
+          <span className="h-2 w-2 rounded-full bg-[#16845B] animate-pulse" />
+          <span className="font-semibold text-[#172B3A]">Lab Patologi Klinik</span>
           <span className="text-slate-300">·</span>
-          <span className="font-mono text-slate-500 text-[11px]">Monitoring QC Aktif</span>
+          <span className="font-mono text-[#647586] text-[11px]">Monitoring Terhubung</span>
         </div>
       </div>
 
@@ -134,9 +134,9 @@ export const Navbar: React.FC<NavbarProps> = ({
           type="button"
           onClick={onOpenDatabaseSettings}
           title="Konfigurasi Supabase & Skrip SQL"
-          className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:text-[#0B5FA5] bg-white hover:bg-blue-50/70 border border-slate-200 rounded-lg transition-colors cursor-pointer shadow-2xs"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-[#172B3A] hover:text-[#0F9D91] bg-white hover:bg-teal-50/50 border border-[#DDE4EA] rounded-lg transition-colors cursor-pointer shadow-2xs"
         >
-          <Database className="h-3.5 w-3.5 text-[#0B5FA5]" />
+          <Database className="h-3.5 w-3.5 text-[#0F9D91]" />
           <span className="hidden md:inline font-mono">Supabase</span>
         </button>
 
@@ -145,11 +145,11 @@ export const Navbar: React.FC<NavbarProps> = ({
           type="button"
           onClick={onOpenNotifications}
           title="Notifikasi & Peringatan QC"
-          className="relative p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+          className="relative p-2 text-[#647586] hover:text-[#172B3A] hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
         >
           <Bell className="h-4 w-4" />
           {unreadCount > 0 && (
-            <span className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-bold text-white font-mono shadow-xs">
+            <span className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#D64545] px-1 text-[10px] font-bold text-white font-mono shadow-xs">
               {unreadCount}
             </span>
           )}
@@ -160,28 +160,28 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             type="button"
             onClick={() => setShowRoleMenu(!showRoleMenu)}
-            className="flex items-center gap-2 p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg border border-slate-200 hover:border-slate-300 bg-white transition-all text-left shadow-2xs cursor-pointer"
+            className="flex items-center gap-2 p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg border border-[#DDE4EA] hover:border-slate-300 bg-white transition-all text-left shadow-2xs cursor-pointer"
           >
             {user.avatar ? (
               <img
                 src={user.avatar}
                 alt={user.name}
-                className="h-7 w-7 rounded-md object-cover border border-slate-200"
+                className="h-7 w-7 rounded-md object-cover border border-[#DDE4EA]"
               />
             ) : (
-              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-[#082B49] text-white font-bold text-xs">
+              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-[#142536] text-white font-bold text-xs">
                 {user.name.charAt(0)}
               </div>
             )}
             <div className="hidden sm:block">
-              <p className="text-xs font-bold text-[#172033] leading-tight truncate max-w-[130px]">
+              <p className="text-xs font-bold text-[#172B3A] leading-tight truncate max-w-[130px]">
                 {user.name}
               </p>
-              <p className="text-[10px] text-slate-500 capitalize font-medium">
+              <p className="text-[10px] text-[#647586] capitalize font-medium">
                 {roleLabels[role]?.label || role}
               </p>
             </div>
-            <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+            <ChevronDown className="h-3.5 w-3.5 text-[#647586]" />
           </button>
 
           {showRoleMenu && (
@@ -219,16 +219,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                       if (onOpenUserProfile) onOpenUserProfile();
                       setShowRoleMenu(false);
                     }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-[#0B5FA5] bg-blue-50/80 hover:bg-blue-100/70 rounded-md transition-colors text-left cursor-pointer"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-[#0F9D91] bg-teal-50/80 hover:bg-teal-100/70 rounded-md transition-colors text-left cursor-pointer"
                   >
-                    <Camera className="h-3.5 w-3.5 text-[#0B5FA5]" />
+                    <Camera className="h-3.5 w-3.5 text-[#0F9D91]" />
                     <span>Profil Saya & Ubah Foto</span>
                   </button>
                 </div>
 
                 {/* Role Switcher */}
                 <div className="py-2">
-                  <div className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400 font-mono">
+                  <div className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-[#647586] font-mono">
                     Ganti Peran (Role Switcher)
                   </div>
                   {(['admin', 'supervisor', 'analis', 'viewer'] as UserRole[]).map((r) => (
@@ -241,12 +241,12 @@ export const Navbar: React.FC<NavbarProps> = ({
                       }}
                       className={`w-full flex items-center justify-between px-3 py-1.5 text-xs rounded-md text-left transition-colors cursor-pointer ${
                         role === r
-                          ? 'bg-slate-100 font-bold text-[#0B5FA5]'
-                          : 'text-slate-600 hover:bg-slate-50'
+                          ? 'bg-slate-100 font-bold text-[#0F9D91]'
+                          : 'text-[#172B3A] hover:bg-slate-50'
                       }`}
                     >
                       <span>{roleLabels[r].label}</span>
-                      {role === r && <UserCheck className="h-3.5 w-3.5 text-emerald-600" />}
+                      {role === r && <UserCheck className="h-3.5 w-3.5 text-[#16845B]" />}
                     </button>
                   ))}
                 </div>

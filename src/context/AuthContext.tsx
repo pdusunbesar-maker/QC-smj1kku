@@ -58,14 +58,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const freshRoles = StorageService.getRoles();
     setUsers(freshUsers);
     setRoles(freshRoles);
-    const matched = freshUsers.find(u => u.id === user.id);
-    if (matched) setUser(matched);
+    const matched = freshUsers.find(u => u.id === user.id || u.email === user.email);
+    if (matched) {
+      setUser(matched);
+      StorageService.setCurrentUser(matched);
+    }
   };
 
   const login = (newUser: User) => {
     setUser(newUser);
+    StorageService.setCurrentUser(newUser);
     setIsAuthenticated(true);
     localStorage.setItem(AUTH_STATUS_KEY, 'true');
+    try {
+      localStorage.setItem('lqcms_current_user_v1', JSON.stringify(newUser));
+    } catch (e) {}
     // Execute audit logging asynchronously so the UI transitions to main menu instantaneously
     setTimeout(() => {
       StorageService.logAudit('LOGIN', `Pengguna ${newUser.name} (${newUser.role}) berhasil masuk ke sistem.`);
@@ -154,12 +161,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     StorageService.logAudit('LOGOUT', `Pengguna ${user.name} (${user.role}) keluar dari sistem.`);
     setIsAuthenticated(false);
     localStorage.removeItem(AUTH_STATUS_KEY);
+    try {
+      localStorage.removeItem('lqcms_current_user_v1');
+    } catch (e) {}
   };
 
   const switchRole = (newRole: string) => {
     const matchedUser = users.find(u => u.role === newRole);
     if (matchedUser) {
       setUser(matchedUser);
+      StorageService.setCurrentUser(matchedUser);
+      try {
+        localStorage.setItem('lqcms_current_user_v1', JSON.stringify(matchedUser));
+      } catch (e) {}
       StorageService.logAudit('LOGIN', `Beralih peran pengguna ke ${newRole} (${matchedUser.name})`);
     } else {
       const updatedUser = {
@@ -167,6 +181,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         role: newRole,
       };
       setUser(updatedUser);
+      StorageService.setCurrentUser(updatedUser);
+      try {
+        localStorage.setItem('lqcms_current_user_v1', JSON.stringify(updatedUser));
+      } catch (e) {}
       StorageService.saveUser(updatedUser);
       refreshUsersAndRoles();
     }
@@ -237,7 +255,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: false, message: 'Tidak dapat mengubah peran admin terakhir pada sistem.' };
     }
 
-    await StorageService.saveUser(updatedUser);
+    const saveRes = await StorageService.saveUser(updatedUser);
+    if (!saveRes.success) {
+      return { success: false, message: saveRes.message || 'Gagal menyimpan ke basis data.' };
+    }
+
     await StorageService.logAudit(
       'UPDATE_MASTER_DATA',
       `Memperbarui profil & hak akses pengguna: ${updatedUser.name} (${updatedUser.role})`,
@@ -246,8 +268,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 
     refreshUsersAndRoles();
-    if (user.id === updatedUser.id) {
+    if (user.id === updatedUser.id || user.email === updatedUser.email) {
       setUser(updatedUser);
+      StorageService.setCurrentUser(updatedUser);
+      try {
+        localStorage.setItem('lqcms_current_user_v1', JSON.stringify(updatedUser));
+      } catch (e) {}
     }
 
     return { success: true };

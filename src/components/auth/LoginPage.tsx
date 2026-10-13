@@ -56,17 +56,34 @@ export const LoginPage: React.FC<LoginPageProps> = ({ labInfo }) => {
     return u.role;
   };
 
-  // Hydrate users from Supabase / local storage & load remembered username
+  // Hydrate users from Supabase / local storage & load remembered username & realtime sync
   useEffect(() => {
-    StorageService.syncFromSupabase(() => {
+    const updateUsers = () => {
       setAvailableUsers(StorageService.getUsers());
+    };
+
+    StorageService.syncFromSupabase(() => {
+      updateUsers();
     });
-    setAvailableUsers(StorageService.getUsers());
+    updateUsers();
+
+    const unsubscribe = StorageService.subscribeToRealtime(() => {
+      updateUsers();
+    });
+
+    window.addEventListener('lqcms_data_updated', updateUsers);
+    window.addEventListener('storage', updateUsers);
 
     const savedUsername = localStorage.getItem('lqcms_saved_username');
     if (savedUsername && localStorage.getItem('lqcms_remember_me') === 'true') {
       setIdentifier(savedUsername);
     }
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('lqcms_data_updated', updateUsers);
+      window.removeEventListener('storage', updateUsers);
+    };
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -185,7 +202,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ labInfo }) => {
           <div className="space-y-2">
             {/* Desktop Hospital Logo */}
             <div className="hidden md:flex items-center gap-3 mb-4">
-              <div className="h-12 w-12 rounded-2xl bg-slate-50 border border-slate-200/80 p-2 shadow-xs flex items-center justify-center shrink-0">
+              <div className="h-12 w-12 rounded-2xl bg-white border border-[#DDE4EA] p-2 shadow-xs flex items-center justify-center shrink-0">
                 <img
                   src={labInfo.logoUrl || '/logo_kayong_utara.png'}
                   alt="Lambang Daerah Kayong Utara"
@@ -196,24 +213,24 @@ export const LoginPage: React.FC<LoginPageProps> = ({ labInfo }) => {
                 />
               </div>
               <div>
-                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-[#647586]">
                   RSUD S.M. JAMALUDIN I
                 </p>
-                <p className="text-xs font-semibold text-[#0B5FA5]">
+                <p className="text-xs font-semibold text-[#0F9D91]">
                   Laboratorium Patologi Klinik
                 </p>
               </div>
             </div>
 
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-100 border border-slate-200/80 text-slate-700 text-xs font-semibold">
-              <Sparkles className="h-3 w-3 text-[#0B5FA5]" />
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#F4F7FA] border border-[#DDE4EA] text-[#172B3A] text-xs font-semibold">
+              <Sparkles className="h-3 w-3 text-[#0F9D91]" />
               <span>Selamat Datang</span>
             </div>
 
-            <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
+            <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#172B3A]">
               Masuk ke L-QCMS
             </h2>
-            <p className="text-xs sm:text-sm text-slate-500 leading-relaxed font-normal">
+            <p className="text-xs sm:text-sm text-[#647586] leading-relaxed font-normal">
               Silakan masuk untuk melanjutkan ke sistem Laboratory Quality Control Management System.
             </p>
           </div>
@@ -224,7 +241,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ labInfo }) => {
               role="alert"
               className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-3 transition-all animate-in fade-in"
             >
-              <AlertCircle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
+              <AlertCircle className="h-4 w-4 text-[#D64545] shrink-0 mt-0.5" />
               <div className="flex-1">
                 <p className="font-semibold text-rose-900">Autentikasi Gagal</p>
                 <p className="text-rose-700 mt-0.5 leading-relaxed">{errorMsg}</p>
@@ -239,7 +256,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ labInfo }) => {
             <div>
               <label 
                 htmlFor="login-identifier" 
-                className="block text-xs font-semibold text-slate-800 mb-1.5"
+                className="block text-xs font-semibold text-[#172B3A] mb-1.5"
               >
                 Username / Email
               </label>
@@ -254,7 +271,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ labInfo }) => {
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
                   placeholder="Masukkan username atau email"
-                  className="w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3.5 py-3 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#0B5FA5] focus:ring-4 focus:ring-[#0B5FA5]/10 focus:outline-none transition-all duration-200"
+                  className="w-full rounded-xl border border-[#DDE4EA] bg-white pl-10 pr-3.5 py-3 text-xs sm:text-sm text-[#172B3A] placeholder:text-slate-400 focus:border-[#0F9D91] focus:ring-4 focus:ring-[#0F9D91]/15 focus:outline-none transition-all duration-200"
                   required
                 />
               </div>
@@ -265,7 +282,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ labInfo }) => {
               <div className="flex items-center justify-between mb-1.5">
                 <label 
                   htmlFor="login-password" 
-                  className="text-xs font-semibold text-slate-800"
+                  className="text-xs font-semibold text-[#172B3A]"
                 >
                   Password
                 </label>
@@ -282,7 +299,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ labInfo }) => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Masukkan password"
-                  className="w-full rounded-xl border border-slate-200 bg-white pl-10 pr-11 py-3 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#0B5FA5] focus:ring-4 focus:ring-[#0B5FA5]/10 focus:outline-none transition-all duration-200"
+                  className="w-full rounded-xl border border-[#DDE4EA] bg-white pl-10 pr-11 py-3 text-xs sm:text-sm text-[#172B3A] placeholder:text-slate-400 focus:border-[#0F9D91] focus:ring-4 focus:ring-[#0F9D91]/15 focus:outline-none transition-all duration-200"
                   required
                 />
                 <button
@@ -299,34 +316,34 @@ export const LoginPage: React.FC<LoginPageProps> = ({ labInfo }) => {
 
             {/* Field 3: Remember Me & Security Badge */}
             <div className="flex items-center justify-between text-xs pt-1">
-              <label className="flex items-center gap-2 cursor-pointer text-slate-600 select-none">
+              <label className="flex items-center gap-2 cursor-pointer text-[#647586] select-none">
                 <input
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 text-[#0B5FA5] focus:ring-[#0B5FA5]/20 cursor-pointer"
+                  className="h-4 w-4 rounded border-slate-300 text-[#0F9D91] focus:ring-[#0F9D91]/20 cursor-pointer"
                 />
-                <span className="font-medium text-slate-700">Ingat saya</span>
+                <span className="font-medium text-[#172B3A]">Ingat saya</span>
               </label>
 
-              <div className="flex items-center gap-1 text-[11px] text-slate-400 font-medium">
-                <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+              <div className="flex items-center gap-1 text-[11px] text-[#647586] font-medium">
+                <ShieldCheck className="h-3.5 w-3.5 text-[#16845B]" />
                 <span>Terotentikasi Aman</span>
               </div>
             </div>
 
             {/* Registered Accounts Quick Profile Selector (Collapsible Drawer) */}
-            <div className="rounded-xl border border-slate-200/90 bg-slate-50/80 overflow-hidden transition-all duration-200">
+            <div className="rounded-xl border border-[#DDE4EA] bg-[#F4F7FA] overflow-hidden transition-all duration-200">
               <button
                 type="button"
                 onClick={() => setShowAccountsGuide(!showAccountsGuide)}
                 className="w-full px-3.5 py-2.5 flex items-center justify-between text-left cursor-pointer hover:bg-slate-100/70 transition-colors"
               >
-                <span className="flex items-center gap-2 text-xs font-semibold text-slate-700">
-                  <KeyRound className="h-3.5 w-3.5 text-[#0B5FA5]" />
+                <span className="flex items-center gap-2 text-xs font-semibold text-[#172B3A]">
+                  <KeyRound className="h-3.5 w-3.5 text-[#0F9D91]" />
                   <span>Petunjuk Akun Terdaftar</span>
                 </span>
-                <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium">
+                <div className="flex items-center gap-1.5 text-[11px] text-[#647586] font-medium">
                   <span>{showAccountsGuide ? 'Tutup' : 'Lihat Profil'}</span>
                   {showAccountsGuide ? (
                     <ChevronUp className="h-3.5 w-3.5 text-slate-400" />
@@ -337,7 +354,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ labInfo }) => {
               </button>
 
               {showAccountsGuide && (
-                <div className="p-3 pt-1 border-t border-slate-200/70 space-y-2 animate-in fade-in duration-200">
+                <div className="p-3 pt-1 border-t border-[#DDE4EA] space-y-2 animate-in fade-in duration-200">
                   <div className="grid grid-cols-2 gap-2">
                     {(availableUsers.length > 0 ? availableUsers.slice(0, 4) : [
                       { id: 'u1', name: 'dr. Hendra Wijaya, Sp.PK', role: 'admin', avatar: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=150&auto=format&fit=crop&q=80' },
@@ -356,8 +373,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ labInfo }) => {
                           onClick={() => handleSelectAccount(u as User)}
                           className={`flex items-center gap-2 p-2 rounded-xl border text-left transition-all cursor-pointer ${
                             isSelected 
-                              ? 'border-[#0B5FA5] bg-blue-50/70 text-blue-950 shadow-2xs ring-1 ring-[#0B5FA5]/30' 
-                              : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                              ? 'border-[#0F9D91] bg-teal-50/70 text-teal-950 shadow-2xs ring-1 ring-[#0F9D91]/30' 
+                              : 'border-[#DDE4EA] bg-white hover:bg-slate-50 text-[#172B3A]'
                           }`}
                         >
                           <div className="relative shrink-0">
@@ -365,26 +382,26 @@ export const LoginPage: React.FC<LoginPageProps> = ({ labInfo }) => {
                               <img
                                 src={u.avatar}
                                 alt={u.name}
-                                className="h-8 w-8 rounded-lg object-cover border border-slate-200"
+                                className="h-8 w-8 rounded-lg object-cover border border-[#DDE4EA]"
                               />
                             ) : (
-                              <div className="h-8 w-8 rounded-lg bg-slate-800 text-white font-bold text-xs flex items-center justify-center">
+                              <div className="h-8 w-8 rounded-lg bg-[#142536] text-white font-bold text-xs flex items-center justify-center">
                                 {u.name.charAt(0)}
                               </div>
                             )}
-                            <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-emerald-500 border border-white rounded-full" />
+                            <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-[#16845B] border border-white rounded-full" />
                           </div>
 
                           <div className="flex-1 overflow-hidden min-w-0">
                             <div className="flex items-center justify-between gap-1">
-                              <span className="font-mono font-bold text-slate-900 text-xs truncate">
+                              <span className="font-mono font-bold text-[#172B3A] text-xs truncate">
                                 @{uUsername}
                               </span>
-                              <span className="text-[9px] px-1 py-0.2 rounded font-semibold shrink-0 bg-slate-100 text-slate-600">
+                              <span className="text-[9px] px-1 py-0.2 rounded font-semibold shrink-0 bg-slate-100 text-[#647586]">
                                 {roleLabel}
                               </span>
                             </div>
-                            <span className="text-[10px] text-slate-500 truncate block mt-0.5 leading-tight">
+                            <span className="text-[10px] text-[#647586] truncate block mt-0.5 leading-tight">
                               {u.name.split(',')[0]}
                             </span>
                           </div>
@@ -392,7 +409,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ labInfo }) => {
                       );
                     })}
                   </div>
-                  <p className="text-[10px] text-slate-500 pt-1 leading-normal">
+                  <p className="text-[10px] text-[#647586] pt-1 leading-normal">
                     * Klik profil untuk mengisi Username otomatis. Kata sandi tidak ditampilkan demi keamanan akun.
                   </p>
                 </div>
@@ -405,8 +422,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ labInfo }) => {
               disabled={isLoading || isSuccess}
               className={`w-full h-12 rounded-xl font-bold text-xs sm:text-sm text-white shadow-md transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99] ${
                 isSuccess
-                  ? 'bg-emerald-600 hover:bg-emerald-600'
-                  : 'bg-[#0B5FA5] hover:bg-[#084e88] active:bg-[#063e6e] disabled:bg-[#0B5FA5]/60 hover:shadow-lg hover:-translate-y-0.5'
+                  ? 'bg-[#16845B] hover:bg-[#16845B]'
+                  : 'bg-[#0F9D91] hover:bg-[#0B8279] active:bg-[#096d66] disabled:bg-[#0F9D91]/60 hover:shadow-lg hover:-translate-y-0.5'
               }`}
             >
               {isLoading ? (

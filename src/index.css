@@ -3,6 +3,42 @@
 @theme {
   --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-navy-950: #0D1926;
+  --color-navy-900: #142536;
+  --color-navy-850: #1A2F44;
+  --color-navy-800: #20384C;
+  --color-navy-700: #2C4A63;
+  --color-teal-600: #0B8279;
+  --color-teal-500: #0F9D91;
+  --color-teal-400: #18B8AA;
+  --color-teal-100: #D2F2EF;
+  --color-teal-50: #F0FAF9;
+  --color-clinical-bg: #F4F7FA;
+  --color-clinical-surface: #FFFFFF;
+  --color-clinical-border: #DDE4EA;
+  --color-clinical-text: #172B3A;
+  --color-clinical-muted: #647586;
+  --color-clinical-success: #16845B;
+  --color-clinical-warning: #D99118;
+  --color-clinical-danger: #D64545;
+  --color-clinical-info: #3478C7;
+}
+
+:root {
+  --primary-navy: #142536;
+  --secondary-navy: #20384C;
+  --accent-teal: #0F9D91;
+  --accent-hover: #0B8279;
+  --clinical-bg: #F4F7FA;
+  --clinical-surface: #FFFFFF;
+  --clinical-border: #DDE4EA;
+  --clinical-text: #172B3A;
+  --clinical-muted: #647586;
+  --clinical-success: #16845B;
+  --clinical-warning: #D99118;
+  --clinical-danger: #D64545;
+  --clinical-info: #3478C7;
 }
 
 html {

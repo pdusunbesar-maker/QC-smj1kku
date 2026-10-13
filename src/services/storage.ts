@@ -523,10 +523,50 @@ export class StorageService {
   private static initSeedData() {
     if (this.users.length === 0) {
       this.users = [
-        { id: 'usr-admin', name: 'Admin Lab', email: 'admin@rsudsmj1.kku.go.id', role: 'admin', nip: '19850101 201001 1 001', department: 'Patologi Klinik', isActive: true, password: 'password123' },
-        { id: 'usr-sup', name: 'dr. Hendra Wijaya, Sp.PK', email: 'hendra@rsudsmj1.kku.go.id', role: 'supervisor', nip: '19800512 200801 1 008', department: 'Patologi Klinik', isActive: true, password: 'password123' },
-        { id: 'usr-analis', name: 'Siti Rahmawati, S.Tr.Kes', email: 'siti@rsudsmj1.kku.go.id', role: 'analis', nip: '19850914 201001 2 015', department: 'Laboratorium Sentral', isActive: true, password: 'password123' },
-        { id: 'usr-viewer', name: 'Auditor KARS', email: 'auditor@rsudsmj1.kku.go.id', role: 'viewer', nip: '19900220 201503 2 002', department: 'Komite Mutu', isActive: true, password: 'password123' },
+        { 
+          id: 'usr-admin', 
+          name: 'dr. Hendra Wijaya, Sp.PK', 
+          email: 'admin@rsudsmj1.kku.go.id', 
+          role: 'admin', 
+          nip: '19800512 200801 1 008', 
+          department: 'Penanggung Jawab Laboratorium', 
+          isActive: true, 
+          password: 'password123',
+          avatar: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=150&auto=format&fit=crop&q=80'
+        },
+        { 
+          id: 'usr-sup', 
+          name: 'Siti Rahmawati, S.Tr.Kes', 
+          email: 'siti@rsudsmj1.kku.go.id', 
+          role: 'supervisor', 
+          nip: '19850914 201001 2 015', 
+          department: 'Penanggung Jawab Mutu (PJ Mutu)', 
+          isActive: true, 
+          password: 'password123',
+          avatar: 'https://images.unsplash.com/photo-1594824813572-132d733737b3?w=150&auto=format&fit=crop&q=80'
+        },
+        { 
+          id: 'usr-analis', 
+          name: 'Budi Pratama, A.Md.AK', 
+          email: 'budi@rsudsmj1.kku.go.id', 
+          role: 'analis', 
+          nip: '19930720 201802 1 003', 
+          department: 'Ahli Teknologi Laboratorium Medik (ATLM)', 
+          isActive: true, 
+          password: 'password123',
+          avatar: 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?w=150&auto=format&fit=crop&q=80'
+        },
+        { 
+          id: 'usr-viewer', 
+          name: 'Maya Andriani, S.Kep', 
+          email: 'maya@rsudsmj1.kku.go.id', 
+          role: 'viewer', 
+          nip: '19950910 202001 2 005', 
+          department: 'Tim Mutu & Akreditasi Rumah Sakit', 
+          isActive: true, 
+          password: 'password123',
+          avatar: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=150&auto=format&fit=crop&q=80'
+        },
       ];
     }
     if (this.roles.length === 0) {
@@ -730,6 +770,13 @@ export class StorageService {
         .channel('lqcms-db-changes')
         .on(
           'postgres_changes',
+          { event: '*', schema: 'public', table: 'app_users' },
+          async (payload) => {
+            await StorageService.syncFromSupabase(onDataChanged);
+          }
+        )
+        .on(
+          'postgres_changes',
           { event: '*', schema: 'public' },
           async () => {
             await StorageService.syncFromSupabase(onDataChanged);
@@ -751,6 +798,11 @@ export class StorageService {
   static notifyDataChanged(type?: string): void {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('lqcms_data_updated', { detail: { type } }));
+      try {
+        localStorage.setItem('lqcms_last_sync_timestamp', Date.now().toString());
+      } catch (e) {
+        // ignore
+      }
     }
   }
 
@@ -779,21 +831,36 @@ export class StorageService {
     return this.users;
   }
 
-  static async saveUser(user: User): Promise<void> {
+  static async saveUser(user: User): Promise<{ success: boolean; message?: string }> {
     const idx = this.users.findIndex(u => u.id === user.id);
     if (idx >= 0) this.users[idx] = user;
     else this.users.push(user);
+
+    if (this.currentUser && (this.currentUser.id === user.id || this.currentUser.email === user.email)) {
+      this.currentUser = { ...this.currentUser, ...user };
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('lqcms_current_user_v1', JSON.stringify(this.currentUser));
+        } catch (e) {}
+      }
+    }
     this.notifyDataChanged('users');
 
     const sb = getSupabase();
     if (sb) {
       try {
         const { error } = await sb.from('app_users').upsert(mapUserToDb(user));
-        if (error) console.error('Supabase saveUser error:', error);
-      } catch (err) {
+        if (error) {
+          console.error('Supabase saveUser error:', error);
+          return { success: false, message: error.message };
+        }
+        return { success: true };
+      } catch (err: any) {
         console.error('Supabase saveUser network error:', err);
+        return { success: false, message: err?.message || 'Gagal menyimpan data pengguna ke Supabase.' };
       }
     }
+    return { success: true };
   }
 
   static async deleteUser(userId: string): Promise<void> {
@@ -864,11 +931,33 @@ export class StorageService {
   }
 
   static getCurrentUser(): User {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('lqcms_current_user_v1');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && parsed.id) {
+            const fresh = this.users.find(u => u.id === parsed.id || u.email === parsed.email);
+            if (fresh) {
+              this.currentUser = fresh;
+              return fresh;
+            }
+            this.currentUser = parsed;
+            return parsed;
+          }
+        }
+      } catch (e) {}
+    }
     return this.currentUser;
   }
 
   static setCurrentUser(user: User): void {
     this.currentUser = user;
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('lqcms_current_user_v1', JSON.stringify(user));
+      } catch (e) {}
+    }
   }
 
   // --- Instruments ---
