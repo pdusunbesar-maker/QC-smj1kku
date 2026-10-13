@@ -36,7 +36,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [availableUsers, setAvailableUsers] = useState<UserType[]>([]);
+  const [availableUsers, setAvailableUsers] = useState<UserType[]>(() => StorageService.getUsers());
   const passwordInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -54,19 +54,18 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     };
   }, [isOpen]);
 
-  const getUserUsername = (u: { name: string; role: string; email?: string }) => {
+  const getUserUsername = (u: { name: string; role: string; email?: string; nip?: string }) => {
+    if (u.email && u.email.includes('@')) {
+      return u.email.split('@')[0];
+    }
+    if (u.nip && u.nip.trim()) {
+      return u.nip.replace(/\s+/g, '');
+    }
     if (u.role === 'admin') return 'admin';
     if (u.role === 'supervisor') return 'supervisor';
-    if (u.role === 'analis') {
-      if (u.name.toLowerCase().includes('budi')) return 'budi';
-      return 'analis';
-    }
-    if (u.role === 'viewer') {
-      if (u.name.toLowerCase().includes('maya')) return 'maya';
-      return 'viewer';
-    }
-    if (u.email) return u.email.split('@')[0];
-    return u.role;
+    if (u.role === 'analis') return 'analis';
+    if (u.role === 'viewer') return 'viewer';
+    return (u.name || '').split(' ')[0].toLowerCase() || u.role;
   };
 
   const handleSelectAccount = (u: UserType) => {
@@ -257,59 +256,64 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
               {/* Grid Akun Terdaftar */}
               <div className="grid grid-cols-2 gap-1.5 pt-0.5">
-                {(availableUsers.length > 0 ? availableUsers.slice(0, 4) : [
-                  { id: 'u1', name: 'dr. Hendra Wijaya, Sp.PK', role: 'admin', nip: '19800512 200801 1 008', avatar: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=150&auto=format&fit=crop&q=80' },
-                  { id: 'u2', name: 'Siti Rahmawati, S.Tr.Kes', role: 'supervisor', nip: '19850914 201001 2 015', avatar: 'https://images.unsplash.com/photo-1594824813572-132d733737b3?w=150&auto=format&fit=crop&q=80' },
-                  { id: 'u3', name: 'Budi Pratama, A.Md.AK', role: 'analis', nip: '19930720 201802 1 003', avatar: 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?w=150&auto=format&fit=crop&q=80' },
-                  { id: 'u4', name: 'Maya Andriani, S.Kep', role: 'viewer', nip: '19950910 202001 2 005', avatar: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=150&auto=format&fit=crop&q=80' },
-                ]).map((u) => {
-                  const uUsername = getUserUsername(u);
-                  const roleLabel = u.role === 'admin' ? 'Admin' : u.role === 'supervisor' ? 'Supervisor' : u.role === 'analis' ? 'ATLM' : 'Viewer';
-                  const isSelected = identifier.toLowerCase() === uUsername.toLowerCase() || identifier.toLowerCase() === u.role.toLowerCase() || (u.nip && identifier.includes(u.nip.slice(0, 6)));
+                {availableUsers.filter(u => u.isActive !== false).length === 0 ? (
+                  <div className="col-span-2 flex items-center justify-center gap-2 p-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-500">
+                    <Loader2 className="h-4 w-4 animate-spin text-emerald-600" />
+                    <span>Sinkronisasi akun terdaftar...</span>
+                  </div>
+                ) : (
+                  availableUsers
+                    .filter(u => u.isActive !== false)
+                    .slice(0, 6)
+                    .map((u) => {
+                      const uUsername = getUserUsername(u);
+                      const roleLabel = u.role === 'admin' ? 'Admin' : u.role === 'supervisor' ? 'Supervisor' : u.role === 'analis' ? 'ATLM' : 'Viewer';
+                      const isSelected = identifier.toLowerCase() === uUsername.toLowerCase() || identifier.toLowerCase() === u.role.toLowerCase() || (u.nip && identifier.includes(u.nip.slice(0, 6)));
 
-                  return (
-                    <button
-                      key={u.id}
-                      type="button"
-                      onClick={() => handleSelectAccount(u as UserType)}
-                      className={`group flex items-center gap-2 p-1.5 rounded-lg border transition-all text-left cursor-pointer ${
-                        isSelected 
-                          ? 'border-emerald-600 bg-emerald-50/90 text-emerald-950 shadow-xs ring-1 ring-emerald-500' 
-                          : 'border-slate-200 bg-white hover:bg-slate-100/90 hover:border-slate-300 text-slate-700'
-                      }`}
-                      title={`Pilih username @${uUsername}`}
-                    >
-                      <div className="relative shrink-0">
-                        {u.avatar ? (
-                          <img
-                            src={u.avatar}
-                            alt={u.name}
-                            className="h-8 w-8 rounded-lg object-cover border border-slate-200 shadow-2xs group-hover:scale-105 transition-transform"
-                          />
-                        ) : (
-                          <div className="h-8 w-8 rounded-lg bg-slate-900 text-white font-bold text-xs flex items-center justify-center shadow-2xs">
-                            {u.name.charAt(0)}
+                      return (
+                        <button
+                          key={u.id}
+                          type="button"
+                          onClick={() => handleSelectAccount(u as UserType)}
+                          className={`group flex items-center gap-2 p-1.5 rounded-lg border transition-all text-left cursor-pointer ${
+                            isSelected 
+                              ? 'border-emerald-600 bg-emerald-50/90 text-emerald-950 shadow-xs ring-1 ring-emerald-500' 
+                              : 'border-slate-200 bg-white hover:bg-slate-100/90 hover:border-slate-300 text-slate-700'
+                          }`}
+                          title={`Pilih username @${uUsername}`}
+                        >
+                          <div className="relative shrink-0">
+                            {u.avatar ? (
+                              <img
+                                src={u.avatar}
+                                alt={u.name}
+                                className="h-8 w-8 rounded-lg object-cover border border-slate-200 shadow-2xs group-hover:scale-105 transition-transform"
+                              />
+                            ) : (
+                              <div className="h-8 w-8 rounded-lg bg-slate-900 text-white font-bold text-xs flex items-center justify-center shadow-2xs">
+                                {u.name.charAt(0)}
+                              </div>
+                            )}
+                            <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-emerald-500 border-2 border-white rounded-full"></span>
                           </div>
-                        )}
-                        <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-emerald-500 border-2 border-white rounded-full"></span>
-                      </div>
 
-                      <div className="flex-1 overflow-hidden min-w-0">
-                        <div className="flex items-center justify-between gap-1">
-                          <span className="font-mono font-bold text-slate-900 text-xs truncate">
-                            @{uUsername}
-                          </span>
-                          <span className="text-[9px] px-1 py-0.2 rounded font-semibold shrink-0 bg-slate-100 text-slate-600">
-                            {roleLabel}
-                          </span>
-                        </div>
-                        <span className="text-[9px] text-slate-500 truncate block mt-0.5 leading-tight font-medium">
-                          {u.name.split(',')[0]}
-                        </span>
-                      </div>
-                    </button>
-                  );
-                })}
+                          <div className="flex-1 overflow-hidden min-w-0">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="font-mono font-bold text-slate-900 text-xs truncate">
+                                @{uUsername}
+                              </span>
+                              <span className="text-[9px] px-1 py-0.2 rounded font-semibold shrink-0 bg-slate-100 text-slate-600">
+                                {roleLabel}
+                              </span>
+                            </div>
+                            <span className="text-[9px] text-slate-500 truncate block mt-0.5 leading-tight font-medium">
+                              {u.name.split(',')[0]}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })
+                )}
               </div>
 
               {/* Catatan Keamanan */}

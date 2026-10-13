@@ -32,7 +32,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ labInfo }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [showAccountsGuide, setShowAccountsGuide] = useState(false);
-  const [availableUsers, setAvailableUsers] = useState<User[]>([]);
+  const [availableUsers, setAvailableUsers] = useState<User[]>(() => StorageService.getUsers());
   const passwordInputRef = useRef<HTMLInputElement>(null);
 
   // Remember me state persisted in localStorage
@@ -42,18 +42,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({ labInfo }) => {
 
   // Extract clean username for quick selector
   const getUserUsername = (u: { name: string; role: string; email?: string; nip?: string }) => {
+    if (u.email && u.email.includes('@')) {
+      return u.email.split('@')[0];
+    }
+    if (u.nip && u.nip.trim()) {
+      return u.nip.replace(/\s+/g, '');
+    }
     if (u.role === 'admin') return 'admin';
     if (u.role === 'supervisor') return 'supervisor';
-    if (u.role === 'analis') {
-      if (u.name.toLowerCase().includes('budi')) return 'budi';
-      return 'analis';
-    }
-    if (u.role === 'viewer') {
-      if (u.name.toLowerCase().includes('maya')) return 'maya';
-      return 'viewer';
-    }
-    if (u.email) return u.email.split('@')[0];
-    return u.role;
+    if (u.role === 'analis') return 'analis';
+    if (u.role === 'viewer') return 'viewer';
+    return (u.name || '').split(' ')[0].toLowerCase() || u.role;
   };
 
   // Hydrate users from Supabase / local storage & load remembered username & realtime sync
@@ -62,10 +61,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ labInfo }) => {
       setAvailableUsers(StorageService.getUsers());
     };
 
+    updateUsers();
+
     StorageService.syncFromSupabase(() => {
       updateUsers();
     });
-    updateUsers();
 
     const unsubscribe = StorageService.subscribeToRealtime(() => {
       updateUsers();
@@ -355,60 +355,65 @@ export const LoginPage: React.FC<LoginPageProps> = ({ labInfo }) => {
 
               {showAccountsGuide && (
                 <div className="p-3 pt-1 border-t border-[#DDE4EA] space-y-2 animate-in fade-in duration-200">
-                  <div className="grid grid-cols-2 gap-2">
-                    {(availableUsers.length > 0 ? availableUsers.slice(0, 4) : [
-                      { id: 'u1', name: 'dr. Hendra Wijaya, Sp.PK', role: 'admin', avatar: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=150&auto=format&fit=crop&q=80' },
-                      { id: 'u2', name: 'Siti Rahmawati, S.Tr.Kes', role: 'supervisor', avatar: 'https://images.unsplash.com/photo-1594824813572-132d733737b3?w=150&auto=format&fit=crop&q=80' },
-                      { id: 'u3', name: 'Budi Pratama, A.Md.AK', role: 'analis', avatar: 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?w=150&auto=format&fit=crop&q=80' },
-                      { id: 'u4', name: 'Maya Andriani, S.Kep', role: 'viewer', avatar: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=150&auto=format&fit=crop&q=80' },
-                    ]).map((u) => {
-                      const uUsername = getUserUsername(u);
-                      const roleLabel = u.role === 'admin' ? 'Admin' : u.role === 'supervisor' ? 'Supervisor' : u.role === 'analis' ? 'ATLM' : 'Viewer';
-                      const isSelected = identifier.toLowerCase() === uUsername.toLowerCase() || identifier.toLowerCase() === u.role.toLowerCase();
+                  {availableUsers.filter(u => u.isActive !== false).length === 0 ? (
+                    <div className="flex items-center justify-center gap-2.5 p-4 rounded-xl border border-[#DDE4EA] bg-white text-xs text-[#647586]">
+                      <Loader2 className="h-4 w-4 animate-spin text-[#0F9D91]" />
+                      <span>Sinkronisasi akun terdaftar dari database...</span>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2">
+                      {availableUsers
+                        .filter(u => u.isActive !== false)
+                        .slice(0, 6)
+                        .map((u) => {
+                          const uUsername = getUserUsername(u);
+                          const roleLabel = u.role === 'admin' ? 'Admin' : u.role === 'supervisor' ? 'Supervisor' : u.role === 'analis' ? 'ATLM' : u.role === 'viewer' ? 'Viewer' : u.role;
+                          const isSelected = identifier.toLowerCase() === uUsername.toLowerCase() || identifier.toLowerCase() === (u.email || '').toLowerCase() || identifier.toLowerCase() === u.role.toLowerCase();
 
-                      return (
-                        <button
-                          key={u.id}
-                          type="button"
-                          onClick={() => handleSelectAccount(u as User)}
-                          className={`flex items-center gap-2 p-2 rounded-xl border text-left transition-all cursor-pointer ${
-                            isSelected 
-                              ? 'border-[#0F9D91] bg-teal-50/70 text-teal-950 shadow-2xs ring-1 ring-[#0F9D91]/30' 
-                              : 'border-[#DDE4EA] bg-white hover:bg-slate-50 text-[#172B3A]'
-                          }`}
-                        >
-                          <div className="relative shrink-0">
-                            {u.avatar ? (
-                              <img
-                                src={u.avatar}
-                                alt={u.name}
-                                className="h-8 w-8 rounded-lg object-cover border border-[#DDE4EA]"
-                              />
-                            ) : (
-                              <div className="h-8 w-8 rounded-lg bg-[#142536] text-white font-bold text-xs flex items-center justify-center">
-                                {u.name.charAt(0)}
+                          return (
+                            <button
+                              key={u.id}
+                              type="button"
+                              onClick={() => handleSelectAccount(u)}
+                              className={`flex items-center gap-2 p-2 rounded-xl border text-left transition-all cursor-pointer ${
+                                isSelected 
+                                  ? 'border-[#0F9D91] bg-teal-50/70 text-teal-950 shadow-2xs ring-1 ring-[#0F9D91]/30' 
+                                  : 'border-[#DDE4EA] bg-white hover:bg-slate-50 text-[#172B3A]'
+                              }`}
+                            >
+                              <div className="relative shrink-0">
+                                {u.avatar ? (
+                                  <img
+                                    src={u.avatar}
+                                    alt={u.name}
+                                    className="h-8 w-8 rounded-lg object-cover border border-[#DDE4EA]"
+                                  />
+                                ) : (
+                                  <div className="h-8 w-8 rounded-lg bg-[#142536] text-white font-bold text-xs flex items-center justify-center">
+                                    {u.name.charAt(0)}
+                                  </div>
+                                )}
+                                <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-[#16845B] border border-white rounded-full" />
                               </div>
-                            )}
-                            <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-[#16845B] border border-white rounded-full" />
-                          </div>
 
-                          <div className="flex-1 overflow-hidden min-w-0">
-                            <div className="flex items-center justify-between gap-1">
-                              <span className="font-mono font-bold text-[#172B3A] text-xs truncate">
-                                @{uUsername}
-                              </span>
-                              <span className="text-[9px] px-1 py-0.2 rounded font-semibold shrink-0 bg-slate-100 text-[#647586]">
-                                {roleLabel}
-                              </span>
-                            </div>
-                            <span className="text-[10px] text-[#647586] truncate block mt-0.5 leading-tight">
-                              {u.name.split(',')[0]}
-                            </span>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
+                              <div className="flex-1 overflow-hidden min-w-0">
+                                <div className="flex items-center justify-between gap-1">
+                                  <span className="font-mono font-bold text-[#172B3A] text-xs truncate">
+                                    @{uUsername}
+                                  </span>
+                                  <span className="text-[9px] px-1 py-0.2 rounded font-semibold shrink-0 bg-slate-100 text-[#647586]">
+                                    {roleLabel}
+                                  </span>
+                                </div>
+                                <span className="text-[10px] text-[#647586] truncate block mt-0.5 leading-tight">
+                                  {u.name.split(',')[0]}
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        })}
+                    </div>
+                  )}
                   <p className="text-[10px] text-[#647586] pt-1 leading-normal">
                     * Klik profil untuk mengisi Username otomatis. Kata sandi tidak ditampilkan demi keamanan akun.
                   </p>

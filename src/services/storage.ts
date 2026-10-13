@@ -496,32 +496,73 @@ function mapDbToNotif(row: any): AppNotification {
   };
 }
 
+const CACHE_KEYS = {
+  USERS: 'lqcms_cache_users_v2',
+  ROLES: 'lqcms_cache_roles_v2',
+  LAB_INFO: 'lqcms_cache_lab_info_v2',
+  INSTRUMENTS: 'lqcms_cache_instruments_v2',
+  CONTROLS: 'lqcms_cache_controls_v2',
+  PARAMETERS: 'lqcms_cache_parameters_v2',
+  QC_RESULTS: 'lqcms_cache_qc_results_v2',
+  NON_CONFORMITIES: 'lqcms_cache_nc_v2',
+  CAPAS: 'lqcms_cache_capas_v2',
+  AUDIT_LOGS: 'lqcms_cache_audit_logs_v2',
+  NOTIFICATIONS: 'lqcms_cache_notifications_v2',
+  QC_LOTS: 'lqcms_cache_qc_lots_v2',
+  QC_HEMATOLOGI: 'lqcms_cache_qc_hematologi_v2',
+};
+
+function readLocalCache<T>(key: string, fallback: T): T {
+  if (typeof window === 'undefined') return fallback;
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    return parsed !== null && parsed !== undefined ? parsed : fallback;
+  } catch (e) {
+    return fallback;
+  }
+}
+
+function writeLocalCache(key: string, data: any): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch (e) {
+    // ignore
+  }
+}
+
 let realtimeSubscription: any = null;
 
 export class StorageService {
-  // In-memory cache synced directly with Supabase (Zero local storage/mock reliance)
-  private static labInfo: LaboratoryInfo = DEFAULT_LAB;
-  private static users: User[] = [];
-  private static roles: RoleDefinition[] = [];
+  // Synchronous local cache for instant menu hydration + background Supabase sync
+  private static labInfo: LaboratoryInfo = readLocalCache(CACHE_KEYS.LAB_INFO, DEFAULT_LAB);
+  private static users: User[] = readLocalCache(CACHE_KEYS.USERS, []);
+  private static roles: RoleDefinition[] = readLocalCache(CACHE_KEYS.ROLES, []);
   private static currentUser: User = { id: 'usr-admin', name: 'Admin Lab', email: 'admin@rsudsmj1.kku.go.id', role: 'admin', permissions: [] };
-  private static instruments: Instrument[] = [];
-  private static controlMaterials: ControlMaterial[] = [];
-  private static parameters: Parameter[] = [];
+  private static instruments: Instrument[] = readLocalCache(CACHE_KEYS.INSTRUMENTS, []);
+  private static controlMaterials: ControlMaterial[] = readLocalCache(CACHE_KEYS.CONTROLS, []);
+  private static parameters: Parameter[] = readLocalCache(CACHE_KEYS.PARAMETERS, []);
   private static westgardRules: WestgardRuleConfig[] = DEFAULT_WESTGARD_RULES;
-  private static qcResults: QCResult[] = [];
-  private static nonConformities: NonConformity[] = [];
-  private static capas: CAPA[] = [];
-  private static auditLogs: AuditLog[] = [];
-  private static notifications: AppNotification[] = [];
-  private static qcLots: QCLot[] = [];
-  private static qcHematologi: QCHematologi[] = [];
+  private static qcResults: QCResult[] = readLocalCache(CACHE_KEYS.QC_RESULTS, []);
+  private static nonConformities: NonConformity[] = readLocalCache(CACHE_KEYS.NON_CONFORMITIES, []);
+  private static capas: CAPA[] = readLocalCache(CACHE_KEYS.CAPAS, []);
+  private static auditLogs: AuditLog[] = readLocalCache(CACHE_KEYS.AUDIT_LOGS, []);
+  private static notifications: AppNotification[] = readLocalCache(CACHE_KEYS.NOTIFICATIONS, []);
+  private static qcLots: QCLot[] = readLocalCache(CACHE_KEYS.QC_LOTS, []);
+  private static qcHematologi: QCHematologi[] = readLocalCache(CACHE_KEYS.QC_HEMATOLOGI, []);
   private static deletedQcIds: string[] = [];
   private static deletedInstIds: string[] = [];
   private static deletedCtrlIds: string[] = [];
   private static deletedParamIds: string[] = [];
+  private static syncPromise: Promise<{ success: boolean; count: number; message: string }> | null = null;
+  private static realtimeDebounceTimer: any = null;
 
   private static initSeedData() {
-    if (this.users.length === 0) {
+    const sb = getSupabase();
+    // Only inject fallback demo users if there is completely NO data and Supabase is not configured
+    if (this.users.length === 0 && !sb) {
       this.users = [
         { 
           id: 'usr-admin', 
@@ -568,6 +609,7 @@ export class StorageService {
           avatar: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=150&auto=format&fit=crop&q=80'
         },
       ];
+      writeLocalCache(CACHE_KEYS.USERS, this.users);
     }
     if (this.roles.length === 0) {
       this.roles = [
@@ -576,22 +618,25 @@ export class StorageService {
         { id: 'analis', name: 'Analis / ATLM', description: 'Input harian QC & Pemeriksaan', permissions: ['input_qc', 'view_reports', 'manage_nc'], isSystem: true },
         { id: 'viewer', name: 'Viewer / Auditor', description: 'Akses baca laporan & grafik', permissions: ['view_reports'], isSystem: true },
       ];
+      writeLocalCache(CACHE_KEYS.ROLES, this.roles);
     }
-    if (this.instruments.length === 0) {
+    if (this.instruments.length === 0 && !sb) {
       this.instruments = [
         { id: 'inst-01', name: 'Sysmex XN-550', code: 'HEM-01', brand: 'Sysmex', model: 'XN-550', serialNumber: '12345', unit: 'Hematologi', location: 'Laboratorium Sentral', status: 'active' },
         { id: 'inst-02', name: 'Mindray BS-240', code: 'BIO-01', brand: 'Mindray', model: 'BS-240', serialNumber: '67890', unit: 'Kimia Klinik', location: 'Laboratorium Sentral', status: 'active' },
         { id: 'inst-03', name: 'Roche Cobas e411', code: 'IMM-01', brand: 'Roche', model: 'Cobas e411', serialNumber: '54321', unit: 'Imunologi', location: 'Laboratorium Sentral', status: 'active' },
       ];
+      writeLocalCache(CACHE_KEYS.INSTRUMENTS, this.instruments);
     }
-    if (this.controlMaterials.length === 0) {
+    if (this.controlMaterials.length === 0 && !sb) {
       this.controlMaterials = [
         { id: 'ctrl-01', name: 'Sysmex e-CHECK (XN)', manufacturer: 'Sysmex', level: 'Level 1', lotNumber: 'E23041', expirationDate: '2026-12-31', storageCondition: '2°C - 8°C', status: 'active' },
         { id: 'ctrl-02', name: 'Sysmex e-CHECK (XN)', manufacturer: 'Sysmex', level: 'Level 2', lotNumber: 'E23042', expirationDate: '2026-12-31', storageCondition: '2°C - 8°C', status: 'active' },
         { id: 'ctrl-03', name: 'Mindray Control Normal', manufacturer: 'Mindray', level: 'Normal', lotNumber: 'MC2401N', expirationDate: '2026-10-30', storageCondition: '2°C - 8°C', status: 'active' },
       ];
+      writeLocalCache(CACHE_KEYS.CONTROLS, this.controlMaterials);
     }
-    if (this.parameters.length === 0) {
+    if (this.parameters.length === 0 && !sb) {
       this.parameters = [
         { id: 'param-01', code: 'HB', name: 'Hemoglobin', unit: 'g/dL', method: 'SLS-Hemoglobin', instrumentId: 'inst-01', controlMaterialId: 'ctrl-01', targetMean: 14.2, targetSd: 0.35, targetCv: 2.5, minAcceptable: 13.1, maxAcceptable: 15.3, decimalPlaces: 1, isActive: true },
         { id: 'param-02', code: 'WBC', name: 'Leukosit', unit: '10^3/uL', method: 'Flow Cytometry', instrumentId: 'inst-01', controlMaterialId: 'ctrl-01', targetMean: 7.5, targetSd: 0.40, targetCv: 5.3, minAcceptable: 6.3, maxAcceptable: 8.7, decimalPlaces: 2, isActive: true },
@@ -600,6 +645,7 @@ export class StorageService {
         { id: 'param-05', code: 'URE', name: 'Ureum', unit: 'mg/dL', method: 'Urease-GLDH', instrumentId: 'inst-02', controlMaterialId: 'ctrl-03', targetMean: 35, targetSd: 1.8, targetCv: 5.1, minAcceptable: 29, maxAcceptable: 41, decimalPlaces: 1, isActive: true },
         { id: 'param-06', code: 'CRE', name: 'Kreatinin', unit: 'mg/dL', method: 'Jaffe Kinetic', instrumentId: 'inst-02', controlMaterialId: 'ctrl-03', targetMean: 0.9, targetSd: 0.05, targetCv: 5.5, minAcceptable: 0.75, maxAcceptable: 1.05, decimalPlaces: 2, isActive: true },
       ];
+      writeLocalCache(CACHE_KEYS.PARAMETERS, this.parameters);
     }
   }
 
@@ -629,11 +675,18 @@ export class StorageService {
     this.deletedInstIds = [];
     this.deletedCtrlIds = [];
     this.deletedParamIds = [];
+    if (typeof window !== 'undefined') {
+      Object.values(CACHE_KEYS).forEach((k) => {
+        try {
+          localStorage.removeItem(k);
+        } catch (e) {}
+      });
+    }
     this.initSeedData();
     this.notifyDataChanged('all');
   }
 
-  // --- Real-Time Sync & Hydration from Supabase ---
+  // --- Lightning-Fast Real-Time Parallel Sync & Hydration from Supabase ---
   static async syncFromSupabase(onSynced?: () => void): Promise<{ success: boolean; count: number; message: string }> {
     const sb = getSupabase();
     if (!sb) {
@@ -643,95 +696,139 @@ export class StorageService {
       return { success: false, count: 0, message: 'Supabase belum dikonfigurasi. Menggunakan data lokal.' };
     }
 
-    try {
-      let totalCount = 0;
-
-      // 1. QC Results
-      const { data: qcData, error: qcErr } = await sb.from('qc_results').select('*').is('deleted_at', null).order('date', { ascending: false });
-      if (!qcErr && qcData) {
-        this.qcResults = qcData.map(mapDbToQCResult);
-        totalCount += this.qcResults.length;
-      }
-
-      // 2. Instruments
-      const { data: instData, error: instErr } = await sb.from('instruments').select('*').is('deleted_at', null);
-      if (!instErr && instData) {
-        this.instruments = instData.map(mapDbToInstrument);
-        totalCount += this.instruments.length;
-      }
-
-      // 3. Control Materials
-      const { data: ctrlData, error: ctrlErr } = await sb.from('control_materials').select('*').is('deleted_at', null);
-      if (!ctrlErr && ctrlData) {
-        this.controlMaterials = ctrlData.map(mapDbToControl);
-        totalCount += this.controlMaterials.length;
-      }
-
-      // 4. Parameters
-      const { data: paramData, error: paramErr } = await sb.from('test_parameters').select('*').is('deleted_at', null);
-      if (!paramErr && paramData) {
-        this.parameters = paramData.map(mapDbToParam);
-        totalCount += this.parameters.length;
-      }
-
-      // 5. Non-Conformities
-      const { data: ncData, error: ncErr } = await sb.from('non_conformities').select('*').is('deleted_at', null);
-      if (!ncErr && ncData) {
-        this.nonConformities = ncData.map(mapDbToNC);
-        totalCount += this.nonConformities.length;
-      }
-
-      // 6. CAPA
-      const { data: capaData, error: capaErr } = await sb.from('capa').select('*').is('deleted_at', null);
-      if (!capaErr && capaData) {
-        this.capas = capaData.map(mapDbToCAPA);
-        totalCount += this.capas.length;
-      }
-
-      // 7. Users
-      const { data: userData, error: userErr } = await sb.from('app_users').select('*');
-      if (!userErr && userData) {
-        this.users = userData.map(mapDbToUser);
-        totalCount += this.users.length;
-      }
-
-      // 7b. Roles
-      const { data: roleData, error: roleErr } = await sb.from('roles').select('*');
-      if (!roleErr && roleData) {
-        this.roles = roleData.map(mapDbToRole);
-        totalCount += this.roles.length;
-      }
-
-      // 8. Laboratories
-      const { data: labData, error: labErr } = await sb.from('laboratories').select('*').limit(1);
-      if (!labErr && labData && labData.length > 0) {
-        this.labInfo = mapDbToLab(labData[0]);
-      }
-
-      // 9. Audit Logs
-      const { data: auditData, error: auditErr } = await sb.from('audit_logs').select('*').order('timestamp', { ascending: false }).limit(100);
-      if (!auditErr && auditData) {
-        this.auditLogs = auditData.map(mapDbToAudit);
-      }
-
-      // 10. Notifications
-      const { data: notifData, error: notifErr } = await sb.from('notifications').select('*').order('timestamp', { ascending: false });
-      if (!notifErr && notifData) {
-        this.notifications = notifData.map(mapDbToNotif);
-      }
-
-      this.initSeedData();
-      this.notifyDataChanged('all');
-      if (onSynced) onSynced();
-
-      return { success: true, count: totalCount, message: 'Sinkronisasi dari Supabase berhasil!' };
-    } catch (err: any) {
-      console.warn('Supabase sync warning (using local fallback):', err);
-      this.initSeedData();
-      this.notifyDataChanged('all');
-      if (onSynced) onSynced();
-      return { success: false, count: 0, message: err.message || 'Gagal sinkronisasi dari Supabase (menggunakan data lokal).' };
+    // Deduplicate in-flight sync requests so menu transitions and components don't spam duplicate network floods
+    if (this.syncPromise) {
+      return this.syncPromise.then((res) => {
+        if (onSynced) onSynced();
+        return res;
+      });
     }
+
+    this.syncPromise = (async () => {
+      try {
+        let totalCount = 0;
+
+        // Fetch ALL tables simultaneously in parallel for instant sub-second response
+        const [
+          qcRes,
+          instRes,
+          ctrlRes,
+          paramRes,
+          ncRes,
+          capaRes,
+          userRes,
+          roleRes,
+          labRes,
+          auditRes,
+          notifRes
+        ] = await Promise.allSettled([
+          sb.from('qc_results').select('*').is('deleted_at', null).order('date', { ascending: false }),
+          sb.from('instruments').select('*').is('deleted_at', null),
+          sb.from('control_materials').select('*').is('deleted_at', null),
+          sb.from('test_parameters').select('*').is('deleted_at', null),
+          sb.from('non_conformities').select('*').is('deleted_at', null),
+          sb.from('capa').select('*').is('deleted_at', null),
+          sb.from('app_users').select('*'),
+          sb.from('roles').select('*'),
+          sb.from('laboratories').select('*').limit(1),
+          sb.from('audit_logs').select('*').order('timestamp', { ascending: false }).limit(100),
+          sb.from('notifications').select('*').order('timestamp', { ascending: false }).limit(50),
+        ]);
+
+        // 1. QC Results
+        if (qcRes.status === 'fulfilled' && !qcRes.value.error && qcRes.value.data) {
+          this.qcResults = qcRes.value.data.map(mapDbToQCResult);
+          totalCount += this.qcResults.length;
+          writeLocalCache(CACHE_KEYS.QC_RESULTS, this.qcResults);
+        }
+
+        // 2. Instruments
+        if (instRes.status === 'fulfilled' && !instRes.value.error && instRes.value.data) {
+          this.instruments = instRes.value.data.map(mapDbToInstrument);
+          totalCount += this.instruments.length;
+          writeLocalCache(CACHE_KEYS.INSTRUMENTS, this.instruments);
+        }
+
+        // 3. Control Materials
+        if (ctrlRes.status === 'fulfilled' && !ctrlRes.value.error && ctrlRes.value.data) {
+          this.controlMaterials = ctrlRes.value.data.map(mapDbToControl);
+          totalCount += this.controlMaterials.length;
+          writeLocalCache(CACHE_KEYS.CONTROLS, this.controlMaterials);
+        }
+
+        // 4. Test Parameters
+        if (paramRes.status === 'fulfilled' && !paramRes.value.error && paramRes.value.data) {
+          this.parameters = paramRes.value.data.map(mapDbToParam);
+          totalCount += this.parameters.length;
+          writeLocalCache(CACHE_KEYS.PARAMETERS, this.parameters);
+        }
+
+        // 5. Non-Conformities
+        if (ncRes.status === 'fulfilled' && !ncRes.value.error && ncRes.value.data) {
+          this.nonConformities = ncRes.value.data.map(mapDbToNC);
+          totalCount += this.nonConformities.length;
+          writeLocalCache(CACHE_KEYS.NON_CONFORMITIES, this.nonConformities);
+        }
+
+        // 6. CAPA
+        if (capaRes.status === 'fulfilled' && !capaRes.value.error && capaRes.value.data) {
+          this.capas = capaRes.value.data.map(mapDbToCAPA);
+          totalCount += this.capas.length;
+          writeLocalCache(CACHE_KEYS.CAPAS, this.capas);
+        }
+
+        // 7. Users
+        if (userRes.status === 'fulfilled' && !userRes.value.error && userRes.value.data) {
+          this.users = userRes.value.data.map(mapDbToUser);
+          totalCount += this.users.length;
+          writeLocalCache(CACHE_KEYS.USERS, this.users);
+        }
+
+        // 7b. Roles
+        if (roleRes.status === 'fulfilled' && !roleRes.value.error && roleRes.value.data) {
+          this.roles = roleRes.value.data.map(mapDbToRole);
+          totalCount += this.roles.length;
+          writeLocalCache(CACHE_KEYS.ROLES, this.roles);
+        }
+
+        // 8. Laboratories
+        if (labRes.status === 'fulfilled' && !labRes.value.error && labRes.value.data && labRes.value.data.length > 0) {
+          this.labInfo = mapDbToLab(labRes.value.data[0]);
+          writeLocalCache(CACHE_KEYS.LAB_INFO, this.labInfo);
+        }
+
+        // 9. Audit Logs
+        if (auditRes.status === 'fulfilled' && !auditRes.value.error && auditRes.value.data) {
+          this.auditLogs = auditRes.value.data.map(mapDbToAudit);
+          writeLocalCache(CACHE_KEYS.AUDIT_LOGS, this.auditLogs);
+        }
+
+        // 10. Notifications
+        if (notifRes.status === 'fulfilled' && !notifRes.value.error && notifRes.value.data) {
+          this.notifications = notifRes.value.data.map(mapDbToNotif);
+          writeLocalCache(CACHE_KEYS.NOTIFICATIONS, this.notifications);
+        }
+
+        // If local cache was completely empty and remote database is empty, seed initial defaults safely
+        if (this.users.length === 0 && this.instruments.length === 0) {
+          this.initSeedData();
+        }
+
+        this.notifyDataChanged('all');
+        if (onSynced) onSynced();
+
+        return { success: true, count: totalCount, message: 'Sinkronisasi dari Supabase berhasil!' };
+      } catch (err: any) {
+        console.warn('Supabase sync warning (using cached data):', err);
+        this.notifyDataChanged('all');
+        if (onSynced) onSynced();
+        return { success: false, count: 0, message: err.message || 'Gagal sinkronisasi dari Supabase (menggunakan cache lokal).' };
+      } finally {
+        this.syncPromise = null;
+      }
+    })();
+
+    return this.syncPromise;
   }
 
   static async pushAllToSupabase(): Promise<{ success: boolean; message: string }> {
@@ -766,20 +863,23 @@ export class StorageService {
         realtimeSubscription.unsubscribe();
       }
 
+      // Single subscription channel with 250ms debounce to avoid sync floods
+      const triggerDebouncedSync = () => {
+        if (this.realtimeDebounceTimer) {
+          clearTimeout(this.realtimeDebounceTimer);
+        }
+        this.realtimeDebounceTimer = setTimeout(() => {
+          StorageService.syncFromSupabase(onDataChanged);
+        }, 250);
+      };
+
       realtimeSubscription = sb
         .channel('lqcms-db-changes')
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'app_users' },
-          async (payload) => {
-            await StorageService.syncFromSupabase(onDataChanged);
-          }
-        )
-        .on(
-          'postgres_changes',
           { event: '*', schema: 'public' },
-          async () => {
-            await StorageService.syncFromSupabase(onDataChanged);
+          () => {
+            triggerDebouncedSync();
           }
         )
         .subscribe();
@@ -797,12 +897,23 @@ export class StorageService {
 
   static notifyDataChanged(type?: string): void {
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('lqcms_data_updated', { detail: { type } }));
       try {
+        if (!type || type === 'all' || type === 'users') writeLocalCache(CACHE_KEYS.USERS, this.users);
+        if (!type || type === 'all' || type === 'roles') writeLocalCache(CACHE_KEYS.ROLES, this.roles);
+        if (!type || type === 'all' || type === 'lab_info') writeLocalCache(CACHE_KEYS.LAB_INFO, this.labInfo);
+        if (!type || type === 'all' || type === 'instruments') writeLocalCache(CACHE_KEYS.INSTRUMENTS, this.instruments);
+        if (!type || type === 'all' || type === 'controls') writeLocalCache(CACHE_KEYS.CONTROLS, this.controlMaterials);
+        if (!type || type === 'all' || type === 'parameters') writeLocalCache(CACHE_KEYS.PARAMETERS, this.parameters);
+        if (!type || type === 'all' || type === 'qc_results') writeLocalCache(CACHE_KEYS.QC_RESULTS, this.qcResults);
+        if (!type || type === 'all' || type === 'non_conformities') writeLocalCache(CACHE_KEYS.NON_CONFORMITIES, this.nonConformities);
+        if (!type || type === 'all' || type === 'capas') writeLocalCache(CACHE_KEYS.CAPAS, this.capas);
+        if (!type || type === 'all' || type === 'audit') writeLocalCache(CACHE_KEYS.AUDIT_LOGS, this.auditLogs);
+        if (!type || type === 'all' || type === 'notifications') writeLocalCache(CACHE_KEYS.NOTIFICATIONS, this.notifications);
         localStorage.setItem('lqcms_last_sync_timestamp', Date.now().toString());
       } catch (e) {
         // ignore
       }
+      window.dispatchEvent(new CustomEvent('lqcms_data_updated', { detail: { type } }));
     }
   }
 
