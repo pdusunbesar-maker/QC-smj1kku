@@ -46,6 +46,8 @@ export interface LaboratoryInfo {
   accreditation: string;
   logoUrl: string;
   logoRightUrl?: string;
+  updatedAt?: string;
+  isCustomSaved?: boolean;
 }
 
 export interface Instrument {

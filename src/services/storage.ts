@@ -38,14 +38,16 @@ const DEFAULT_LAB: LaboratoryInfo = {
 };
 
 // Data Mappers: TypeScript (camelCase) <-> Supabase PostgreSQL (snake_case)
+// Data Mappers: TypeScript (camelCase) <-> Supabase PostgreSQL (snake_case)
 function mapLabToDbFull(info: LaboratoryInfo) {
   return {
     id: info.id || 'lab-rsud-smj1',
     name: info.name,
     hospital_name: info.hospitalName,
+    health_service: info.healthService || DEFAULT_LAB.healthService,
     regency: info.regency,
-    province: info.province,
-    room_unit: info.roomUnit,
+    province: info.province || DEFAULT_LAB.province,
+    room_unit: info.roomUnit || DEFAULT_LAB.roomUnit,
     head_of_lab: info.headOfLab,
     head_nip: info.headNip,
     head_of_quality: info.headOfQuality || 'Siti Rahmawati, S.Tr.Kes',
@@ -55,6 +57,8 @@ function mapLabToDbFull(info: LaboratoryInfo) {
     email: info.email,
     accreditation: info.accreditation,
     logo_url: info.logoUrl,
+    logo_right_url: info.logoRightUrl || null,
+    updated_at: info.updatedAt || new Date().toISOString(),
   };
 }
 
@@ -63,9 +67,10 @@ function mapLabToDbBase(info: LaboratoryInfo) {
     id: info.id || 'lab-rsud-smj1',
     name: info.name,
     hospital_name: info.hospitalName,
+    health_service: info.healthService || DEFAULT_LAB.healthService,
     regency: info.regency,
-    province: info.province,
-    room_unit: info.roomUnit,
+    province: info.province || DEFAULT_LAB.province,
+    room_unit: info.roomUnit || DEFAULT_LAB.roomUnit,
     head_of_lab: info.headOfLab,
     head_nip: info.headNip,
     address: info.address,
@@ -95,24 +100,57 @@ function mapDbToLab(row: any): LaboratoryInfo {
     accreditation: row.accreditation || DEFAULT_LAB.accreditation,
     logoUrl: row.logo_url || row.logoUrl || DEFAULT_LAB.logoUrl,
     logoRightUrl: row.logo_right_url || row.logoRightUrl || '',
+    updatedAt: row.updated_at || row.updatedAt,
+    isCustomSaved: true,
   };
 }
 
+export function isValidUserAvatar(avatar?: string | null): boolean {
+  if (!avatar || typeof avatar !== 'string') return false;
+  const trimmed = avatar.trim();
+  if (!trimmed) return false;
+  // Eliminate all demo model pictures (unsplash, pravatar, randomuser, etc.)
+  if (
+    trimmed.includes('unsplash.com') ||
+    trimmed.includes('images.unsplash') ||
+    trimmed.includes('pravatar.cc') ||
+    trimmed.includes('randomuser.me') ||
+    trimmed.includes('placeholder')
+  ) {
+    return false;
+  }
+  // User-uploaded photos are standard base64 data URLs: data:image/...
+  if (trimmed.startsWith('data:image/')) return true;
+  return trimmed.startsWith('http://') || trimmed.startsWith('https://');
+}
+
+function cleanDemoAvatars(userList: User[]): User[] {
+  return userList.map(u => {
+    if (u.avatar && !isValidUserAvatar(u.avatar)) {
+      return { ...u, avatar: undefined };
+    }
+    return u;
+  });
+}
+
 function mapUserToDb(u: User) {
+  const avatar = isValidUserAvatar(u.avatar) ? u.avatar : null;
   return {
     id: u.id,
     name: u.name,
     email: u.email,
     role: u.role,
-    nip: u.nip,
-    department: u.department,
-    avatar: u.avatar,
+    nip: u.nip || null,
+    department: u.department || null,
+    avatar: avatar,
     is_active: u.isActive ?? true,
     password: u.password || 'password123',
   };
 }
 
 function mapDbToUser(row: any): User {
+  const rawAvatar = row.avatar;
+  const avatar = isValidUserAvatar(rawAvatar) ? rawAvatar : undefined;
   return {
     id: row.id,
     name: row.name || '',
@@ -120,7 +158,7 @@ function mapDbToUser(row: any): User {
     role: row.role || 'analis',
     nip: row.nip || '',
     department: row.department || 'Instalasi Patologi Klinik',
-    avatar: row.avatar,
+    avatar: avatar,
     isActive: row.is_active ?? row.isActive ?? true,
     password: row.password || row.pass || 'password123',
     createdAt: row.created_at || row.createdAt,
@@ -533,12 +571,26 @@ function writeLocalCache(key: string, data: any): void {
   }
 }
 
+export const PERSISTENT_KOP_KEY = 'lqcms_kop_surat_saved_v1';
+
+function getInitialLabInfo(): LaboratoryInfo {
+  const customSaved = readLocalCache<LaboratoryInfo | null>(PERSISTENT_KOP_KEY, null);
+  if (customSaved && customSaved.hospitalName) {
+    return { ...DEFAULT_LAB, ...customSaved, isCustomSaved: true };
+  }
+  const cached = readLocalCache<LaboratoryInfo | null>(CACHE_KEYS.LAB_INFO, null);
+  if (cached && cached.hospitalName) {
+    return { ...DEFAULT_LAB, ...cached };
+  }
+  return DEFAULT_LAB;
+}
+
 let realtimeSubscription: any = null;
 
 export class StorageService {
   // Synchronous local cache for instant menu hydration + background Supabase sync
-  private static labInfo: LaboratoryInfo = readLocalCache(CACHE_KEYS.LAB_INFO, DEFAULT_LAB);
-  private static users: User[] = readLocalCache(CACHE_KEYS.USERS, []);
+  private static labInfo: LaboratoryInfo = getInitialLabInfo();
+  private static users: User[] = cleanDemoAvatars(readLocalCache(CACHE_KEYS.USERS, []));
   private static roles: RoleDefinition[] = readLocalCache(CACHE_KEYS.ROLES, []);
   private static currentUser: User = { id: 'usr-admin', name: 'Admin Lab', email: 'admin@rsudsmj1.kku.go.id', role: 'admin', permissions: [] };
   private static instruments: Instrument[] = readLocalCache(CACHE_KEYS.INSTRUMENTS, []);
@@ -573,7 +625,7 @@ export class StorageService {
           department: 'Penanggung Jawab Laboratorium', 
           isActive: true, 
           password: 'password123',
-          avatar: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=150&auto=format&fit=crop&q=80'
+          avatar: undefined,
         },
         { 
           id: 'usr-sup', 
@@ -584,7 +636,7 @@ export class StorageService {
           department: 'Penanggung Jawab Mutu (PJ Mutu)', 
           isActive: true, 
           password: 'password123',
-          avatar: 'https://images.unsplash.com/photo-1594824813572-132d733737b3?w=150&auto=format&fit=crop&q=80'
+          avatar: undefined,
         },
         { 
           id: 'usr-analis', 
@@ -595,7 +647,7 @@ export class StorageService {
           department: 'Ahli Teknologi Laboratorium Medik (ATLM)', 
           isActive: true, 
           password: 'password123',
-          avatar: 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?w=150&auto=format&fit=crop&q=80'
+          avatar: undefined,
         },
         { 
           id: 'usr-viewer', 
@@ -606,7 +658,7 @@ export class StorageService {
           department: 'Tim Mutu & Akreditasi Rumah Sakit', 
           isActive: true, 
           password: 'password123',
-          avatar: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=150&auto=format&fit=crop&q=80'
+          avatar: undefined,
         },
       ];
       writeLocalCache(CACHE_KEYS.USERS, this.users);
@@ -791,10 +843,37 @@ export class StorageService {
           writeLocalCache(CACHE_KEYS.ROLES, this.roles);
         }
 
-        // 8. Laboratories
+        // 8. Laboratories (Kop Surat & Penanggung Jawab)
         if (labRes.status === 'fulfilled' && !labRes.value.error && labRes.value.data && labRes.value.data.length > 0) {
-          this.labInfo = mapDbToLab(labRes.value.data[0]);
-          writeLocalCache(CACHE_KEYS.LAB_INFO, this.labInfo);
+          const remoteLab = mapDbToLab(labRes.value.data[0]);
+          const localCustom = readLocalCache<LaboratoryInfo | null>(PERSISTENT_KOP_KEY, null);
+
+          if (localCustom && localCustom.isCustomSaved) {
+            const localTime = new Date(localCustom.updatedAt || 0).getTime();
+            const remoteTime = new Date(labRes.value.data[0].updated_at || labRes.value.data[0].updatedAt || 0).getTime();
+
+            if (remoteTime > localTime) {
+              // Remote edit from another session is newer
+              this.labInfo = { ...DEFAULT_LAB, ...remoteLab, isCustomSaved: true };
+              writeLocalCache(CACHE_KEYS.LAB_INFO, this.labInfo);
+              if (typeof window !== 'undefined') {
+                try {
+                  localStorage.setItem(PERSISTENT_KOP_KEY, JSON.stringify(this.labInfo));
+                } catch (e) {}
+              }
+            } else {
+              // Local custom kop is newer or equal, preserve it and never overwrite with stale default
+              this.labInfo = { ...DEFAULT_LAB, ...localCustom, isCustomSaved: true };
+              writeLocalCache(CACHE_KEYS.LAB_INFO, this.labInfo);
+              // Push local custom kop to remote if remote was outdated
+              if (remoteTime < localTime && sb) {
+                sb.from('laboratories').update(mapLabToDbFull(this.labInfo)).eq('id', labRes.value.data[0].id).then();
+              }
+            }
+          } else {
+            this.labInfo = remoteLab;
+            writeLocalCache(CACHE_KEYS.LAB_INFO, this.labInfo);
+          }
         }
 
         // 9. Audit Logs
@@ -900,7 +979,14 @@ export class StorageService {
       try {
         if (!type || type === 'all' || type === 'users') writeLocalCache(CACHE_KEYS.USERS, this.users);
         if (!type || type === 'all' || type === 'roles') writeLocalCache(CACHE_KEYS.ROLES, this.roles);
-        if (!type || type === 'all' || type === 'lab_info') writeLocalCache(CACHE_KEYS.LAB_INFO, this.labInfo);
+        if (!type || type === 'all' || type === 'lab_info') {
+          writeLocalCache(CACHE_KEYS.LAB_INFO, this.labInfo);
+          if (this.labInfo.isCustomSaved) {
+            try {
+              localStorage.setItem(PERSISTENT_KOP_KEY, JSON.stringify(this.labInfo));
+            } catch (e) {}
+          }
+        }
         if (!type || type === 'all' || type === 'instruments') writeLocalCache(CACHE_KEYS.INSTRUMENTS, this.instruments);
         if (!type || type === 'all' || type === 'controls') writeLocalCache(CACHE_KEYS.CONTROLS, this.controlMaterials);
         if (!type || type === 'all' || type === 'parameters') writeLocalCache(CACHE_KEYS.PARAMETERS, this.parameters);
@@ -917,24 +1003,58 @@ export class StorageService {
     }
   }
 
-  // --- Laboratory Info ---
+  // --- Laboratory Info (Kop Surat Laporan Resmi) ---
   static getLabInfo(): LaboratoryInfo {
     return this.labInfo;
   }
 
-  static async updateLabInfo(info: LaboratoryInfo): Promise<void> {
-    this.labInfo = { ...DEFAULT_LAB, ...info };
+  static async updateLabInfo(info: LaboratoryInfo): Promise<{ success: boolean; message?: string }> {
+    const updatedLab: LaboratoryInfo = {
+      ...DEFAULT_LAB,
+      ...this.labInfo,
+      ...info,
+      updatedAt: new Date().toISOString(),
+      isCustomSaved: true,
+    };
+    this.labInfo = updatedLab;
+
+    // Immediately persist locally across both storage keys
+    writeLocalCache(CACHE_KEYS.LAB_INFO, this.labInfo);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(PERSISTENT_KOP_KEY, JSON.stringify(this.labInfo));
+      } catch (e) {
+        console.warn('LocalStorage save kop warning:', e);
+      }
+    }
+
     this.notifyDataChanged('lab_info');
 
     const sb = getSupabase();
     if (sb) {
       try {
-        const { error } = await sb.from('laboratories').upsert(mapLabToDbFull(this.labInfo));
-        if (error) console.error('Supabase updateLabInfo error:', error);
+        const payload = mapLabToDbFull(this.labInfo);
+        // Find existing record in laboratories table to update its specific row
+        const { data: existingRows } = await sb.from('laboratories').select('id').limit(1);
+        if (existingRows && existingRows.length > 0) {
+          const rowId = existingRows[0].id;
+          payload.id = rowId;
+          this.labInfo.id = rowId;
+          const { error: updateErr } = await sb.from('laboratories').update(payload).eq('id', rowId);
+          if (updateErr) {
+            console.warn('Supabase update laboratories failed, trying upsert:', updateErr);
+            await sb.from('laboratories').upsert(payload);
+          }
+        } else {
+          const { error: upsertErr } = await sb.from('laboratories').upsert(payload);
+          if (upsertErr) console.error('Supabase updateLabInfo upsert error:', upsertErr);
+        }
       } catch (err) {
         console.error('Supabase updateLabInfo network error:', err);
       }
     }
+
+    return { success: true };
   }
 
   // --- Users & Roles ---

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   Users, 
   UserPlus, 
@@ -23,7 +23,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { User, RoleDefinition } from '../../types';
 import { SYSTEM_PERMISSIONS } from '../../services/demoData';
-import { PRESET_MODEL_AVATARS, compressAvatarImage } from '../../utils/imageUtils';
+import { compressAvatarImage } from '../../utils/imageUtils';
 
 export const UserManagementView: React.FC = () => {
   const { 
@@ -62,22 +62,27 @@ export const UserManagementView: React.FC = () => {
   });
 
   const [isProcessingAvatar, setIsProcessingAvatar] = useState(false);
+  const [avatarUploadError, setAvatarUploadError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 8 * 1024 * 1024) {
-      alert('Ukuran file foto terlalu besar. Maksimal 8MB.');
+    if (file.size > 12 * 1024 * 1024) {
+      setAvatarUploadError('Ukuran file foto terlalu besar. Maksimal 12MB.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
     try {
       setIsProcessingAvatar(true);
+      setAvatarUploadError('');
       const compressed = await compressAvatarImage(file, 256, 0.85);
       setFormData(prev => ({ ...prev, avatar: compressed }));
     } catch (err: any) {
-      alert(err.message || 'Gagal memproses gambar foto profil.');
+      setAvatarUploadError(err.message || 'Gagal memproses gambar foto profil.');
     } finally {
       setIsProcessingAvatar(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -121,6 +126,7 @@ export const UserManagementView: React.FC = () => {
       isActive: true,
     });
     setModalError('');
+    setAvatarUploadError('');
     setShowAddUserModal(true);
   };
 
@@ -137,6 +143,7 @@ export const UserManagementView: React.FC = () => {
       isActive: u.isActive !== false,
     });
     setModalError('');
+    setAvatarUploadError('');
     setShowAddUserModal(true);
   };
 
@@ -592,81 +599,88 @@ export const UserManagementView: React.FC = () => {
 
             <form onSubmit={handleSaveUser} className="space-y-3 text-xs">
               {/* Foto Profil Field */}
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
-                <div className="flex items-center gap-3">
-                  {formData.avatar ? (
-                    <img
-                      src={formData.avatar}
-                      alt="Preview Foto"
-                      className="h-12 w-12 rounded-lg object-cover border border-slate-200 shrink-0"
-                    />
-                  ) : (
-                    <div className="h-12 w-12 rounded-lg bg-slate-800 text-white font-bold text-base flex items-center justify-center shrink-0">
-                      {formData.name ? formData.name.charAt(0) : '?'}
-                    </div>
-                  )}
-                  <div className="flex-1 space-y-1">
-                    <label className="block font-semibold text-slate-800">
-                      Foto Profil Pengguna
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                <div className="flex items-center gap-3.5">
+                    <label 
+                      htmlFor="user-mgmt-avatar-file-input" 
+                      className="relative shrink-0 cursor-pointer group"
+                      title="Klik untuk memilih foto"
+                    >
+                      {formData.avatar ? (
+                        <img
+                          src={formData.avatar}
+                          alt="Preview Foto"
+                          className="h-14 w-14 rounded-xl object-cover border-2 border-[#0F9D91] shadow-2xs group-hover:opacity-90 transition-opacity"
+                        />
+                      ) : (
+                        <div className="h-14 w-14 rounded-xl bg-[#142536] text-white font-bold text-lg flex items-center justify-center shadow-2xs group-hover:bg-[#1a324b] transition-colors">
+                          {formData.name ? formData.name.charAt(0).toUpperCase() : '?'}
+                        </div>
+                      )}
+                      {formData.avatar && (
+                        <span className="absolute -bottom-1 -right-1 h-3.5 w-3.5 bg-[#16845B] border-2 border-white rounded-full" title="Foto Terunggah" />
+                      )}
                     </label>
-                    <div className="flex items-center gap-2">
-                      <label className="flex items-center gap-1 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-900 text-white font-semibold text-[11px] cursor-pointer transition-colors">
-                        {isProcessingAvatar ? (
-                          <>
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                            <span>Memproses...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Upload className="h-3 w-3" />
-                            <span>Unggah Foto</span>
-                          </>
-                        )}
+
+                    <div className="flex-1 min-w-0 space-y-1.5">
+                      <div>
+                        <p className="font-semibold text-slate-800 text-xs">
+                          Foto Profil Pengguna
+                        </p>
+                        <p className="text-[11px] text-slate-500">
+                          {formData.avatar ? 'Foto profil aktif (tersimpan di sistem & database)' : 'Pilih dan unggah foto resmi staf lab (JPG, PNG, WEBP)'}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
                         <input
+                          ref={fileInputRef}
                           type="file"
                           accept="image/*"
                           onChange={handleAvatarUpload}
                           disabled={isProcessingAvatar}
-                          className="hidden"
+                          className="sr-only"
+                          id="user-mgmt-avatar-file-input"
                         />
-                      </label>
-                      {formData.avatar && (
-                        <button
-                          type="button"
-                          onClick={() => setFormData({ ...formData, avatar: '' })}
-                          className="text-[11px] text-rose-600 hover:underline font-semibold"
+                        <label
+                          htmlFor="user-mgmt-avatar-file-input"
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0F9D91] hover:bg-[#0B8279] text-white font-semibold text-xs cursor-pointer transition-colors shadow-2xs ${isProcessingAvatar ? 'opacity-50 pointer-events-none' : ''}`}
                         >
-                          Hapus Foto
-                        </button>
-                      )}
+                          {isProcessingAvatar ? (
+                            <>
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              <span>Memproses Foto...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="h-3.5 w-3.5" />
+                              <span>{formData.avatar ? 'Ganti Foto' : 'Pilih & Unggah Foto'}</span>
+                            </>
+                          )}
+                        </label>
+
+                        {formData.avatar && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormData(prev => ({ ...prev, avatar: '' }));
+                              setAvatarUploadError('');
+                              if (fileInputRef.current) fileInputRef.current.value = '';
+                            }}
+                            className="px-2.5 py-1.5 text-xs text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-lg font-semibold transition-colors cursor-pointer"
+                          >
+                            Hapus Foto
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Preset Avatars for quick selection */}
-                <div className="pt-2 border-t border-slate-200/70">
-                  <span className="text-[10px] text-slate-500 font-medium block mb-1">
-                    Pilih Foto Model Medis/ATLM:
-                  </span>
-                  <div className="grid grid-cols-4 gap-1">
-                    {PRESET_MODEL_AVATARS.map((p) => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => setFormData({ ...formData, avatar: p.url })}
-                        className={`flex items-center gap-1 p-1 rounded-md border text-left transition-all cursor-pointer ${
-                          formData.avatar === p.url
-                            ? 'border-emerald-600 bg-emerald-50 ring-1 ring-emerald-500'
-                            : 'border-slate-200 bg-white hover:bg-slate-100'
-                        }`}
-                        title={p.label}
-                      >
-                        <img src={p.url} alt={p.label} className="h-5 w-5 rounded object-cover shrink-0" />
-                        <span className="text-[9px] text-slate-700 truncate block">{p.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                {avatarUploadError && (
+                  <p className="text-[11px] text-rose-600 font-medium">
+                    {avatarUploadError}
+                  </p>
+                )}
               </div>
 
               <div>

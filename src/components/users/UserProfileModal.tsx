@@ -18,8 +18,7 @@ import {
 } from 'lucide-react';
 import { User as UserType } from '../../types';
 import { useAuth } from '../../context/AuthContext';
-import { StorageService } from '../../services/storage';
-import { PRESET_MODEL_AVATARS, compressAvatarImage } from '../../utils/imageUtils';
+import { compressAvatarImage } from '../../utils/imageUtils';
 
 interface UserProfileModalProps {
   isOpen: boolean;
@@ -147,104 +146,87 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
           )}
 
           {/* FOTO PROFIL SECTION */}
-          <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-3 text-center">
-            <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
-              Foto Profil Pengguna
-            </label>
-
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-3">
+            <div className="flex flex-col sm:flex-row items-center gap-4">
               {/* Avatar Preview */}
-              <div className="relative group shrink-0">
+              <label 
+                htmlFor="profile-photo-input" 
+                className="relative group shrink-0 cursor-pointer"
+                title="Pilih dan unggah foto profil"
+              >
                 {form.avatar ? (
                   <img
                     src={form.avatar}
                     alt={form.name}
-                    className="h-20 w-20 rounded-2xl object-cover border-2 border-emerald-600 shadow-md"
+                    className="h-20 w-20 rounded-2xl object-cover border-2 border-emerald-600 shadow-md group-hover:opacity-90 transition-opacity"
                   />
                 ) : (
-                  <div className="h-20 w-20 rounded-2xl bg-slate-900 text-white font-black text-2xl flex items-center justify-center border-2 border-slate-800 shadow-md">
+                  <div className="h-20 w-20 rounded-2xl bg-slate-900 text-white font-black text-2xl flex items-center justify-center border-2 border-slate-800 shadow-md group-hover:bg-slate-800 transition-colors">
                     {form.name.charAt(0)}
                   </div>
                 )}
                 
-                <label 
-                  htmlFor="profile-photo-input" 
-                  className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-700 text-white shadow-md hover:bg-emerald-800 cursor-pointer transition-transform group-hover:scale-110"
-                  title="Unggah Foto Baru"
+                <div 
+                  className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-700 text-white shadow-md hover:bg-emerald-800 transition-transform group-hover:scale-110"
                 >
-                  <Camera className="h-3.5 w-3.5" />
-                </label>
+                  {isProcessingPhoto ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Camera className="h-3.5 w-3.5" />
+                  )}
+                </div>
                 <input
                   id="profile-photo-input"
                   type="file"
                   accept="image/*"
                   onChange={handleFileUpload}
+                  disabled={isProcessingPhoto}
                   className="hidden"
                 />
-              </div>
+              </label>
 
-              {/* Upload Controls & URL */}
+              {/* Upload Controls */}
               <div className="space-y-2 text-left flex-1 w-full">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Unggah File Foto atau Masukkan URL:
-                  </label>
-                  <input
-                    type="text"
-                    value={form.avatar || ''}
-                    onChange={(e) => setForm({ ...form, avatar: e.target.value })}
-                    placeholder="URL gambar foto profil..."
-                    className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs bg-white focus:border-emerald-500 focus:outline-none font-mono"
-                  />
+                  <h4 className="font-bold text-slate-800 text-xs">
+                    Foto Profil Pengguna
+                  </h4>
+                  <p className="text-[11px] text-slate-500">
+                    {form.avatar 
+                      ? 'Foto profil Anda aktif dan tersimpan di database.' 
+                      : 'Belum ada foto. Unggah foto resmi Anda dari komputer atau HP (JPG, PNG, WEBP).'}
+                  </p>
                 </div>
 
                 <div className="flex items-center gap-2">
                   <label
                     htmlFor="profile-photo-input"
-                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-900 text-white font-semibold cursor-pointer transition-colors"
+                    className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-semibold cursor-pointer transition-colors shadow-2xs text-xs ${isProcessingPhoto ? 'opacity-50 pointer-events-none' : ''}`}
                   >
-                    <Upload className="h-3.5 w-3.5" />
-                    <span>Pilih Foto dari Komputer / HP</span>
+                    {isProcessingPhoto ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        <span>Memproses...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-3.5 w-3.5" />
+                        <span>{form.avatar ? 'Ganti Foto' : 'Pilih & Unggah Foto'}</span>
+                      </>
+                    )}
                   </label>
                   
                   {form.avatar && (
                     <button
                       type="button"
                       onClick={() => setForm({ ...form, avatar: '' })}
-                      className="px-2.5 py-1.5 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-lg font-semibold"
+                      className="px-2.5 py-1.5 text-xs text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-lg font-semibold cursor-pointer transition-colors"
                       title="Hapus foto profil"
                     >
                       Hapus Foto
                     </button>
                   )}
                 </div>
-              </div>
-            </div>
-
-            {/* Preset Avatars */}
-            <div className="pt-2 border-t border-slate-200/80">
-              <span className="text-[10px] text-slate-500 font-medium block mb-1.5">
-                Atau pilih dari foto model medis & laboratorium siap pakai:
-              </span>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                {PRESET_MODEL_AVATARS.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => setForm({ ...form, avatar: p.url })}
-                    className={`flex items-center gap-1.5 p-1.5 rounded-lg border text-left transition-all cursor-pointer ${
-                      form.avatar === p.url 
-                        ? 'border-emerald-600 bg-emerald-50/80 ring-2 ring-emerald-500/20 shadow-xs' 
-                        : 'border-slate-200 bg-white hover:bg-slate-100'
-                    }`}
-                  >
-                    <img src={p.url} alt={p.label} className="h-7 w-7 rounded-md object-cover shrink-0" />
-                    <div className="overflow-hidden min-w-0">
-                      <span className="text-[10px] text-slate-800 font-semibold block truncate leading-tight">{p.label}</span>
-                      <span className="text-[9px] text-slate-400 block">{p.category}</span>
-                    </div>
-                  </button>
-                ))}
               </div>
             </div>
           </div>

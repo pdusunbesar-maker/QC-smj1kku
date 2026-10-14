@@ -202,6 +202,7 @@ function AppContent() {
             {/* 1. Dashboard View */}
             {activeTab === 'dashboard' && (
               <DashboardView
+                labInfo={labInfo}
                 qcResults={qcResults}
                 capas={capas}
                 nonConformities={nonConformities}
@@ -296,6 +297,7 @@ function AppContent() {
                     parameter={selectedChartParam}
                     results={qcResults}
                     labInfo={labInfo}
+                    onLabInfoUpdated={(info) => setLabInfo(info)}
                     onCreateCapa={(res) => handleNavigateToTab('capa', { fromQc: res })}
                     onCreateNC={(res) => handleNavigateToTab('non-conformity', { fromQc: res })}
                   />

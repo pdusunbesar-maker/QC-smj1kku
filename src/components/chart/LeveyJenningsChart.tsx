@@ -37,6 +37,7 @@ interface LeveyJenningsChartProps {
   onSelectResult?: (result: QCResult) => void;
   onCreateCapa?: (result: QCResult) => void;
   onCreateNC?: (result: QCResult) => void;
+  onLabInfoUpdated?: (info: LaboratoryInfo) => void;
 }
 
 export interface PlottedQCPoint {
@@ -71,6 +72,7 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
   onSelectResult,
   onCreateCapa,
   onCreateNC,
+  onLabInfoUpdated,
 }) => {
   const labInfo = propLabInfo || StorageService.getLabInfo();
   const [selectedLevel, setSelectedLevel] = useState<'all' | 'Level 1' | 'Level 2' | 'Level 3'>('all');
@@ -1506,6 +1508,9 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
         isOpen={isKopModalOpen}
         onClose={() => setIsKopModalOpen(false)}
         labInfo={labInfo}
+        onSaved={(updated) => {
+          if (onLabInfoUpdated) onLabInfoUpdated(updated);
+        }}
       />
     </div>
   );

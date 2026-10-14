@@ -8,10 +8,12 @@ import {
   Save, 
   X, 
   CheckCircle2, 
-  AlertCircle 
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
 import { LaboratoryInfo } from '../../types';
 import { StorageService } from '../../services/storage';
+import { compressLogoImage } from '../../utils/imageUtils';
 
 interface KopEditorModalProps {
   isOpen: boolean;
@@ -28,41 +30,54 @@ export const KopEditorModal: React.FC<KopEditorModalProps> = ({
 }) => {
   const [form, setForm] = useState<LaboratoryInfo>({ ...labInfo });
   const [isSavedSuccess, setIsSavedSuccess] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isProcessingLogo, setIsProcessingLogo] = useState(false);
+  const [logoError, setLogoError] = useState('');
 
   useEffect(() => {
     if (isOpen) {
       setForm({ ...labInfo });
       setIsSavedSuccess(false);
+      setLogoError('');
     }
   }, [isOpen, labInfo]);
 
   if (!isOpen) return null;
 
-  const handleLogoFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 2 * 1024 * 1024) {
-      alert('Ukuran file logo terlalu besar. Gunakan file gambar di bawah 2MB.');
+    if (file.size > 8 * 1024 * 1024) {
+      setLogoError('Ukuran file logo terlalu besar. Maksimal 8MB.');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      if (evt.target?.result) {
-        setForm(prev => ({ ...prev, logoUrl: evt.target!.result as string }));
-      }
-    };
-    reader.readAsDataURL(file);
+    try {
+      setIsProcessingLogo(true);
+      setLogoError('');
+      const compressed = await compressLogoImage(file, 400, 0.88);
+      setForm(prev => ({ ...prev, logoUrl: compressed }));
+    } catch (err: any) {
+      setLogoError(err.message || 'Gagal memproses gambar logo.');
+    } finally {
+      setIsProcessingLogo(false);
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
+
     const updated: LaboratoryInfo = {
       ...form,
+      id: form.id || labInfo.id || 'lab-rsud-smj1',
       name: form.name.trim(),
       hospitalName: form.hospitalName.trim(),
+      healthService: (form.healthService || '').trim(),
       regency: form.regency.trim(),
+      province: (form.province || '').trim(),
+      roomUnit: (form.roomUnit || '').trim(),
       address: form.address.trim(),
       phone: form.phone.trim(),
       email: form.email.trim(),
@@ -72,18 +87,26 @@ export const KopEditorModal: React.FC<KopEditorModalProps> = ({
       headOfQuality: (form.headOfQuality || '').trim(),
       qualityNip: (form.qualityNip || '').trim(),
       logoUrl: form.logoUrl || '/logo_kayong_utara.png',
+      logoRightUrl: (form.logoRightUrl || '').trim() || undefined,
+      isCustomSaved: true,
+      updatedAt: new Date().toISOString(),
     };
 
-    StorageService.updateLabInfo(updated);
-    if (onSaved) {
-      onSaved(updated);
-    }
+    try {
+      await StorageService.updateLabInfo(updated);
+      if (onSaved) {
+        onSaved(updated);
+      }
 
-    setIsSavedSuccess(true);
-    setTimeout(() => {
-      setIsSavedSuccess(false);
-      onClose();
-    }, 800);
+      setIsSavedSuccess(true);
+      setTimeout(() => {
+        setIsSavedSuccess(false);
+        setIsSubmitting(false);
+        onClose();
+      }, 700);
+    } catch (err) {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -292,8 +315,8 @@ export const KopEditorModal: React.FC<KopEditorModalProps> = ({
             </div>
 
             {/* LOGO SELECTION & UPLOAD */}
-            <div className="pt-2 border-t border-slate-100">
-              <label className="block font-semibold text-slate-700 mb-1.5">
+            <div className="pt-2 border-t border-slate-100 space-y-1.5">
+              <label className="block font-semibold text-slate-700">
                 Logo Instansi KOP Surat:
               </label>
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
@@ -305,19 +328,36 @@ export const KopEditorModal: React.FC<KopEditorModalProps> = ({
                   className="flex-1 rounded-lg border border-slate-200 px-3 py-2 font-mono text-xs focus:border-emerald-500 focus:outline-none"
                 />
                 
-                <label className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-900 text-white font-semibold cursor-pointer shrink-0 transition-colors">
-                  <Upload className="h-3.5 w-3.5" />
-                  <span>Unggah Gambar Logo</span>
+                <label className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-900 text-white font-semibold cursor-pointer shrink-0 transition-colors ${isProcessingLogo ? 'opacity-60 pointer-events-none' : ''}`}>
+                  {isProcessingLogo ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Memproses Logo...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-3.5 w-3.5" />
+                      <span>Unggah Gambar Logo</span>
+                    </>
+                  )}
                   <input
                     type="file"
                     accept="image/*"
                     onChange={handleLogoFileUpload}
+                    disabled={isProcessingLogo}
                     className="hidden"
                   />
                 </label>
               </div>
-              <p className="text-[10px] text-slate-400 mt-1">
-                Format: PNG/JPG/SVG. Klik "Unggah Gambar Logo" untuk memilih gambar logo instansi Anda sendiri.
+
+              {logoError && (
+                <p className="text-[11px] text-rose-600 font-medium">
+                  {logoError}
+                </p>
+              )}
+
+              <p className="text-[10px] text-slate-400">
+                Format: PNG/JPG/SVG. Gambar dikompresi otomatis agar proporsional dan tersimpan permanen.
               </p>
             </div>
           </div>
@@ -397,10 +437,20 @@ export const KopEditorModal: React.FC<KopEditorModalProps> = ({
             </button>
             <button
               type="submit"
-              className="flex items-center gap-1.5 px-5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-semibold shadow-xs transition-colors"
+              disabled={isSubmitting || isProcessingLogo}
+              className="flex items-center gap-1.5 px-5 py-2 bg-emerald-700 hover:bg-emerald-800 disabled:bg-emerald-700/60 text-white rounded-lg font-semibold shadow-xs transition-colors cursor-pointer"
             >
-              <Save className="h-4 w-4" />
-              <span>Simpan KOP Surat & Tanda Tangan</span>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Menyimpan KOP...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4" />
+                  <span>Simpan KOP Surat & Tanda Tangan</span>
+                </>
+              )}
             </button>
           </div>
         </form>

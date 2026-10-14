@@ -135,12 +135,17 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
     setItemToDelete(null);
   };
 
-  // Save Lab Profile
-  const handleSaveLab = (e: React.FormEvent) => {
+  // Save Lab Profile (Kop Surat)
+  const handleSaveLab = async (e: React.FormEvent) => {
     e.preventDefault();
-    StorageService.updateLabInfo(labForm);
+    const updated: LaboratoryInfo = {
+      ...labForm,
+      isCustomSaved: true,
+      updatedAt: new Date().toISOString(),
+    };
+    await StorageService.updateLabInfo(updated);
     StorageService.logAudit('UPDATE_MASTER_DATA', `Memperbarui profil laboratorium RSUD SMJ I`);
-    onLabInfoUpdated(labForm);
+    onLabInfoUpdated(updated);
     setLabSaved(true);
     setTimeout(() => setLabSaved(false), 3000);
   };

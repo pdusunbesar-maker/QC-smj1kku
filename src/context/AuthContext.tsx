@@ -232,7 +232,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       password: newUser.password || 'password123',
     };
 
-    await StorageService.saveUser(fullUser);
+    const saveRes = await StorageService.saveUser(fullUser);
+    if (!saveRes.success) {
+      return { success: false, message: saveRes.message || 'Gagal menyimpan data pengguna ke database.' };
+    }
+
     await StorageService.logAudit(
       'UPDATE_MASTER_DATA',
       `Menambahkan pengguna baru: ${fullUser.name} (${fullUser.email}) dengan peran ${fullUser.role}`,

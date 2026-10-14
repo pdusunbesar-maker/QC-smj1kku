@@ -44,6 +44,7 @@ import { MultiInstrumentComparisonPanel } from './panels/MultiInstrumentComparis
 import { RunningAverageAlertService } from '../../services/runningAverageAlertService';
 
 interface DashboardViewProps {
+  labInfo?: LaboratoryInfo;
   qcResults: QCResult[];
   capas: CAPA[];
   nonConformities: NonConformity[];
@@ -55,6 +56,7 @@ interface DashboardViewProps {
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
+  labInfo: propLabInfo,
   qcResults,
   capas,
   nonConformities,
@@ -65,7 +67,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onNavigateToTab,
 }) => {
   const { user } = useAuth();
-  const labInfo = useMemo(() => StorageService.getLabInfo(), []);
+  const labInfo = propLabInfo || StorageService.getLabInfo();
   const [isPrintPreviewOpen, setIsPrintPreviewOpen] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<'today' | '7d' | '30d' | 'all'>('today');
   const [selectedPreviewParamId, setSelectedPreviewParamId] = useState<string>(parameters[0]?.id || '');
