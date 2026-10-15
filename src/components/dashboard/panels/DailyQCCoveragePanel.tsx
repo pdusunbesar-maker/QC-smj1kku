@@ -5,7 +5,6 @@ import {
   Clock, 
   ListTodo, 
   ArrowRight, 
-  Camera, 
   Plus, 
   Sparkles, 
   ShieldCheck, 
@@ -124,11 +123,11 @@ export const DailyQCCoveragePanel: React.FC<DailyQCCoveragePanelProps> = ({
         {/* Quick Nav Button */}
         <button
           type="button"
-          onClick={() => onNavigateToTab('qc-scan')}
+          onClick={() => onNavigateToTab('qc-input')}
           className="flex items-center justify-center gap-2 h-9 px-4 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-xs transition-all cursor-pointer shrink-0 self-start sm:self-center"
         >
-          <Camera className="h-4 w-4" />
-          <span>Scan Struk / Foto QC</span>
+          <Plus className="h-4 w-4" />
+          <span>Input QC Harian</span>
         </button>
       </div>
 
@@ -359,7 +358,7 @@ export const DailyQCCoveragePanel: React.FC<DailyQCCoveragePanelProps> = ({
                   Belum Ada QC Dimulai Hari Ini
                 </p>
                 <p className="text-[11px]">
-                  Gunakan tombol Input QC / Scan QC untuk memulai pengujian hari ini.
+                  Gunakan tombol Input QC untuk memulai pengujian hari ini.
                 </p>
               </div>
             )}

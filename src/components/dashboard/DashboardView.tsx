@@ -21,7 +21,6 @@ import {
   Check, 
   ExternalLink,
   CalendarDays,
-  Camera,
   X,
   Sparkles,
   BellRing,
@@ -621,14 +620,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             >
               <Printer className="h-4 w-4 text-[#647586]" />
               <span>Ekspor PDF</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => onNavigateToTab('qc-scan')}
-              className="flex items-center gap-1.5 h-9 px-3.5 text-xs font-semibold text-[#0F9D91] bg-teal-50/50 border border-teal-200/80 hover:bg-teal-50 rounded-lg shadow-2xs transition-all active:scale-[0.98] cursor-pointer"
-            >
-              <Camera className="h-4 w-4 text-[#0F9D91]" />
-              <span>Scan QC</span>
             </button>
             <button
               type="button"
