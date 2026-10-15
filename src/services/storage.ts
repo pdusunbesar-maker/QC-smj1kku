@@ -249,41 +249,57 @@ function mapDbToControl(row: any): ControlMaterial {
   };
 }
 
-function mapParamToDb(p: Parameter) {
+function mapParamToDb(p: any) {
+  const targetMean = Number(p.targetMean ?? p.target_mean ?? 0);
+  const targetSd = Number(p.targetSD ?? p.targetSd ?? p.target_sd ?? 0);
+  const targetCv = Number(p.targetCV ?? p.targetCv ?? p.target_cv ?? 0);
+  const minAcceptable = Number(p.minAcceptable ?? p.min_acceptable ?? (targetMean - 3 * targetSd));
+  const maxAcceptable = Number(p.maxAcceptable ?? p.max_acceptable ?? (targetMean + 3 * targetSd));
+  const decimalPlaces = Number(p.decimalPlaces ?? p.decimal_places ?? 1);
+
   return {
-    id: p.id,
-    code: p.code,
-    name: p.name,
-    unit: p.unit,
-    method: p.method,
-    instrument_id: p.instrumentId || null,
-    control_material_id: p.controlMaterialId || null,
-    target_mean: Number(p.targetMean),
-    target_sd: Number(p.targetSd),
-    target_cv: Number(p.targetCv),
-    min_acceptable: Number(p.minAcceptable),
-    max_acceptable: Number(p.maxAcceptable),
-    decimal_places: Number(p.decimalPlaces ?? 1),
-    is_active: p.isActive ?? true,
+    id: p.id || `param-${Date.now().toString().slice(-4)}`,
+    code: p.code || p.id || 'PARAM',
+    name: p.name || 'Parameter Pemeriksaan',
+    unit: p.unit || '',
+    method: p.method || '',
+    instrument_id: p.instrumentId || p.instrument_id || null,
+    control_material_id: p.controlMaterialId || p.control_material_id || null,
+    target_mean: isNaN(targetMean) ? 0 : targetMean,
+    target_sd: isNaN(targetSd) ? 0 : targetSd,
+    target_cv: isNaN(targetCv) ? 0 : targetCv,
+    min_acceptable: isNaN(minAcceptable) ? 0 : minAcceptable,
+    max_acceptable: isNaN(maxAcceptable) ? 0 : maxAcceptable,
+    decimal_places: isNaN(decimalPlaces) ? 1 : decimalPlaces,
+    is_active: p.isActive ?? p.is_active ?? true,
   };
 }
 
 function mapDbToParam(row: any): Parameter {
+  const targetMean = Number(row.target_mean ?? row.targetMean ?? 0);
+  const targetSd = Number(row.target_sd ?? row.targetSd ?? row.targetSD ?? 0);
+  const targetCv = Number(row.target_cv ?? row.targetCv ?? row.targetCV ?? 0);
+  const minAcceptable = Number(row.min_acceptable ?? row.minAcceptable ?? (targetMean - 3 * targetSd));
+  const maxAcceptable = Number(row.max_acceptable ?? row.maxAcceptable ?? (targetMean + 3 * targetSd));
+  const decimalPlaces = Number(row.decimal_places ?? row.decimalPlaces ?? 1);
+
   return {
     id: row.id,
-    code: row.code,
+    code: row.code || row.id,
     name: row.name,
-    unit: row.unit,
-    method: row.method,
-    instrumentId: row.instrument_id || row.instrumentId,
-    controlMaterialId: row.control_material_id || row.controlMaterialId,
-    targetMean: Number(row.target_mean ?? row.targetMean),
-    targetSd: Number(row.target_sd ?? row.targetSd),
-    targetCv: Number(row.target_cv ?? row.targetCv),
-    minAcceptable: Number(row.min_acceptable ?? row.minAcceptable),
-    maxAcceptable: Number(row.max_acceptable ?? row.maxAcceptable),
-    decimal_places: row.decimal_places,
-    decimalPlaces: row.decimal_places ?? row.decimalPlaces ?? 1,
+    unit: row.unit || '',
+    method: row.method || '',
+    instrumentId: row.instrument_id || row.instrumentId || '',
+    controlMaterialId: row.control_material_id || row.controlMaterialId || '',
+    targetMean: isNaN(targetMean) ? 0 : targetMean,
+    targetSD: isNaN(targetSd) ? 0 : targetSd,
+    targetSd: isNaN(targetSd) ? 0 : targetSd,
+    targetCV: isNaN(targetCv) ? 0 : targetCv,
+    targetCv: isNaN(targetCv) ? 0 : targetCv,
+    minAcceptable: isNaN(minAcceptable) ? 0 : minAcceptable,
+    maxAcceptable: isNaN(maxAcceptable) ? 0 : maxAcceptable,
+    decimal_places: isNaN(decimalPlaces) ? 1 : decimalPlaces,
+    decimalPlaces: isNaN(decimalPlaces) ? 1 : decimalPlaces,
     isActive: row.is_active ?? row.isActive ?? true,
     deletedAt: row.deleted_at || row.deletedAt || undefined,
   };
@@ -810,9 +826,48 @@ export class StorageService {
 
         // 4. Test Parameters
         if (paramRes.status === 'fulfilled' && !paramRes.value.error && paramRes.value.data) {
-          this.parameters = paramRes.value.data.map(mapDbToParam);
-          totalCount += this.parameters.length;
-          writeLocalCache(CACHE_KEYS.PARAMETERS, this.parameters);
+          const remoteRows = paramRes.value.data;
+          if (remoteRows.length > 0) {
+            const remoteParams = remoteRows.map(mapDbToParam);
+            const remoteIds = new Set(remoteParams.map(p => p.id));
+            // Retain local-only parameters that were created or edited locally and not deleted
+            const localOnly = this.parameters.filter(
+              p => !remoteIds.has(p.id) && !this.deletedParamIds.includes(p.id) && !p.deletedAt
+            );
+            if (localOnly.length > 0 && sb) {
+              // Upload local-only parameters to Supabase so remote stays completely synced
+              sb.from('test_parameters').upsert(localOnly.map(mapParamToDb)).then();
+            }
+            this.parameters = [...remoteParams, ...localOnly];
+            totalCount += this.parameters.length;
+            writeLocalCache(CACHE_KEYS.PARAMETERS, this.parameters);
+          } else {
+            // Database Supabase is empty:
+            // "Pertahankan data lokal dan otomatis unggah ke Supabase"
+            if (this.parameters.length > 0) {
+              const activeParams = this.parameters.filter(p => !this.deletedParamIds.includes(p.id) && !p.deletedAt);
+              if (activeParams.length > 0) {
+                totalCount += activeParams.length;
+                writeLocalCache(CACHE_KEYS.PARAMETERS, activeParams);
+                if (sb) {
+                  sb.from('test_parameters').upsert(activeParams.map(mapParamToDb)).then(({ error }) => {
+                    if (error) console.warn('Supabase auto-upload local parameters error:', error);
+                    else console.log('Sukses auto-upload parameter pemeriksaan lokal ke Supabase');
+                  });
+                }
+              }
+            } else {
+              // Both remote and local are empty: populate defaults and auto-upload
+              this.initSeedData();
+              if (this.parameters.length > 0) {
+                totalCount += this.parameters.length;
+                writeLocalCache(CACHE_KEYS.PARAMETERS, this.parameters);
+                if (sb) {
+                  sb.from('test_parameters').upsert(this.parameters.map(mapParamToDb)).then();
+                }
+              }
+            }
+          }
         }
 
         // 5. Non-Conformities
@@ -1282,64 +1337,152 @@ export class StorageService {
     return this.parameters.filter(p => !this.deletedParamIds.includes(p.id) && !p.deletedAt);
   }
 
-  static async saveParameter(param: Parameter): Promise<void> {
-    const idx = this.parameters.findIndex(p => p.id === param.id);
-    if (idx >= 0) this.parameters[idx] = param;
-    else this.parameters.push(param);
+  static async saveParameter(param: Parameter): Promise<{ success: boolean; syncedToSupabase: boolean; error?: string }> {
+    const id = param.id || `param-${Date.now().toString().slice(-4)}`;
+    const targetMean = Number(param.targetMean ?? 0);
+    const targetSD = Number(param.targetSD ?? (param as any).targetSd ?? 0);
+    const targetCV = Number(param.targetCV ?? (param as any).targetCv ?? 0);
+    const minAcceptable = Number(param.minAcceptable ?? (targetMean - 3 * targetSD));
+    const maxAcceptable = Number(param.maxAcceptable ?? (targetMean + 3 * targetSD));
+    const decimalPlaces = Number(param.decimalPlaces ?? (param as any).decimal_places ?? 1);
+
+    const normalizedParam: Parameter = {
+      ...param,
+      id,
+      code: (param.code || id).trim().toUpperCase(),
+      name: (param.name || 'Parameter').trim(),
+      unit: (param.unit || '').trim(),
+      method: (param.method || '').trim(),
+      instrumentId: param.instrumentId || '',
+      controlMaterialId: param.controlMaterialId || '',
+      targetMean: isNaN(targetMean) ? 0 : targetMean,
+      targetSD: isNaN(targetSD) ? 0 : targetSD,
+      targetSd: isNaN(targetSD) ? 0 : targetSD,
+      targetCV: isNaN(targetCV) ? 0 : targetCV,
+      targetCv: isNaN(targetCV) ? 0 : targetCV,
+      minAcceptable: isNaN(minAcceptable) ? 0 : minAcceptable,
+      maxAcceptable: isNaN(maxAcceptable) ? 0 : maxAcceptable,
+      decimalPlaces: isNaN(decimalPlaces) ? 1 : decimalPlaces,
+      isActive: (param as any).isActive ?? true,
+    };
+
+    // Remove from deleted list if re-added
+    this.deletedParamIds = this.deletedParamIds.filter(dId => dId !== id);
+
+    const idx = this.parameters.findIndex(p => p.id === id);
+    if (idx >= 0) this.parameters[idx] = normalizedParam;
+    else this.parameters.push(normalizedParam);
+
+    writeLocalCache(CACHE_KEYS.PARAMETERS, this.parameters);
     this.notifyDataChanged('parameters');
+
+    let syncedToSupabase = false;
+    let errorMessage: string | undefined;
 
     const sb = getSupabase();
     if (sb) {
       try {
-        const { error } = await sb.from('test_parameters').upsert(mapParamToDb(param));
-        if (error) console.error('Supabase saveParameter error:', error);
-      } catch (err) {
+        const { error } = await sb.from('test_parameters').upsert(mapParamToDb(normalizedParam));
+        if (error) {
+          console.error('Supabase saveParameter error:', error);
+          errorMessage = error.message;
+        } else {
+          syncedToSupabase = true;
+        }
+      } catch (err: any) {
         console.error('Supabase saveParameter network error:', err);
+        errorMessage = err?.message || 'Gagal koneksi ke server Supabase';
       }
     }
+
+    await this.logAudit('UPDATE_MASTER_DATA', `Menyimpan parameter pemeriksaan: ${normalizedParam.name} (${normalizedParam.code})`);
+
+    return { success: true, syncedToSupabase, error: errorMessage };
   }
 
-  static async saveParameters(params: Parameter[]): Promise<{ updatedCount: number; createdCount: number }> {
+  static async saveParameters(params: Parameter[]): Promise<{ updatedCount: number; createdCount: number; syncedToSupabase: boolean; error?: string }> {
     let updatedCount = 0;
     let createdCount = 0;
 
     params.forEach(param => {
-      const idx = this.parameters.findIndex(p => p.id === param.id || (p.code.toLowerCase() === param.code.toLowerCase() && p.instrumentId === param.instrumentId));
+      const id = param.id || `param-${Date.now().toString().slice(-4)}`;
+      const targetMean = Number(param.targetMean ?? 0);
+      const targetSD = Number(param.targetSD ?? (param as any).targetSd ?? 0);
+      const targetCV = Number(param.targetCV ?? (param as any).targetCv ?? 0);
+      const minAcceptable = Number(param.minAcceptable ?? (targetMean - 3 * targetSD));
+      const maxAcceptable = Number(param.maxAcceptable ?? (targetMean + 3 * targetSD));
+      const decimalPlaces = Number(param.decimalPlaces ?? (param as any).decimal_places ?? 1);
+
+      const normalizedParam: Parameter = {
+        ...param,
+        id,
+        code: (param.code || id).trim().toUpperCase(),
+        name: (param.name || 'Parameter').trim(),
+        unit: (param.unit || '').trim(),
+        method: (param.method || '').trim(),
+        instrumentId: param.instrumentId || '',
+        controlMaterialId: param.controlMaterialId || '',
+        targetMean: isNaN(targetMean) ? 0 : targetMean,
+        targetSD: isNaN(targetSD) ? 0 : targetSD,
+        targetSd: isNaN(targetSD) ? 0 : targetSD,
+        targetCV: isNaN(targetCV) ? 0 : targetCV,
+        targetCv: isNaN(targetCV) ? 0 : targetCV,
+        minAcceptable: isNaN(minAcceptable) ? 0 : minAcceptable,
+        maxAcceptable: isNaN(maxAcceptable) ? 0 : maxAcceptable,
+        decimalPlaces: isNaN(decimalPlaces) ? 1 : decimalPlaces,
+        isActive: (param as any).isActive ?? true,
+      };
+
+      const idx = this.parameters.findIndex(p => p.id === normalizedParam.id || (p.code.toLowerCase() === normalizedParam.code.toLowerCase() && p.instrumentId === normalizedParam.instrumentId));
       if (idx >= 0) {
-        this.parameters[idx] = { ...this.parameters[idx], ...param, id: this.parameters[idx].id };
+        this.parameters[idx] = { ...this.parameters[idx], ...normalizedParam, id: this.parameters[idx].id };
         updatedCount++;
       } else {
-        this.parameters.push(param);
+        this.parameters.push(normalizedParam);
         createdCount++;
       }
     });
+
+    writeLocalCache(CACHE_KEYS.PARAMETERS, this.parameters);
     this.notifyDataChanged('parameters');
+
+    let syncedToSupabase = false;
+    let errorMessage: string | undefined;
 
     const sb = getSupabase();
     if (sb) {
       try {
         const { error } = await sb.from('test_parameters').upsert(this.parameters.map(mapParamToDb));
-        if (error) console.error('Supabase saveParameters bulk error:', error);
-      } catch (err) {
+        if (error) {
+          console.error('Supabase saveParameters bulk error:', error);
+          errorMessage = error.message;
+        } else {
+          syncedToSupabase = true;
+        }
+      } catch (err: any) {
         console.error('Supabase saveParameters bulk network error:', err);
+        errorMessage = err?.message || 'Gagal koneksi sinkronisasi parameter ke Supabase';
       }
     }
     await this.logAudit('UPDATE_MASTER_DATA', `Mengimpor ${params.length} parameter QC (${createdCount} baru, ${updatedCount} diperbarui).`);
 
-    return { updatedCount, createdCount };
+    return { updatedCount, createdCount, syncedToSupabase, error: errorMessage };
   }
 
-  static async deleteParameter(id: string): Promise<void> {
+  static async deleteParameter(id: string): Promise<{ success: boolean; syncedToSupabase: boolean }> {
     const param = this.parameters.find(p => p.id === id);
     this.parameters = this.parameters.filter(p => p.id !== id);
     if (!this.deletedParamIds.includes(id)) this.deletedParamIds.push(id);
+    writeLocalCache(CACHE_KEYS.PARAMETERS, this.parameters);
     this.notifyDataChanged('parameters');
 
+    let syncedToSupabase = false;
     const sb = getSupabase();
     if (sb) {
       try {
         const { error } = await sb.from('test_parameters').delete().eq('id', id);
         if (error) console.error('Supabase deleteParameter error:', error);
+        else syncedToSupabase = true;
       } catch (err) {
         console.error('Supabase deleteParameter network error:', err);
       }
@@ -1347,6 +1490,7 @@ export class StorageService {
     if (param) {
       await this.logAudit('UPDATE_MASTER_DATA', `Menghapus parameter pemeriksaan: ${param.name} [${param.code}]`);
     }
+    return { success: true, syncedToSupabase };
   }
 
   // --- Westgard Rules ---

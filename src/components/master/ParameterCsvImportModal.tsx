@@ -10,7 +10,8 @@ import {
   HelpCircle,
   FileText,
   RefreshCw,
-  Info
+  Info,
+  Loader2
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Instrument, ControlMaterial, Parameter } from '../../types';
@@ -63,6 +64,7 @@ export const ParameterCsvImportModal: React.FC<ParameterCsvImportModalProps> = (
   const [defaultControlId, setDefaultControlId] = useState<string>(controls[0]?.id || '');
   const [overwriteExisting, setOverwriteExisting] = useState<boolean>(true);
   const [parseError, setParseError] = useState<string | null>(null);
+  const [isImporting, setIsImporting] = useState<boolean>(false);
 
   if (!isOpen) return null;
 
@@ -275,7 +277,7 @@ export const ParameterCsvImportModal: React.FC<ParameterCsvImportModalProps> = (
   };
 
   // Perform Import
-  const handleExecuteImport = () => {
+  const handleExecuteImport = async () => {
     const validRowsToImport = parsedRows.filter(r => r.status !== 'error');
 
     if (validRowsToImport.length === 0) {
@@ -283,33 +285,40 @@ export const ParameterCsvImportModal: React.FC<ParameterCsvImportModalProps> = (
       return;
     }
 
-    const paramsToSave: Parameter[] = validRowsToImport.map(row => {
-      const existing = existingParameters.find(
-        p => p.code.toLowerCase() === row.code.toLowerCase() && p.instrumentId === row.instrumentId
-      );
+    setIsImporting(true);
+    try {
+      const paramsToSave: Parameter[] = validRowsToImport.map(row => {
+        const existing = existingParameters.find(
+          p => p.code.toLowerCase() === row.code.toLowerCase() && p.instrumentId === row.instrumentId
+        );
 
-      const id = existing ? existing.id : `param-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+        const id = existing ? existing.id : `param-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
 
-      return {
-        id,
-        code: row.code,
-        name: row.name,
-        unit: row.unit,
-        method: row.method,
-        instrumentId: row.instrumentId || defaultInstrumentId,
-        controlMaterialId: row.controlMaterialId || defaultControlId,
-        targetMean: row.targetMean,
-        targetSD: row.targetSD,
-        targetCV: row.targetCV,
-        minAcceptable: row.minAcceptable,
-        maxAcceptable: row.maxAcceptable,
-        decimalPlaces: row.decimalPlaces,
-      };
-    });
+        return {
+          id,
+          code: row.code,
+          name: row.name,
+          unit: row.unit,
+          method: row.method,
+          instrumentId: row.instrumentId || defaultInstrumentId,
+          controlMaterialId: row.controlMaterialId || defaultControlId,
+          targetMean: row.targetMean,
+          targetSD: row.targetSD,
+          targetCV: row.targetCV,
+          minAcceptable: row.minAcceptable,
+          maxAcceptable: row.maxAcceptable,
+          decimalPlaces: row.decimalPlaces,
+        };
+      });
 
-    const result = StorageService.saveParameters(paramsToSave);
-    onImportSuccess(validRowsToImport.length);
-    onClose();
+      await StorageService.saveParameters(paramsToSave);
+      onImportSuccess(validRowsToImport.length);
+      onClose();
+    } catch (err) {
+      console.error('Error importing parameters:', err);
+    } finally {
+      setIsImporting(false);
+    }
   };
 
   const validCount = parsedRows.filter(r => r.status === 'valid').length;
@@ -550,16 +559,25 @@ export const ParameterCsvImportModal: React.FC<ParameterCsvImportModalProps> = (
 
           <button
             type="button"
-            disabled={parsedRows.length === 0 || validCount + warningCount === 0}
+            disabled={parsedRows.length === 0 || validCount + warningCount === 0 || isImporting}
             onClick={handleExecuteImport}
             className={`flex items-center gap-2 px-5 py-2.5 text-xs font-bold rounded-xl transition-colors shadow-xs ${
-              parsedRows.length === 0 || validCount + warningCount === 0
+              parsedRows.length === 0 || validCount + warningCount === 0 || isImporting
                 ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
                 : 'bg-purple-700 hover:bg-purple-800 text-white'
             }`}
           >
-            <Upload className="h-4 w-4" />
-            <span>Impor ({validCount + warningCount}) Parameter Ke Master Data</span>
+            {isImporting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Menyimpan ke Supabase & Cache...</span>
+              </>
+            ) : (
+              <>
+                <Upload className="h-4 w-4" />
+                <span>Impor ({validCount + warningCount}) Parameter Ke Master Data</span>
+              </>
+            )}
           </button>
         </div>
 

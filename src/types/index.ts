@@ -91,9 +91,13 @@ export interface Parameter {
   targetMean: number;
   targetSD: number;
   targetCV: number; // in %
+  targetSd?: number;
+  targetCv?: number;
   minAcceptable: number;
   maxAcceptable: number;
   decimalPlaces: number;
+  decimal_places?: number;
+  isActive?: boolean;
   deletedAt?: string;
 }
 

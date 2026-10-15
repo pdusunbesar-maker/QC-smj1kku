@@ -14,7 +14,8 @@ import {
   HelpCircle,
   AlertTriangle,
   Upload,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Loader2
 } from 'lucide-react';
 import { LaboratoryInfo, Instrument, Parameter, ControlMaterial, QCLot } from '../../types';
 import { useAuth } from '../../context/AuthContext';
@@ -120,16 +121,28 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
     warning?: string;
   } | null>(null);
 
-  const handleConfirmDelete = () => {
+  // Parameter Save & Delete Notification
+  const [paramNotice, setParamNotice] = useState<{
+    type: 'success' | 'warning' | 'error';
+    message: string;
+  } | null>(null);
+  const [isSavingParam, setIsSavingParam] = useState(false);
+
+  const handleConfirmDelete = async () => {
     if (!itemToDelete) return;
     if (itemToDelete.type === 'instrument') {
-      StorageService.deleteInstrument(itemToDelete.id);
+      await StorageService.deleteInstrument(itemToDelete.id);
       onInstrumentsUpdated(StorageService.getInstruments());
     } else if (itemToDelete.type === 'parameter') {
-      StorageService.deleteParameter(itemToDelete.id);
+      const res = await StorageService.deleteParameter(itemToDelete.id);
       onParametersUpdated(StorageService.getParameters());
+      setParamNotice({
+        type: res.syncedToSupabase ? 'success' : 'warning',
+        message: `Parameter "${itemToDelete.name}" telah dihapus dari ${res.syncedToSupabase ? 'database Supabase dan ' : ''}sistem.`,
+      });
+      setTimeout(() => setParamNotice(null), 5000);
     } else if (itemToDelete.type === 'control') {
-      StorageService.deleteControlMaterial(itemToDelete.id);
+      await StorageService.deleteControlMaterial(itemToDelete.id);
       onControlsUpdated(StorageService.getControlMaterials());
     }
     setItemToDelete(null);
@@ -167,9 +180,11 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
   // Save Parameter
   const handleSaveParameter = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSavingParam(true);
     const id = editingParameter?.id || `param-${Date.now().toString().slice(-4)}`;
     const mean = Number(paramForm.targetMean) || 0;
-    const sd = Number(paramForm.targetSD) || 0;
+    const sd = Number(paramForm.targetSD ?? (paramForm as any).targetSd) || 0;
+    const cv = Number(paramForm.targetCV ?? (paramForm as any).targetCv) || (mean > 0 ? Number(((sd / mean) * 100).toFixed(2)) : 0);
     const dec = paramForm.decimalPlaces !== undefined ? Number(paramForm.decimalPlaces) : 1;
     const minAcc = paramForm.minAcceptable !== undefined && !isNaN(Number(paramForm.minAcceptable))
       ? Number(paramForm.minAcceptable)
@@ -181,14 +196,41 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
     const fullParam: Parameter = {
       ...(paramForm as Parameter),
       id,
+      code: (paramForm.code || id).trim().toUpperCase(),
+      name: (paramForm.name || 'Parameter').trim(),
+      unit: (paramForm.unit || '').trim(),
+      method: (paramForm.method || '').trim(),
+      instrumentId: paramForm.instrumentId || instruments[0]?.id || '',
+      controlMaterialId: paramForm.controlMaterialId || controls[0]?.id || '',
+      targetMean: mean,
+      targetSD: sd,
+      targetSd: sd,
+      targetCV: cv,
+      targetCv: cv,
       minAcceptable: minAcc,
       maxAcceptable: maxAcc,
       decimalPlaces: dec,
+      isActive: true,
     };
-    await StorageService.saveParameter(fullParam);
+
+    const res = await StorageService.saveParameter(fullParam);
     onParametersUpdated(StorageService.getParameters());
     setShowParameterModal(false);
     setEditingParameter(null);
+    setIsSavingParam(false);
+
+    if (res.syncedToSupabase) {
+      setParamNotice({
+        type: 'success',
+        message: `Parameter "${fullParam.name}" (${fullParam.code}) berhasil disimpan ke Supabase database dan cache lokal.`,
+      });
+    } else {
+      setParamNotice({
+        type: 'warning',
+        message: `Parameter "${fullParam.name}" (${fullParam.code}) tersimpan di cache lokal (akan otomatis diunggah ke Supabase).`,
+      });
+    }
+    setTimeout(() => setParamNotice(null), 6000);
   };
 
   // Save Control Material
@@ -502,6 +544,32 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
       {/* Tab 3: Parameters Table */}
       {activeTab === 'parameters' && (
         <div className="space-y-3">
+          {paramNotice && (
+            <div className={`rounded-xl p-3 text-xs flex items-center justify-between border shadow-xs animate-in fade-in ${
+              paramNotice.type === 'success'
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                : paramNotice.type === 'warning'
+                ? 'bg-amber-50 border-amber-200 text-amber-900'
+                : 'bg-rose-50 border-rose-200 text-rose-900'
+            }`}>
+              <div className="flex items-center gap-2">
+                {paramNotice.type === 'success' ? (
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                ) : (
+                  <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                )}
+                <span className="font-medium">{paramNotice.message}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setParamNotice(null)}
+                className="text-slate-500 hover:text-slate-800 p-1 rounded-md"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+
           {importNotice && (
             <div className="rounded-xl bg-purple-50 border border-purple-200 p-3 text-xs text-purple-900 flex items-center justify-between animate-in fade-in">
               <div className="flex items-center gap-2">
@@ -658,7 +726,12 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
                                       type="button"
                                       onClick={() => {
                                         setEditingParameter(p);
-                                        setParamForm(p);
+                                        setParamForm({
+                                          ...p,
+                                          targetSD: p.targetSD ?? (p as any).targetSd ?? 0,
+                                          targetCV: p.targetCV ?? (p as any).targetCv ?? 0,
+                                          decimalPlaces: p.decimalPlaces ?? (p as any).decimal_places ?? 1,
+                                        });
                                         setShowParameterModal(true);
                                       }}
                                       className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
@@ -1167,9 +1240,17 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-semibold"
+                  disabled={isSavingParam}
+                  className="px-5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 disabled:opacity-60 text-white font-semibold flex items-center gap-1.5 transition-opacity"
                 >
-                  Simpan Parameter
+                  {isSavingParam ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Menyimpan ke Database...</span>
+                    </>
+                  ) : (
+                    <span>Simpan Parameter</span>
+                  )}
                 </button>
               </div>
             </form>
