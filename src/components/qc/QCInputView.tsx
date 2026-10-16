@@ -643,6 +643,26 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
               </div>
             )}
 
+            {/* Success Saved Notification Banner */}
+            {isSaved && lastSavedResult && (
+              <div className="p-3.5 bg-emerald-50 border border-emerald-300 rounded-xl text-emerald-900 text-xs flex items-center justify-between shadow-sm animate-in fade-in slide-in-from-top-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-7 w-7 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <CheckCircle2 className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-emerald-950">Data Berhasil Disimpan!</p>
+                    <p className="text-[11px] text-emerald-800">
+                      Parameter: {lastSavedResult.parameterName} · Nilai: {lastSavedResult.value} {lastSavedResult.unit} ({lastSavedResult.sdPosition})
+                    </p>
+                  </div>
+                </div>
+                <span className="font-mono text-[10px] bg-emerald-200/80 text-emerald-900 px-2 py-1 rounded font-bold">
+                  {lastSavedResult.status.toUpperCase()}
+                </span>
+              </div>
+            )}
+
             {/* Action Buttons */}
             <div className="flex items-center justify-end gap-3 pt-2">
               <button
