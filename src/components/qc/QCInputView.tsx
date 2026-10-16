@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   CheckCircle2, 
   AlertTriangle, 
@@ -13,7 +13,8 @@ import {
   Info,
   Loader2,
   FileSpreadsheet,
-  Zap
+  Zap,
+  X
 } from 'lucide-react';
 import { QCBatchUploadPanel } from './QCBatchUploadPanel';
 import { Parameter, Instrument, ControlMaterial, QCResult, WestgardViolation } from '../../types';
@@ -56,12 +57,39 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
   const [ibNotes, setIbNotes] = useState('');
   const [ibSubmitting, setIbSubmitting] = useState(false);
   const [ibSuccessMessage, setIbSuccessMessage] = useState<string | null>(null);
+  const [ibSavedDetails, setIbSavedDetails] = useState<{
+    count: number;
+    instName: string;
+    instCode: string;
+    level: string;
+    lot: string;
+    time: string;
+    passCount: number;
+    warnCount: number;
+    rejectCount: number;
+  } | null>(null);
+  const ibTopRef = useRef<HTMLDivElement>(null);
+  const qcInputTopRef = useRef<HTMLDivElement>(null);
+
+  // Floating notification toast for save confirmations
+  const [floatingNotification, setFloatingNotification] = useState<{
+    type: 'success' | 'warning' | 'danger';
+    title: string;
+    message: string;
+    detail?: string;
+  } | null>(null);
+
+  // Manual input save confirmation notice
+  const [manualSavedNotice, setManualSavedNotice] = useState<{
+    result: QCResult;
+    message: string;
+  } | null>(null);
 
   const ibAvailableParameters = useMemo(() => {
     return parameters.filter(p => p.instrumentId === ibInstrumentId);
   }, [parameters, ibInstrumentId]);
 
-  const handleInstrumentBatchSubmit = (e: React.FormEvent) => {
+  const handleInstrumentBatchSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const instParams = parameters.filter(p => p.instrumentId === ibInstrumentId);
     const filledEntries = instParams.filter(p => {
@@ -80,7 +108,11 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
     const currentInst = instruments.find(i => i.id === ibInstrumentId) || instruments[0];
 
     let savedCount = 0;
-    filledEntries.forEach(param => {
+    let passCount = 0;
+    let warnCount = 0;
+    let rejectCount = 0;
+
+    for (const param of filledEntries) {
       const val = parseFloat(ibValues[param.id]);
       const mean = param.targetMean;
       const sd = param.targetSD;
@@ -94,6 +126,10 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
         history,
         westgardRules
       );
+
+      if (status === 'pass') passCount++;
+      else if (status === 'warning') warnCount++;
+      else if (status === 'reject') rejectCount++;
 
       const newResult: QCResult = {
         id: `QC-${Date.now()}-${Math.random().toString(36).substring(7)}`,
@@ -121,19 +157,80 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
         reviewStatus: status === 'pass' ? 'accepted' : 'pending',
       };
 
-      StorageService.saveQCResult(newResult);
+      await StorageService.saveQCResult(newResult);
       StorageService.logAudit(
         'INPUT_QC',
         `Input QC Multi-Parameter ${param.code} nilai ${val} ${param.unit} (${sdPosition}) status: ${status.toUpperCase()}`,
         newResult
       );
+
+      if (newResult.status !== 'pass') {
+        StorageService.addNotification({
+          type: newResult.status === 'reject' ? 'danger' : 'warning',
+          title: `QC ${newResult.parameterCode} ${newResult.status.toUpperCase()}`,
+          message: `[INPUT CEPAT] Hasil pemeriksaan ${newResult.parameterName} bernilai ${newResult.value} ${newResult.unit} (${newResult.sdPosition}).`,
+          linkTab: 'qc-review',
+          linkId: newResult.id,
+        });
+      }
+
       onResultAdded(newResult);
       savedCount++;
+    }
+
+    // 1. Reset input values & notes so the form is completely empty again
+    setIbValues({});
+    setIbNotes('');
+    setIbSubmitting(false);
+
+    // 2. Set success details with icon notification
+    const msg = `Berhasil menyimpan ${savedCount} parameter QC untuk instrumen ${currentInst.name}!`;
+    setIbSuccessMessage(msg);
+    setIbSavedDetails({
+      count: savedCount,
+      instName: currentInst.name,
+      instCode: currentInst.code,
+      level: ibLevel,
+      lot: ibLotNumber,
+      time: `${date} ${time}`,
+      passCount,
+      warnCount,
+      rejectCount,
     });
 
-    setIbSubmitting(false);
-    setIbSuccessMessage(`Berhasil menyimpan ${savedCount} parameter QC untuk instrumen ${currentInst.name}!`);
-    setTimeout(() => setIbSuccessMessage(null), 4000);
+    // 3. Trigger floating toast notification
+    setFloatingNotification({
+      type: 'success',
+      title: 'Data Berhasil Disimpan!',
+      message: `${savedCount} parameter QC instrumen ${currentInst.name} berhasil disimpan. Formulir telah dikosongkan.`,
+      detail: `${passCount} Normal · ${warnCount} Warning · ${rejectCount} Reject`
+    });
+
+    // 4. Smoothly scroll back to the top of the input cepat section
+    const scrollToTop = () => {
+      if (ibTopRef.current) {
+        ibTopRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      const scrollableMain = document.querySelector('main');
+      if (scrollableMain) {
+        scrollableMain.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      document.documentElement.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    scrollToTop();
+    setTimeout(scrollToTop, 60);
+    setTimeout(scrollToTop, 200);
+
+    setTimeout(() => {
+      setFloatingNotification(null);
+    }, 7000);
+
+    setTimeout(() => {
+      setIbSuccessMessage(null);
+      setIbSavedDetails(null);
+    }, 10000);
   };
 
   const today = new Date().toISOString().split('T')[0];
@@ -232,7 +329,7 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
     };
   }, [inputValue, currentParam, existingResults]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting || !liveAnalysis || !currentParam) return;
 
@@ -286,7 +383,7 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
       reviewStatus: liveAnalysis.status === 'pass' ? 'accepted' : 'pending',
     };
 
-    StorageService.saveQCResult(newResult);
+    await StorageService.saveQCResult(newResult);
     StorageService.logAudit(
       'INPUT_QC',
       `Input QC ${newResult.parameterCode} nilai ${newResult.value} ${newResult.unit} (${newResult.sdPosition}) status: ${newResult.status.toUpperCase()}`,
@@ -306,18 +403,35 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
     onResultAdded(newResult);
     setLastSavedResult(newResult);
     setIsSaved(true);
+    setManualSavedNotice({
+      result: newResult,
+      message: `Hasil pemeriksaan ${newResult.parameterCode} (${newResult.value} ${newResult.unit}) berhasil disimpan ke database!`,
+    });
+    setFloatingNotification({
+      type: 'success',
+      title: 'Data Berhasil Disimpan!',
+      message: `Hasil QC ${newResult.parameterCode} (${newResult.value} ${newResult.unit}) status ${newResult.status.toUpperCase()} berhasil disimpan.`,
+      detail: `Deviasi: ${newResult.sdPosition} · Z-Score: ${newResult.zScore}`
+    });
 
     // Reset input fields immediately to prevent double submissions
     setInputValue('');
     setNotes('');
-    setIsSaved(true);
+    setIsSubmitting(false);
 
-    // Otomatis diarahkan kembali ke Formulir QC Input
-    // (Jika ingin tetap di halaman input, tidak perlu pindah ke dashboard)
+    // Otomatis scroll ke atas
+    const scrollableMain = document.querySelector('main');
+    if (scrollableMain) {
+      scrollableMain.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
     setTimeout(() => {
-      setIsSaved(false); // Reset saved state for next input
-      setIsSubmitting(false);
-    }, 2000);
+      setFloatingNotification(null);
+    }, 6000);
+
+    setTimeout(() => {
+      setIsSaved(false);
+    }, 10000);
   };
 
   const handleResetForm = () => {
@@ -330,7 +444,52 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div ref={qcInputTopRef} className="space-y-6 relative">
+      {/* Floating Notification Toast */}
+      {floatingNotification && (
+        <div className="fixed top-5 right-5 sm:right-8 z-50 max-w-sm sm:max-w-md w-full pointer-events-auto animate-in slide-in-from-top-4 fade-in duration-300">
+          <div className="bg-white/95 backdrop-blur-md border-2 border-emerald-500 rounded-2xl p-4 shadow-2xl flex items-start gap-3.5 ring-4 ring-emerald-500/20">
+            <div className="relative shrink-0 mt-0.5">
+              <div className="h-10 w-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-md ring-2 ring-emerald-200 animate-pulse">
+                <CheckCircle2 className="h-6 w-6 stroke-[2.5]" />
+              </div>
+              <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 border-2 border-white"></span>
+              </span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <h5 className="font-extrabold text-sm text-slate-900 flex items-center gap-1.5">
+                  <span className="text-emerald-700">✓</span>
+                  <span>{floatingNotification.title}</span>
+                </h5>
+                <button
+                  type="button"
+                  onClick={() => setFloatingNotification(null)}
+                  className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                  title="Tutup Notifikasi"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <p className="text-xs text-slate-700 mt-1 leading-snug font-medium">
+                {floatingNotification.message}
+              </p>
+              {floatingNotification.detail && (
+                <p className="text-[11px] font-mono text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded mt-1.5 inline-block font-semibold border border-emerald-200">
+                  {floatingNotification.detail}
+                </p>
+              )}
+              <p className="text-[11px] text-emerald-700 font-semibold mt-1 flex items-center gap-1">
+                <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                Formulir telah otomatis kembali ke kondisi kosong.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top Banner */}
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between border-b border-slate-200 pb-4">
         <div>
@@ -385,7 +544,47 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
       {inputMode === 'manual' ? (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Main Entry Form (7 Columns) */}
-        <div className="lg:col-span-7">
+        <div className="lg:col-span-7 space-y-4">
+          {manualSavedNotice && (
+            <div className="p-4 bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border-2 border-emerald-400 rounded-2xl text-emerald-950 shadow-md animate-in fade-in slide-in-from-top-2 duration-300 flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="relative shrink-0 mt-0.5">
+                  <div className="h-10 w-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-xs ring-4 ring-emerald-100 animate-pulse">
+                    <CheckCircle2 className="h-6 w-6 stroke-[2.5]" />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-extrabold text-sm text-emerald-950 flex items-center gap-1.5">
+                      <span>Data QC Berhasil Disimpan!</span>
+                    </span>
+                    <span className="font-mono text-[10px] bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded-full font-bold">
+                      ID: {manualSavedNotice.result.id}
+                    </span>
+                  </div>
+                  <p className="text-xs text-emerald-900 leading-relaxed font-medium">
+                    {manualSavedNotice.message} Status:{' '}
+                    <strong className="uppercase font-bold">
+                      {manualSavedNotice.result.status} ({manualSavedNotice.result.sdPosition})
+                    </strong>.
+                  </p>
+                  <p className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
+                    <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                    Formulir telah otomatis kembali kosong untuk pengujian berikutnya.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setManualSavedNotice(null)}
+                className="text-emerald-700 hover:text-emerald-950 p-1 rounded-lg hover:bg-emerald-100 transition-colors cursor-pointer shrink-0"
+                title="Tutup Notifikasi"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
           <form
             onSubmit={handleSubmit}
             className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs space-y-4"
@@ -838,7 +1037,75 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
         </div>
       </div>
       ) : inputMode === 'instrument-batch' ? (
-        <div className="space-y-6">
+        <div ref={ibTopRef} className="space-y-6 scroll-mt-6">
+          {/* Success Notification Banner with Icon at the Top of Input Cepat */}
+          {ibSavedDetails && (
+            <div className="p-4 sm:p-5 bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border-2 border-emerald-500 rounded-2xl text-emerald-950 shadow-lg animate-in fade-in slide-in-from-top-3 duration-300 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ring-2 ring-emerald-400/20">
+              <div className="flex items-start gap-3.5">
+                <div className="relative shrink-0 mt-0.5">
+                  <div className="h-12 w-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-md ring-4 ring-emerald-200 animate-pulse">
+                    <CheckCircle2 className="h-7 w-7 stroke-[2.5]" />
+                  </div>
+                  <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 border-2 border-white"></span>
+                  </span>
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h4 className="font-extrabold text-sm sm:text-base text-emerald-950 flex items-center gap-1.5">
+                      <span>✓ Data QC Berhasil Disimpan!</span>
+                    </h4>
+                    <span className="font-mono text-xs bg-emerald-200 text-emerald-950 px-2.5 py-0.5 rounded-full font-bold">
+                      {ibSavedDetails.count} Parameter Tersimpan
+                    </span>
+                    <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-md">
+                      Halaman kembali ke atas & form kosong
+                    </span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-emerald-900 leading-relaxed font-medium">
+                    Hasil pemeriksaan seluruh parameter instrumen <strong className="text-emerald-950 underline decoration-emerald-400 font-bold">{ibSavedDetails.instName} [{ibSavedDetails.instCode}]</strong> ({ibSavedDetails.level} · Lot: {ibSavedDetails.lot}) telah berhasil disimpan ke database dan tersinkronisasi secara real-time.
+                  </p>
+                  <div className="flex items-center gap-2 pt-1 flex-wrap text-[11px] font-mono">
+                    <span className="text-emerald-800 bg-white/90 px-2.5 py-0.5 rounded-md font-bold border border-emerald-300 shadow-2xs flex items-center gap-1">
+                      <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                      {ibSavedDetails.passCount} Normal (Pass)
+                    </span>
+                    {ibSavedDetails.warnCount > 0 && (
+                      <span className="text-amber-900 bg-amber-100 px-2.5 py-0.5 rounded-md font-bold border border-amber-300 shadow-2xs flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3 text-amber-600" />
+                        {ibSavedDetails.warnCount} Warning (1-2s)
+                      </span>
+                    )}
+                    {ibSavedDetails.rejectCount > 0 && (
+                      <span className="text-rose-900 bg-rose-100 px-2.5 py-0.5 rounded-md font-bold border border-rose-300 shadow-2xs flex items-center gap-1">
+                        <XCircle className="h-3 w-3 text-rose-600" />
+                        {ibSavedDetails.rejectCount} Reject (Out of Control)
+                      </span>
+                    )}
+                    <span className="text-slate-600 font-sans text-xs">
+                      · Formulir telah otomatis dikosongkan dan siap untuk input pengujian baru.
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 self-end md:self-center shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIbSuccessMessage(null);
+                    setIbSavedDetails(null);
+                  }}
+                  className="p-1.5 text-emerald-700 hover:text-emerald-950 hover:bg-emerald-200/60 rounded-xl transition-colors cursor-pointer"
+                  title="Tutup Notifikasi"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Instrument Selection Grid Cards */}
           <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
             <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
@@ -1031,25 +1298,56 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
                 />
               </div>
 
-              {/* Submit Button */}
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
-                <button
-                  type="submit"
-                  disabled={ibSubmitting || Object.values(ibValues).every(v => !v || v.trim() === '')}
-                  className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow-md cursor-pointer transition-all"
-                >
-                  {ibSubmitting ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>Menyimpan Semua Hasil...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Save className="h-4 w-4" />
-                      <span>Simpan Semua Hasil QC Instrumen Ini (Sekaligus)</span>
-                    </>
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-slate-100">
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                  {Object.values(ibValues).filter(v => v && v.trim() !== '').length > 0 && (
+                    <span className="font-mono font-semibold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-200">
+                      {Object.values(ibValues).filter(v => v && v.trim() !== '').length} parameter siap disimpan
+                    </span>
                   )}
-                </button>
+                </div>
+
+                <div className="flex items-center gap-2.5 self-end sm:self-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIbValues({});
+                      setIbNotes('');
+                      if (ibTopRef.current) {
+                        ibTopRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }
+                      const scrollableMain = document.querySelector('main');
+                      if (scrollableMain) {
+                        scrollableMain.scrollTo({ top: 0, behavior: 'smooth' });
+                      }
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    disabled={ibSubmitting || Object.values(ibValues).every(v => !v || v.trim() === '')}
+                    className="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl border border-slate-200 transition-colors disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    <span>Kosongkan Form</span>
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={ibSubmitting || Object.values(ibValues).every(v => !v || v.trim() === '')}
+                    className="px-6 py-3 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] disabled:bg-slate-300 text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow-md cursor-pointer transition-all"
+                  >
+                    {ibSubmitting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Menyimpan Semua Hasil...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4" />
+                        <span>Simpan Semua Hasil QC Instrumen Ini (Sekaligus)</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
