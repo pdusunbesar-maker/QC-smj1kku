@@ -154,6 +154,16 @@ function AppContent() {
     setNavigationPayload(itemData || null);
     if (itemData?.parameterId) {
       setSelectedChartParamId(itemData.parameterId);
+      const targetParam = parameters.find(p => p.id === itemData.parameterId);
+      if (targetParam?.instrumentId) {
+        setSelectedInstrumentId(targetParam.instrumentId);
+      }
+    } else if (itemData?.instrumentId) {
+      setSelectedInstrumentId(itemData.instrumentId);
+      const instrumentParams = parameters.filter(p => p.instrumentId === itemData.instrumentId);
+      if (instrumentParams.length > 0 && !instrumentParams.find(p => p.id === selectedChartParamId)) {
+        setSelectedChartParamId(instrumentParams[0].id);
+      }
     }
   };
 
@@ -247,6 +257,7 @@ function AppContent() {
                   setNotifications(StorageService.getNotifications());
                 }}
                 onNavigateToTab={handleNavigateToTab}
+                initialData={navigationPayload}
               />
             )}
 

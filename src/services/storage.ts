@@ -564,6 +564,7 @@ const CACHE_KEYS = {
   NOTIFICATIONS: 'lqcms_cache_notifications_v2',
   QC_LOTS: 'lqcms_cache_qc_lots_v2',
   QC_HEMATOLOGI: 'lqcms_cache_qc_hematologi_v2',
+  WESTGARD_RULES: 'lqcms_cache_westgard_rules_v2',
 };
 
 function readLocalCache<T>(key: string, fallback: T): T {
@@ -612,7 +613,7 @@ export class StorageService {
   private static instruments: Instrument[] = readLocalCache(CACHE_KEYS.INSTRUMENTS, []);
   private static controlMaterials: ControlMaterial[] = readLocalCache(CACHE_KEYS.CONTROLS, []);
   private static parameters: Parameter[] = readLocalCache(CACHE_KEYS.PARAMETERS, []);
-  private static westgardRules: WestgardRuleConfig[] = DEFAULT_WESTGARD_RULES;
+  private static westgardRules: WestgardRuleConfig[] = readLocalCache(CACHE_KEYS.WESTGARD_RULES, DEFAULT_WESTGARD_RULES);
   private static qcResults: QCResult[] = readLocalCache(CACHE_KEYS.QC_RESULTS, []);
   private static nonConformities: NonConformity[] = readLocalCache(CACHE_KEYS.NON_CONFORMITIES, []);
   private static capas: CAPA[] = readLocalCache(CACHE_KEYS.CAPAS, []);
@@ -788,7 +789,8 @@ export class StorageService {
           roleRes,
           labRes,
           auditRes,
-          notifRes
+          notifRes,
+          westgardRes
         ] = await Promise.allSettled([
           sb.from('qc_results').select('*').is('deleted_at', null).order('date', { ascending: false }),
           sb.from('instruments').select('*').is('deleted_at', null),
@@ -801,6 +803,7 @@ export class StorageService {
           sb.from('laboratories').select('*').limit(1),
           sb.from('audit_logs').select('*').order('timestamp', { ascending: false }).limit(100),
           sb.from('notifications').select('*').order('timestamp', { ascending: false }).limit(50),
+          sb.from('westgard_rules').select('*'),
         ]);
 
         // 1. QC Results
@@ -943,6 +946,33 @@ export class StorageService {
           writeLocalCache(CACHE_KEYS.NOTIFICATIONS, this.notifications);
         }
 
+        // 11. Westgard Rules Configuration
+        if (westgardRes.status === 'fulfilled' && !westgardRes.value.error && westgardRes.value.data) {
+          if (westgardRes.value.data.length > 0) {
+            this.westgardRules = westgardRes.value.data.map((r: any) => ({
+              key: r.key,
+              name: r.name,
+              shortDesc: r.short_desc || r.shortDesc || '',
+              description: r.description || '',
+              type: r.type,
+              enabled: r.enabled ?? true,
+              recommendation: r.recommendation || '',
+            }));
+            writeLocalCache(CACHE_KEYS.WESTGARD_RULES, this.westgardRules);
+          } else if (sb && this.westgardRules.length > 0) {
+            writeLocalCache(CACHE_KEYS.WESTGARD_RULES, this.westgardRules);
+            sb.from('westgard_rules').upsert(this.westgardRules.map(r => ({
+              key: r.key,
+              name: r.name,
+              short_desc: r.shortDesc,
+              description: r.description,
+              type: r.type,
+              enabled: r.enabled,
+              recommendation: r.recommendation,
+            }))).then();
+          }
+        }
+
         // If local cache was completely empty and remote database is empty, seed initial defaults safely
         if (this.users.length === 0 && this.instruments.length === 0) {
           this.initSeedData();
@@ -1050,6 +1080,7 @@ export class StorageService {
         if (!type || type === 'all' || type === 'capas') writeLocalCache(CACHE_KEYS.CAPAS, this.capas);
         if (!type || type === 'all' || type === 'audit') writeLocalCache(CACHE_KEYS.AUDIT_LOGS, this.auditLogs);
         if (!type || type === 'all' || type === 'notifications') writeLocalCache(CACHE_KEYS.NOTIFICATIONS, this.notifications);
+        if (!type || type === 'all' || type === 'westgard') writeLocalCache(CACHE_KEYS.WESTGARD_RULES, this.westgardRules);
         localStorage.setItem('lqcms_last_sync_timestamp', Date.now().toString());
       } catch (e) {
         // ignore
@@ -1498,9 +1529,29 @@ export class StorageService {
     return this.westgardRules;
   }
 
-  static saveWestgardRules(rules: WestgardRuleConfig[]): void {
+  static async saveWestgardRules(rules: WestgardRuleConfig[]): Promise<{ success: boolean }> {
     this.westgardRules = rules;
+    writeLocalCache(CACHE_KEYS.WESTGARD_RULES, this.westgardRules);
     this.notifyDataChanged('westgard');
+
+    const sb = getSupabase();
+    if (sb) {
+      try {
+        const rows = rules.map(r => ({
+          key: r.key,
+          name: r.name,
+          short_desc: r.shortDesc,
+          description: r.description,
+          type: r.type,
+          enabled: r.enabled,
+          recommendation: r.recommendation,
+        }));
+        await sb.from('westgard_rules').upsert(rows);
+      } catch (err) {
+        console.error('Supabase saveWestgardRules error:', err);
+      }
+    }
+    return { success: true };
   }
 
   static getDeletedQCIds(): string[] {
