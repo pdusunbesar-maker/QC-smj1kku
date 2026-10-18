@@ -39,6 +39,12 @@ import { MonthlyTrendAnalysisPanel } from './panels/MonthlyTrendAnalysisPanel';
 import { DailyQCCoveragePanel } from './panels/DailyQCCoveragePanel';
 import { DynamicFishboneRCAPanel } from './panels/DynamicFishboneRCAPanel';
 import { ProactiveRecommendationsPanel } from './panels/ProactiveRecommendationsPanel';
+import { 
+  getLocalDateString, 
+  getDaysAgoDateString, 
+  formatIndonesianDate, 
+  formatIndonesianDateTime 
+} from '../../utils/dateUtils';
 import { MultiInstrumentComparisonPanel } from './panels/MultiInstrumentComparisonPanel';
 import { RunningAverageAlertService } from '../../services/runningAverageAlertService';
 
@@ -115,7 +121,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   } | null>(null);
 
   // Daily Summary Stats
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getLocalDateString();
   const dailyStats = useMemo(() => {
     const todayResults = qcResults.filter(r => r.date === todayStr);
     const totalTests = todayResults.length;
@@ -213,9 +219,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   }, [qcResults, parameters, instruments, todayStr]);
 
   const getDateNDaysAgo = (days: number) => {
-    const d = new Date();
-    d.setDate(d.getDate() - days);
-    return d.toISOString().split('T')[0];
+    return getDaysAgoDateString(days);
   };
 
   const sevenDaysAgoStr = getDateNDaysAgo(7);

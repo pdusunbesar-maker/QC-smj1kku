@@ -18,6 +18,7 @@ import {
 import { NonConformity, Instrument, Parameter, QCResult } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { StorageService } from '../../services/storage';
+import { getLocalDateString, getLocalTimeString } from '../../utils/dateUtils';
 
 interface NonConformityViewProps {
   nonConformities: NonConformity[];
@@ -63,8 +64,8 @@ export const NonConformityView: React.FC<NonConformityViewProps> = ({
     ? parameters.find(p => p.id === initialData.fromQc?.parameterId) || parameters[0]
     : parameters[0];
 
-  const [date, setDate] = useState(initialData?.fromQc?.date || new Date().toISOString().split('T')[0]);
-  const [time, setTime] = useState(initialData?.fromQc?.time || '08:00');
+  const [date, setDate] = useState(initialData?.fromQc?.date || getLocalDateString());
+  const [time, setTime] = useState(initialData?.fromQc?.time || getLocalTimeString());
   const [unit, setUnit] = useState('Patologi Klinik - Kimia Klinik');
   const [instrumentId, setInstrumentId] = useState(defaultInst?.id || '');
   const [parameterId, setParameterId] = useState(defaultParam?.id || '');

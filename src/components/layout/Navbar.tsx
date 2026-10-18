@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Bell, 
   Database, 
@@ -9,11 +9,13 @@ import {
   ChevronDown,
   Camera,
   PanelLeftClose,
-  PanelLeftOpen,
-  ChevronRight
+  ChevronRight,
+  Clock,
+  Calendar
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { LaboratoryInfo, AppNotification, UserRole } from '../../types';
+import { formatIndonesianDate, getLocalTimeWithSecondsString } from '../../utils/dateUtils';
 
 interface NavbarProps {
   labInfo: LaboratoryInfo;
@@ -58,6 +60,15 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const { user, role, switchRole, logout } = useAuth();
   const [showRoleMenu, setShowRoleMenu] = useState(false);
+  const [liveNow, setLiveNow] = useState(() => new Date());
+
+  // Live real-time clock ticking every second
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setLiveNow(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const unreadCount = notifications.filter(n => !n.read).length;
   const currentCrumb = TAB_BREADCRUMBS[activeTab] || { group: 'Sistem', title: 'L-QCMS' };
@@ -117,13 +128,19 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
       </div>
 
-      {/* Zone 2: Realtime Telemetry Indicator */}
-      <div className="hidden xl:flex items-center gap-3 text-xs">
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#F4F7FA] border border-[#DDE4EA]">
-          <span className="h-2 w-2 rounded-full bg-[#16845B] animate-pulse" />
-          <span className="font-semibold text-[#172B3A]">Lab Patologi Klinik</span>
+      {/* Zone 2: Realtime Clock & Calendar Indicator */}
+      <div className="hidden lg:flex items-center gap-2 text-xs">
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#F4F7FA] border border-[#DDE4EA] shadow-2xs font-mono text-[11px]">
+          <span className="h-2 w-2 rounded-full bg-[#16845B] animate-pulse shrink-0" title="Sinkronisasi Realtime Aktif" />
+          <Calendar className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+          <span className="font-semibold text-[#172B3A]">
+            {formatIndonesianDate(liveNow)}
+          </span>
           <span className="text-slate-300">·</span>
-          <span className="font-mono text-[#647586] text-[11px]">Monitoring Terhubung</span>
+          <Clock className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+          <span className="font-bold text-[#0F9D91]">
+            {getLocalTimeWithSecondsString(liveNow)}
+          </span>
         </div>
       </div>
 

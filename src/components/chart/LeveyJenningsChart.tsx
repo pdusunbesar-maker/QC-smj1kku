@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
   ZoomIn, 
   ZoomOut, 
@@ -28,6 +28,13 @@ import html2canvas from 'html2canvas-pro';
 import { QCResult, Parameter, QCStatistics, LaboratoryInfo, QCStatus, WestgardViolation } from '../../types';
 import { calculateQCStatistics, calculateTrendline, detect6ConsecutiveTrends, detect10xConsecutiveShifts, Shift10xDetection, calculateProcessCapability, calculateSigmaMetric } from '../../utils/qcCalculations';
 import { StorageService } from '../../services/storage';
+import { 
+  getLocalDateString, 
+  getStartOfMonthDateString, 
+  getEndOfMonthDateString, 
+  getDaysAgoDateString, 
+  formatIndonesianDate 
+} from '../../utils/dateUtils';
 import { KopEditorModal } from '../common/KopEditorModal';
 
 interface LeveyJenningsChartProps {
@@ -81,8 +88,18 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
   const [plotMode, setPlotMode] = useState<'single_per_date' | 'all_runs'>('single_per_date');
 
   // Precise Date Range Search ("Dari Tanggal" s/d "Sampai Tanggal")
-  const [startDate, setStartDate] = useState<string>('2026-09-01');
-  const [endDate, setEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [startDate, setStartDate] = useState<string>(() => {
+    const today = new Date();
+    const thisMonthStart = getStartOfMonthDateString(today);
+    const hasThisMonthData = results.some(r => r.parameterId === parameter.id && r.date >= thisMonthStart);
+    return hasThisMonthData ? thisMonthStart : getDaysAgoDateString(30, today);
+  });
+  const [endDate, setEndDate] = useState<string>(() => getLocalDateString());
+
+  // Auto-sync endDate with current realtime date whenever parameter or view changes
+  useEffect(() => {
+    setEndDate(getLocalDateString());
+  }, [parameter.id]);
   
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [hoveredPoint, setHoveredPoint] = useState<{
@@ -98,37 +115,30 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
   const printableDocRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
-  // Quick preset button handler
+  // Quick preset button handler with accurate realtime dates
   const handleSetPreset = (preset: 'today' | '7d' | 'this_month' | 'last_month' | '90d' | 'all') => {
     const today = new Date();
-    const todayStr = today.toLocaleDateString('sv-SE');
+    const todayStr = getLocalDateString(today);
 
     if (preset === 'today') {
       setStartDate(todayStr);
       setEndDate(todayStr);
     } else if (preset === '7d') {
-      const d7 = new Date();
-      d7.setDate(d7.getDate() - 6);
-      setStartDate(d7.toLocaleDateString('sv-SE'));
+      setStartDate(getDaysAgoDateString(6, today));
       setEndDate(todayStr);
     } else if (preset === 'this_month') {
-      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-      const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-      setStartDate(startOfMonth.toLocaleDateString('sv-SE'));
-      setEndDate(endOfMonth.toLocaleDateString('sv-SE'));
+      setStartDate(getStartOfMonthDateString(today));
+      setEndDate(todayStr);
     } else if (preset === 'last_month') {
-      const startOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-      const endOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
-      setStartDate(startOfLastMonth.toLocaleDateString('sv-SE'));
-      setEndDate(endOfLastMonth.toLocaleDateString('sv-SE'));
+      const prevMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      setStartDate(getStartOfMonthDateString(prevMonth));
+      setEndDate(getEndOfMonthDateString(prevMonth));
     } else if (preset === '90d') {
-      const d90 = new Date();
-      d90.setDate(d90.getDate() - 89);
-      setStartDate(d90.toLocaleDateString('sv-SE'));
+      setStartDate(getDaysAgoDateString(89, today));
       setEndDate(todayStr);
     } else if (preset === 'all') {
       setStartDate('2026-01-01');
-      setEndDate(todayStr > '2026-12-31' ? todayStr : '2026-12-31');
+      setEndDate(todayStr);
     }
   };
 
@@ -1490,7 +1500,7 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
           </div>
 
           <div className="relative group">
-            <p className="text-slate-600">Sukadana, {new Date().toISOString().split('T')[0]}</p>
+            <p className="text-slate-600">Sukadana, {formatIndonesianDate(new Date())}</p>
             <p className="font-bold text-slate-900 mt-1">Penanggung Jawab Mutu</p>
             <div className="h-20" />
             <p className="font-bold underline text-slate-900">

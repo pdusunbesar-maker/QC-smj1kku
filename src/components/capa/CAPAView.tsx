@@ -22,6 +22,7 @@ import { CAPADetailView } from './CAPADetailView';
 import { CAPA, QCResult, NonConformity } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { StorageService } from '../../services/storage';
+import { getLocalDateString, getDaysAheadDateString } from '../../utils/dateUtils';
 
 interface CAPAViewProps {
   capas: CAPA[];
@@ -66,8 +67,8 @@ export const CAPAView: React.FC<CAPAViewProps> = ({
   const [capaToDelete, setCapaToDelete] = useState<CAPA | null>(null);
 
   // Form State for new CAPA
-  const todayStr = new Date().toISOString().split('T')[0];
-  const nextTwoWeeks = new Date(Date.now() + 14 * 24 * 3600 * 1000).toISOString().split('T')[0];
+  const todayStr = getLocalDateString();
+  const nextTwoWeeks = getDaysAheadDateString(14);
 
   const [source, setSource] = useState<CAPA['source']>(
     initialData?.prefill?.source || (initialData?.fromQc ? 'Pelanggaran Westgard' : initialData?.fromNC ? 'Non-Conformity' : 'QC Gagal')

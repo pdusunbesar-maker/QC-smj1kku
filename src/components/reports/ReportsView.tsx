@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
   FileSpreadsheet, 
   Printer, 
@@ -39,6 +39,14 @@ import { calculateQCStatistics } from '../../utils/qcCalculations';
 import { exportAuditReadyExcel } from '../../utils/excelExport';
 import { StorageService } from '../../services/storage';
 import { KopEditorModal } from '../common/KopEditorModal';
+import { 
+  getLocalDateString, 
+  getStartOfMonthDateString, 
+  getEndOfMonthDateString, 
+  getDaysAgoDateString, 
+  formatIndonesianDate,
+  formatIndonesianDateTime 
+} from '../../utils/dateUtils';
 
 interface ReportsViewProps {
   labInfo: LaboratoryInfo;
@@ -63,8 +71,18 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   const [reportType, setReportType] = useState<'qc' | 'westgard' | 'nc' | 'capa'>('qc');
   
   // Date Range Search ("Dari Tanggal" - "Sampai Tanggal")
-  const [startDate, setStartDate] = useState<string>('2026-09-01');
-  const [endDate, setEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [startDate, setStartDate] = useState<string>(() => {
+    const today = new Date();
+    const thisMonthStart = getStartOfMonthDateString(today);
+    const hasThisMonthData = results.some(r => r.date >= thisMonthStart);
+    return hasThisMonthData ? thisMonthStart : getDaysAgoDateString(30, today);
+  });
+  const [endDate, setEndDate] = useState<string>(() => getLocalDateString());
+
+  // Auto-sync endDate with current realtime date
+  useEffect(() => {
+    setEndDate(getLocalDateString());
+  }, [reportType]);
   
   // Additional Filters
   const [searchKeyword, setSearchKeyword] = useState<string>('');
@@ -109,32 +127,27 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
     setIsSignatoriesModalOpen(false);
   };
 
-  // Quick Date Preset Handler
+  // Quick Date Preset Handler with accurate realtime dates
   const handleSetPreset = (preset: 'today' | '7d' | 'this_month' | 'last_month' | 'all') => {
     const today = new Date();
-    const todayStr = today.toLocaleDateString('sv-SE');
+    const todayStr = getLocalDateString(today);
 
     if (preset === 'today') {
       setStartDate(todayStr);
       setEndDate(todayStr);
     } else if (preset === '7d') {
-      const d7 = new Date();
-      d7.setDate(d7.getDate() - 6);
-      setStartDate(d7.toLocaleDateString('sv-SE'));
+      setStartDate(getDaysAgoDateString(6, today));
       setEndDate(todayStr);
     } else if (preset === 'this_month') {
-      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-      const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-      setStartDate(startOfMonth.toLocaleDateString('sv-SE'));
-      setEndDate(endOfMonth.toLocaleDateString('sv-SE'));
+      setStartDate(getStartOfMonthDateString(today));
+      setEndDate(todayStr);
     } else if (preset === 'last_month') {
-      const startOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-      const endOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
-      setStartDate(startOfLastMonth.toLocaleDateString('sv-SE'));
-      setEndDate(endOfLastMonth.toLocaleDateString('sv-SE'));
+      const prevMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      setStartDate(getStartOfMonthDateString(prevMonth));
+      setEndDate(getEndOfMonthDateString(prevMonth));
     } else if (preset === 'all') {
       setStartDate('2026-01-01');
-      setEndDate(todayStr > '2026-12-31' ? todayStr : '2026-12-31');
+      setEndDate(todayStr);
     }
   };
 
@@ -889,7 +902,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             {reportType === 'capa' && 'LEMBAR DOKUMEN CORRECTIVE & PREVENTIVE ACTION (CAPA)'}
           </h2>
           <p className="text-xs text-slate-600 font-mono mt-1.5">
-            Rentang Tanggal: <strong>{startDate}</strong> s/d <strong>{endDate}</strong> · Tanggal Cetak: {new Date().toISOString().split('T')[0]} · Unit: {labInfo.roomUnit}
+            Rentang Tanggal: <strong>{startDate}</strong> s/d <strong>{endDate}</strong> · Tanggal Cetak: {formatIndonesianDateTime(new Date())} · Unit: {labInfo.roomUnit}
           </p>
         </div>
 
@@ -1300,7 +1313,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           </div>
 
           <div className="relative group">
-            <p className="text-slate-600 whitespace-nowrap">Sukadana, {new Date().toISOString().split('T')[0]}</p>
+            <p className="text-slate-600 whitespace-nowrap">Sukadana, {formatIndonesianDate(new Date())}</p>
             <p className="font-bold text-slate-900 mt-1 whitespace-nowrap">Penanggung Jawab Mutu</p>
             <div className="h-20" />
             <p className="font-bold underline text-slate-900 whitespace-nowrap">

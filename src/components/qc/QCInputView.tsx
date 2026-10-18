@@ -14,12 +14,20 @@ import {
   Loader2,
   FileSpreadsheet,
   Zap,
-  X
+  X,
+  Clock,
+  Calendar
 } from 'lucide-react';
 import { QCBatchUploadPanel } from './QCBatchUploadPanel';
 import { Parameter, Instrument, ControlMaterial, QCResult, WestgardViolation } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { StorageService } from '../../services/storage';
+import { 
+  getLocalDateString, 
+  getLocalTimeString, 
+  formatIndonesianDate, 
+  formatIndonesianDateTime 
+} from '../../utils/dateUtils';
 import { 
   calculateZScore, 
   formatSDPosition, 
@@ -178,9 +186,11 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
       savedCount++;
     }
 
-    // 1. Reset input values & notes so the form is completely empty again
+    // 1. Reset input values & notes so the form is completely empty again, and sync to realtime
     setIbValues({});
     setIbNotes('');
+    setDate(getLocalDateString());
+    setTime(getLocalTimeString());
     setIbSubmitting(false);
 
     // 2. Set success details with icon notification
@@ -233,11 +243,20 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
     }, 10000);
   };
 
-  const today = new Date().toISOString().split('T')[0];
-  const currentTime = new Date().toTimeString().split(' ')[0].substring(0, 5);
+  const [date, setDate] = useState(() => getLocalDateString());
+  const [time, setTime] = useState(() => getLocalTimeString());
 
-  const [date, setDate] = useState(today);
-  const [time, setTime] = useState(currentTime);
+  // Auto-sync date and time with current realtime clock when inputMode switches or on component mount
+  useEffect(() => {
+    setDate(getLocalDateString());
+    setTime(getLocalTimeString());
+  }, [inputMode]);
+
+  // Handler to manually re-sync to current realtime moment
+  const handleSyncRealtimeTime = () => {
+    setDate(getLocalDateString());
+    setTime(getLocalTimeString());
+  };
   
   // Use initialData for pre-selection
   const [selectedInstrumentId, setSelectedInstrumentId] = useState(initialData?.instrumentId || instruments[0]?.id || '');
@@ -414,9 +433,11 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
       detail: `Deviasi: ${newResult.sdPosition} · Z-Score: ${newResult.zScore}`
     });
 
-    // Reset input fields immediately to prevent double submissions
+    // Reset input fields immediately to prevent double submissions and refresh clock
     setInputValue('');
     setNotes('');
+    setDate(getLocalDateString());
+    setTime(getLocalTimeString());
     setIsSubmitting(false);
 
     // Otomatis scroll ke atas
@@ -437,6 +458,8 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
   const handleResetForm = () => {
     setInputValue('');
     setNotes('');
+    setDate(getLocalDateString());
+    setTime(getLocalTimeString());
     setIsSaved(false);
     setIsSubmitting(false);
     setDuplicateWarning(null);
@@ -601,29 +624,45 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
             {/* Date & Time Row */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Tanggal Pengujian *
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Tanggal Pengujian *
+                  </label>
+                  <span className="text-[10px] text-emerald-700 font-mono font-semibold">
+                    Kalender Realtime
+                  </span>
+                </div>
                 <input
                   type="date"
                   name="qc-date"
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
                   required
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-mono focus:border-emerald-500 focus:outline-none"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-mono focus:border-emerald-500 focus:outline-none bg-emerald-50/20"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Waktu Running *
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Waktu Running *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleSyncRealtimeTime}
+                    className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-200 transition-colors cursor-pointer"
+                    title="Perbarui ke jam realtime sekarang"
+                  >
+                    <Clock className="h-3 w-3" />
+                    <span>Waktu Sekarang</span>
+                  </button>
+                </div>
                 <input
                   type="time"
                   name="qc-time"
                   value={time}
                   onChange={(e) => setTime(e.target.value)}
                   required
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-mono focus:border-emerald-500 focus:outline-none"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-mono focus:border-emerald-500 focus:outline-none bg-emerald-50/20"
                 />
               </div>
             </div>
@@ -1161,7 +1200,9 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
 
               <div className="flex items-center gap-3 flex-wrap">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase">Tanggal</label>
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase">Tanggal</label>
+                  </div>
                   <input
                     type="date"
                     name="ib-date"
@@ -1171,7 +1212,18 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase">Waktu</label>
+                  <div className="flex items-center justify-between gap-1">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase">Waktu</label>
+                    <button
+                      type="button"
+                      onClick={handleSyncRealtimeTime}
+                      className="text-[9px] font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-0.5 cursor-pointer"
+                      title="Perbarui ke jam realtime sekarang"
+                    >
+                      <Clock className="h-2.5 w-2.5" />
+                      <span>Sekarang</span>
+                    </button>
+                  </div>
                   <input
                     type="time"
                     name="ib-time"

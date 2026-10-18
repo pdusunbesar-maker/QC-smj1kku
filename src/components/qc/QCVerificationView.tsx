@@ -28,6 +28,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { Parameter, Instrument, ControlMaterial, QCResult, WestgardViolation, QCStatus } from '../../types';
+import { getLocalDateString, getLocalTimeString } from '../../utils/dateUtils';
 import { calculateZScore, formatSDPosition, evaluateWestgardRules, DEFAULT_WESTGARD_RULES } from '../../utils/qcCalculations';
 import { buildVerifiedItemsFromAI, VerifiedQCItem } from '../../utils/aiUtils';
 import { StorageService } from '../../services/storage';
@@ -327,8 +328,8 @@ export const QCVerificationView: React.FC<QCVerificationViewProps> = ({
     const instParams = parameters.filter(p => p.instrumentId === targetInst?.id);
     const defaultParam = instParams[0] || parameters[0];
 
-    const today = new Date().toISOString().split('T')[0];
-    const time = new Date().toTimeString().split(' ')[0].substring(0, 5);
+    const today = getLocalDateString();
+    const time = getLocalTimeString();
 
     const newItem: VerifiedQCItem = {
       id: `VERIFY-${Date.now()}-MANUAL`,

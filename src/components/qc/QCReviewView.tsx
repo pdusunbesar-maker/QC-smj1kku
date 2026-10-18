@@ -23,6 +23,7 @@ import {
 import * as XLSX from 'xlsx';
 import { Instrument, Parameter, QCResult } from '../../types';
 import { useAuth } from '../../context/AuthContext';
+import { getLocalDateString } from '../../utils/dateUtils';
 import { StorageService } from '../../services/storage';
 import { calculateZScore, formatSDPosition } from '../../utils/qcCalculations';
 
@@ -207,7 +208,7 @@ export const QCReviewView: React.FC<QCReviewViewProps> = ({
       return;
     }
 
-    const todayDate = new Date().toISOString().split('T')[0];
+    const todayDate = getLocalDateString();
     const filename = `Data_Hasil_QC_Review_${filterStatus.toUpperCase()}_${todayDate}.csv`;
 
     const headers = [
@@ -301,7 +302,7 @@ export const QCReviewView: React.FC<QCReviewViewProps> = ({
       return;
     }
 
-    const todayDate = new Date().toISOString().split('T')[0];
+    const todayDate = getLocalDateString();
     const filename = `Data_Hasil_QC_Review_${filterStatus.toUpperCase()}_${todayDate}.xlsx`;
 
     const excelData = filteredResults.map((r, idx) => {

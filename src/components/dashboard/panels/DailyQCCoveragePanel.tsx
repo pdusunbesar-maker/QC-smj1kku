@@ -12,6 +12,7 @@ import {
   Search
 } from 'lucide-react';
 import { QCResult, Parameter, Instrument } from '../../../types';
+import { getLocalDateString } from '../../../utils/dateUtils';
 
 interface DailyQCCoveragePanelProps {
   qcResults: QCResult[];
@@ -27,7 +28,7 @@ export const DailyQCCoveragePanel: React.FC<DailyQCCoveragePanelProps> = ({
   onNavigateToTab,
 }) => {
   // Today's date YYYY-MM-DD
-  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const todayStr = useMemo(() => getLocalDateString(), []);
 
   // Compute coverage metrics
   const coverageData = useMemo(() => {
