@@ -7,13 +7,21 @@ import {
   FolderGit2, 
   Calendar, 
   Search, 
-  Filter,
-  FileText,
-  AlertCircle,
-  Clock,
-  Edit3,
-  Trash2,
-  Save
+  Filter, 
+  FileText, 
+  AlertCircle, 
+  Clock, 
+  Edit3, 
+  Trash2, 
+  Save,
+  ArrowRight,
+  Check,
+  RotateCcw,
+  Printer,
+  ShieldCheck,
+  Layers,
+  Sparkles,
+  Info
 } from 'lucide-react';
 import { NonConformity, Instrument, Parameter, QCResult } from '../../types';
 import { useAuth } from '../../context/AuthContext';
@@ -46,8 +54,31 @@ export const NonConformityView: React.FC<NonConformityViewProps> = ({
   const { user, can } = useAuth();
   const [showModal, setShowModal] = useState(!!initialData?.fromQc);
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [severityFilter, setSeverityFilter] = useState<string>('all');
   const [selectedNC, setSelectedNC] = useState<NonConformity | null>(null);
+
+  // Workflow Action Form State
+  const [ncActionForm, setNcActionForm] = useState({
+    actionExecutedByName: user.name,
+    actionExecutionDate: getLocalDateString(),
+    actionExecutionTime: getLocalTimeString(),
+    resolutionAction: '',
+    postActionQcResult: '',
+    resolutionNotes: '',
+  });
+
+  const handleSelectNC = (nc: NonConformity) => {
+    setSelectedNC(nc);
+    setNcActionForm({
+      actionExecutedByName: nc.actionExecutedByName || user.name,
+      actionExecutionDate: nc.actionExecutionDate || getLocalDateString(),
+      actionExecutionTime: nc.actionExecutionTime || getLocalTimeString(),
+      resolutionAction: nc.resolutionAction || nc.immediateAction || '',
+      postActionQcResult: nc.postActionQcResult || '',
+      resolutionNotes: nc.resolutionNotes || '',
+    });
+  };
 
   // Edit NC Modal State
   const [editingNC, setEditingNC] = useState<NonConformity | null>(null);
@@ -87,6 +118,18 @@ export const NonConformityView: React.FC<NonConformityViewProps> = ({
   const canManage = can('manage_capa') || user.role === 'admin' || user.role === 'supervisor';
 
   const filteredNC = nonConformities.filter(nc => {
+    const st = (nc.status || 'open').toLowerCase();
+    if (statusFilter !== 'all') {
+      if (statusFilter === 'open') {
+        if (st !== 'open') return false;
+      } else if (statusFilter === 'in_progress') {
+        if (st !== 'under_investigation' && st !== 'under_review' && st !== 'in_progress') return false;
+      } else if (statusFilter === 'resolved') {
+        if (st !== 'resolved') return false;
+      } else if (statusFilter === 'escalated_to_capa') {
+        if (st !== 'escalated_to_capa' && !nc.linkedCapaId) return false;
+      }
+    }
     if (severityFilter !== 'all' && nc.severity !== severityFilter) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -94,7 +137,8 @@ export const NonConformityView: React.FC<NonConformityViewProps> = ({
         nc.id.toLowerCase().includes(q) ||
         nc.parameterName.toLowerCase().includes(q) ||
         nc.description.toLowerCase().includes(q) ||
-        nc.reportedByName.toLowerCase().includes(q)
+        nc.reportedByName.toLowerCase().includes(q) ||
+        (nc.resolutionAction && nc.resolutionAction.toLowerCase().includes(q))
       );
     }
     return true;
@@ -188,16 +232,90 @@ export const NonConformityView: React.FC<NonConformityViewProps> = ({
     setNcToDelete(null);
   };
 
-  const handleResolveNC = (nc: NonConformity) => {
+  const handleStartNCAction = (nc: NonConformity) => {
+    const updated: NonConformity = {
+      ...nc,
+      status: 'under_investigation',
+      actionExecutedByName: ncActionForm.actionExecutedByName || user.name,
+      actionExecutionDate: ncActionForm.actionExecutionDate || getLocalDateString(),
+      actionExecutionTime: ncActionForm.actionExecutionTime || getLocalTimeString(),
+      resolutionAction: ncActionForm.resolutionAction || nc.immediateAction || '',
+    };
+    StorageService.saveNonConformity(updated);
+    StorageService.logAudit(
+      'START_NC_ACTION',
+      `Memulai tindakan perbaikan penyimpangan #${nc.id} (${nc.parameterName}) oleh ${user.name}`,
+      updated,
+      nc
+    );
+    onNCUpdated(updated);
+    setSelectedNC(updated);
+  };
+
+  const handleSaveNCActionProgress = (nc: NonConformity) => {
+    const updated: NonConformity = {
+      ...nc,
+      status: 'under_investigation',
+      actionExecutedByName: ncActionForm.actionExecutedByName,
+      actionExecutionDate: ncActionForm.actionExecutionDate,
+      actionExecutionTime: ncActionForm.actionExecutionTime,
+      resolutionAction: ncActionForm.resolutionAction,
+      postActionQcResult: ncActionForm.postActionQcResult,
+      resolutionNotes: ncActionForm.resolutionNotes,
+    };
+    StorageService.saveNonConformity(updated);
+    StorageService.logAudit(
+      'UPDATE_NC_ACTION',
+      `Menyimpan progres tindakan perbaikan #${nc.id} oleh ${user.name}`,
+      updated,
+      nc
+    );
+    onNCUpdated(updated);
+    setSelectedNC(updated);
+  };
+
+  const handleCompleteNC = (nc: NonConformity) => {
+    if (!ncActionForm.resolutionAction.trim()) {
+      alert('Mohon isi tindakan perbaikan yang telah dilaksanakan sebelum menandai selesai.');
+      return;
+    }
     const updated: NonConformity = {
       ...nc,
       status: 'resolved',
-      resolvedAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
+      actionExecutedByName: ncActionForm.actionExecutedByName || user.name,
+      actionExecutionDate: ncActionForm.actionExecutionDate || getLocalDateString(),
+      actionExecutionTime: ncActionForm.actionExecutionTime || getLocalTimeString(),
+      resolutionAction: ncActionForm.resolutionAction,
+      postActionQcResult: ncActionForm.postActionQcResult,
+      resolutionNotes: ncActionForm.resolutionNotes,
+      resolvedAt: `${getLocalDateString()} ${getLocalTimeString()}`,
+      resolvedBy: user.id,
+      resolvedByName: user.name,
     };
     StorageService.saveNonConformity(updated);
     StorageService.logAudit(
       'RESOLVE_NC',
-      `Menyelesaikan laporan ketidaksesuaian #${nc.id} oleh ${user.name}`,
+      `Menyelesaikan penyimpangan #${nc.id} (${nc.parameterName}) dengan status Selesai / Resolved oleh ${user.name}`,
+      updated,
+      nc
+    );
+    onNCUpdated(updated);
+    setSelectedNC(updated);
+  };
+
+  const handleReopenNC = (nc: NonConformity) => {
+    if (!window.confirm('Buka kembali laporan penyimpangan ini untuk evaluasi perbaikan lanjutan?')) return;
+    const updated: NonConformity = {
+      ...nc,
+      status: 'under_investigation',
+      resolvedAt: undefined,
+      resolvedBy: undefined,
+      resolvedByName: undefined,
+    };
+    StorageService.saveNonConformity(updated);
+    StorageService.logAudit(
+      'REOPEN_NC',
+      `Membuka kembali laporan penyimpangan #${nc.id} oleh ${user.name}`,
       updated,
       nc
     );
@@ -229,10 +347,49 @@ export const NonConformityView: React.FC<NonConformityViewProps> = ({
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="flex items-center rounded-lg bg-slate-100 p-1 text-xs font-medium text-slate-600 overflow-x-auto w-full sm:w-auto">
+      <div className="space-y-3">
+        {/* Workflow Status Filter Tabs */}
+        <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1">
+          <div className="flex items-center rounded-xl bg-slate-100 p-1 text-xs font-semibold text-slate-600 overflow-x-auto w-full sm:w-auto">
+            {[
+              { id: 'all', label: 'Semua Status' },
+              { id: 'open', label: '1. Open (Baru)' },
+              { id: 'in_progress', label: '2. Sedang Dilaksanakan' },
+              { id: 'resolved', label: '3. Selesai (Resolved)' },
+              { id: 'escalated_to_capa', label: '4. Eskalasi ke CAPA' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setStatusFilter(tab.id)}
+                className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
+                  statusFilter === tab.id
+                    ? 'bg-white text-slate-900 shadow-xs font-bold'
+                    : 'hover:text-slate-900'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Cari ID, parameter, tindakan, pelapor..."
+              className="w-full rounded-lg border border-slate-200 pl-9 pr-3 py-1.5 text-xs focus:border-rose-500 focus:outline-none"
+            />
+          </div>
+        </div>
+
+        {/* Severity Filter Pills */}
+        <div className="flex items-center gap-1.5 text-xs">
+          <span className="text-slate-500 font-medium text-[11px] mr-1">Tingkat Keparahan:</span>
           {[
-            { id: 'all', label: 'Semua Tingkat' },
+            { id: 'all', label: 'Semua' },
             { id: 'critical', label: 'Kritis (Critical)' },
             { id: 'major', label: 'Mayor (Major)' },
             { id: 'minor', label: 'Minor' },
@@ -241,26 +398,15 @@ export const NonConformityView: React.FC<NonConformityViewProps> = ({
               key={tab.id}
               type="button"
               onClick={() => setSeverityFilter(tab.id)}
-              className={`px-3 py-1.5 rounded-md whitespace-nowrap transition-colors ${
+              className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold transition-colors cursor-pointer ${
                 severityFilter === tab.id
-                  ? 'bg-white text-slate-900 shadow-xs font-semibold'
-                  : 'hover:text-slate-900'
+                  ? 'bg-slate-900 text-white shadow-2xs'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
               {tab.label}
             </button>
           ))}
-        </div>
-
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cari ID, parameter, pelapor..."
-            className="w-full rounded-lg border border-slate-200 pl-9 pr-3 py-1.5 text-xs focus:border-emerald-500 focus:outline-none"
-          />
         </div>
       </div>
 
@@ -269,12 +415,17 @@ export const NonConformityView: React.FC<NonConformityViewProps> = ({
         {filteredNC.map((nc) => {
           const isCritical = nc.severity === 'critical';
           const isMajor = nc.severity === 'major';
+          const isResolved = nc.status === 'resolved';
+          const isUnderInvestigation = nc.status === 'under_investigation' || nc.status === 'under_review';
+          const isEscalated = nc.status === 'escalated_to_capa' || !!nc.linkedCapaId;
 
           return (
             <div
               key={nc.id}
               className={`rounded-xl border bg-white p-4 shadow-xs transition-all flex flex-col justify-between ${
-                isCritical 
+                isResolved
+                  ? 'border-emerald-200 hover:border-emerald-300'
+                  : isCritical 
                   ? 'border-rose-300' 
                   : isMajor 
                   ? 'border-amber-300' 
@@ -296,14 +447,22 @@ export const NonConformityView: React.FC<NonConformityViewProps> = ({
                     }`}>
                       {nc.severity}
                     </span>
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-semibold capitalize ${
-                      nc.status === 'resolved'
-                        ? 'bg-emerald-100 text-emerald-800'
-                        : nc.status === 'escalated_to_capa'
-                        ? 'bg-indigo-100 text-indigo-800'
-                        : 'bg-slate-100 text-slate-700'
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                      isResolved
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                        : isEscalated
+                        ? 'bg-indigo-100 text-indigo-800 border border-indigo-300'
+                        : isUnderInvestigation
+                        ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                        : 'bg-amber-100 text-amber-800 border border-amber-300'
                     }`}>
-                      {nc.status.replace(/_/g, ' ')}
+                      {isResolved
+                        ? 'Selesai'
+                        : isEscalated
+                        ? 'Eskalasi CAPA'
+                        : isUnderInvestigation
+                        ? 'Dilaksanakan'
+                        : 'Open'}
                     </span>
                   </div>
                 </div>
@@ -325,21 +484,52 @@ export const NonConformityView: React.FC<NonConformityViewProps> = ({
                   </div>
                 )}
 
-                <div className="text-[11px] text-slate-500">
+                <div className="text-[11px] text-slate-500 space-y-0.5">
                   <p><strong>Pelapor:</strong> {nc.reportedByName}</p>
-                  <p><strong>Tindakan Segera:</strong> {nc.immediateAction || '-'}</p>
+                  {isResolved ? (
+                    <p className="text-emerald-700 font-semibold font-mono">
+                      ✓ Diselesaikan: {nc.resolvedAt} ({nc.resolvedByName || nc.reportedByName})
+                    </p>
+                  ) : nc.resolutionAction ? (
+                    <p className="text-blue-700 font-mono line-clamp-1">
+                      ▶ Tindakan: {nc.resolutionAction}
+                    </p>
+                  ) : (
+                    <p><strong>Tindakan Segera:</strong> {nc.immediateAction || '-'}</p>
+                  )}
                 </div>
               </div>
 
               {/* Action buttons footer */}
               <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-1">
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1.5">
                   <button
                     type="button"
-                    onClick={() => setSelectedNC(nc)}
-                    className="px-2 py-1 text-xs text-slate-700 hover:bg-slate-100 rounded-md font-medium"
+                    onClick={() => handleSelectNC(nc)}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center gap-1 cursor-pointer ${
+                      isResolved
+                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                        : isUnderInvestigation
+                        ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                        : 'bg-amber-600 hover:bg-amber-700 text-white'
+                    }`}
                   >
-                    Detail
+                    {isResolved ? (
+                      <>
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        <span>Selesai (Lihat)</span>
+                      </>
+                    ) : isUnderInvestigation ? (
+                      <>
+                        <Clock className="h-3.5 w-3.5" />
+                        <span>Lanjutkan Tindakan</span>
+                      </>
+                    ) : (
+                      <>
+                        <ArrowRight className="h-3.5 w-3.5" />
+                        <span>Laksanakan Tindakan</span>
+                      </>
+                    )}
                   </button>
 
                   {canManage && (
@@ -347,7 +537,7 @@ export const NonConformityView: React.FC<NonConformityViewProps> = ({
                       <button
                         type="button"
                         onClick={() => handleOpenEditNC(nc)}
-                        className="p-1 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
+                        className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
                         title="Edit Laporan NC"
                       >
                         <Edit3 className="h-3.5 w-3.5" />
@@ -355,7 +545,7 @@ export const NonConformityView: React.FC<NonConformityViewProps> = ({
                       <button
                         type="button"
                         onClick={() => setNcToDelete(nc)}
-                        className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-md transition-colors"
+                        className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors"
                         title="Hapus Laporan NC"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -662,42 +852,340 @@ export const NonConformityView: React.FC<NonConformityViewProps> = ({
         </div>
       )}
 
-      {/* 3. Detail NC Modal */}
+      {/* 3. Detail & Workflow NC Modal */}
       {selectedNC && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-3 sm:p-5 overflow-y-auto animate-in fade-in">
+          <div className="w-full max-w-3xl rounded-2xl bg-white p-5 sm:p-6 shadow-2xl space-y-4 my-6 max-h-[92vh] flex flex-col overflow-hidden border border-slate-200">
+            {/* Header Modal */}
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div>
-                <h3 className="font-bold text-slate-900 text-sm">
-                  Detail Penyimpangan #{selectedNC.id}
-                </h3>
-                <p className="text-xs text-slate-500 font-mono">
-                  {selectedNC.parameterName} · {selectedNC.date} {selectedNC.time}
-                </p>
+              <div className="flex items-center gap-3">
+                <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-white shadow-xs shrink-0 ${
+                  selectedNC.status === 'resolved'
+                    ? 'bg-emerald-600'
+                    : selectedNC.status === 'under_investigation' || selectedNC.status === 'under_review'
+                    ? 'bg-blue-600'
+                    : 'bg-amber-600'
+                }`}>
+                  <AlertTriangle className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-slate-900 text-base sm:text-lg">
+                      Alur Penanganan Penyimpangan #{selectedNC.id}
+                    </h3>
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                      selectedNC.status === 'resolved'
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                        : selectedNC.status === 'escalated_to_capa'
+                        ? 'bg-indigo-100 text-indigo-800 border border-indigo-300'
+                        : selectedNC.status === 'under_investigation'
+                        ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                        : 'bg-amber-100 text-amber-800 border border-amber-300'
+                    }`}>
+                      {selectedNC.status === 'resolved'
+                        ? 'Selesai (Resolved)'
+                        : selectedNC.status === 'under_investigation'
+                        ? 'Sedang Dilaksanakan'
+                        : selectedNC.status === 'escalated_to_capa'
+                        ? 'Eskalasi ke CAPA'
+                        : 'Open / Baru'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 font-mono mt-0.5">
+                    {selectedNC.parameterName} · {selectedNC.instrumentName} · {selectedNC.date} {selectedNC.time}
+                  </p>
+                </div>
               </div>
+
               <button
                 type="button"
                 onClick={() => setSelectedNC(null)}
-                className="text-slate-400 hover:text-slate-600"
+                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <div className="space-y-3 text-xs">
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 space-y-1">
-                <p><strong>Deskripsi:</strong> {selectedNC.description}</p>
-                <p><strong>Dampak:</strong> {selectedNC.impact}</p>
-                <p><strong>Tindakan Segera:</strong> {selectedNC.immediateAction}</p>
-                <p><strong>Analisis Awal:</strong> {selectedNC.initialAnalysis}</p>
-              </div>
+            {/* Workflow Stepper Bar */}
+            <div className="p-3 bg-gradient-to-r from-slate-50 via-slate-100/70 to-slate-50 rounded-xl border border-slate-200">
+              <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                {/* Step 1: Open */}
+                <div className={`p-2 rounded-lg border flex flex-col items-center justify-center transition-all ${
+                  selectedNC.status === 'open'
+                    ? 'bg-amber-50 border-amber-400 text-amber-900 font-bold shadow-2xs'
+                    : 'bg-white/80 border-slate-200 text-slate-600'
+                }`}>
+                  <div className="flex items-center gap-1">
+                    <span className={`h-4 w-4 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                      selectedNC.status === 'open' ? 'bg-amber-600 text-white' : 'bg-slate-300 text-slate-700'
+                    }`}>1</span>
+                    <span>1. Dilaporkan (Open)</span>
+                  </div>
+                  <span className="text-[10px] text-slate-500 mt-0.5">Insiden Tercatat</span>
+                </div>
 
-              <div className="flex items-center justify-between text-[11px] text-slate-500 font-mono">
-                <span>Pelapor: {selectedNC.reportedByName}</span>
-                <span>Status: {selectedNC.status}</span>
+                {/* Step 2: Under Investigation / In Progress */}
+                <div className={`p-2 rounded-lg border flex flex-col items-center justify-center transition-all ${
+                  selectedNC.status === 'under_investigation' || selectedNC.status === 'under_review'
+                    ? 'bg-blue-50 border-blue-400 text-blue-900 font-bold shadow-2xs'
+                    : 'bg-white/80 border-slate-200 text-slate-600'
+                }`}>
+                  <div className="flex items-center gap-1">
+                    <span className={`h-4 w-4 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                      selectedNC.status === 'under_investigation' ? 'bg-blue-600 text-white' : 'bg-slate-300 text-slate-700'
+                    }`}>2</span>
+                    <span>2. Dilaksanakan (In Progress)</span>
+                  </div>
+                  <span className="text-[10px] text-slate-500 mt-0.5">Tindakan Perbaikan</span>
+                </div>
+
+                {/* Step 3: Resolved */}
+                <div className={`p-2 rounded-lg border flex flex-col items-center justify-center transition-all ${
+                  selectedNC.status === 'resolved'
+                    ? 'bg-emerald-50 border-emerald-400 text-emerald-900 font-bold shadow-2xs'
+                    : 'bg-white/80 border-slate-200 text-slate-600'
+                }`}>
+                  <div className="flex items-center gap-1">
+                    <span className={`h-4 w-4 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                      selectedNC.status === 'resolved' ? 'bg-emerald-600 text-white' : 'bg-slate-300 text-slate-700'
+                    }`}>3</span>
+                    <span>3. Selesai (Resolved)</span>
+                  </div>
+                  <span className="text-[10px] text-slate-500 mt-0.5">Kontrol QC Normal</span>
+                </div>
               </div>
             </div>
 
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1 text-xs">
+              {/* Incident Details Card */}
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between text-slate-700 font-semibold border-b border-slate-200/80 pb-2">
+                  <span>Informasi Kejadian & Dampak</span>
+                  <span className="font-mono text-[11px] text-slate-500">Pelapor: <strong>{selectedNC.reportedByName}</strong></span>
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-slate-800">
+                  <div>
+                    <span className="text-slate-500 block text-[11px]">Uraian Penyimpangan:</span>
+                    <p className="font-medium mt-0.5">{selectedNC.description}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-[11px]">Dampak Klinis Hasil Pasien:</span>
+                    <p className="font-medium mt-0.5 text-rose-700">{selectedNC.impact}</p>
+                  </div>
+                </div>
+                {selectedNC.westgardRule && (
+                  <div className="mt-1 inline-flex items-center gap-1 text-[11px] font-mono font-bold text-rose-800 bg-rose-100 px-2 py-0.5 rounded border border-rose-200">
+                    Pelanggaran Aturan: {selectedNC.westgardRule}
+                  </div>
+                )}
+              </div>
+
+              {/* Status Specific Section: Resolved vs Action in Progress */}
+              {selectedNC.status === 'resolved' ? (
+                /* Completed Summary Card */
+                <div className="p-4 rounded-xl bg-emerald-50 border-2 border-emerald-500 text-emerald-950 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 font-bold text-sm text-emerald-900">
+                      <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                      <span>PENYIMPANGAN TELAH SELESAI DITANGANI DAN DIVERIFIKASI</span>
+                    </div>
+                    <span className="text-[11px] font-mono text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded font-semibold">
+                      Selesai: {selectedNC.resolvedAt}
+                    </span>
+                  </div>
+
+                  <div className="bg-white/90 p-3 rounded-lg border border-emerald-200 space-y-2 text-xs">
+                    <div>
+                      <span className="text-slate-500 block text-[11px]">Tindakan Perbaikan yang Telah Dilaksanakan:</span>
+                      <p className="font-bold text-slate-900 mt-0.5">{selectedNC.resolutionAction || selectedNC.immediateAction}</p>
+                    </div>
+
+                    {selectedNC.postActionQcResult && (
+                      <div>
+                        <span className="text-slate-500 block text-[11px]">Hasil Evaluasi / Re-run QC Kontrol:</span>
+                        <p className="font-semibold text-emerald-800 font-mono mt-0.5">
+                          ✓ {selectedNC.postActionQcResult}
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px] text-slate-500 font-mono">
+                      <span>Pelaksana Tindakan: <strong>{selectedNC.actionExecutedByName || selectedNC.resolvedByName || user.name}</strong></span>
+                      <span>Disetujui: <strong>{selectedNC.resolvedByName || user.name}</strong></span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <button
+                      type="button"
+                      onClick={() => window.print()}
+                      className="px-3.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs flex items-center gap-1.5 shadow-2xs"
+                    >
+                      <Printer className="h-3.5 w-3.5" />
+                      <span>Cetak Berita Acara</span>
+                    </button>
+
+                    {canManage && (
+                      <button
+                        type="button"
+                        onClick={() => handleReopenNC(selectedNC)}
+                        className="px-3 py-1.5 rounded-lg border border-emerald-300 hover:bg-emerald-100 text-emerald-900 font-semibold text-xs flex items-center gap-1 transition-colors"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                        <span>Buka Kembali (Reopen)</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                /* Action Implementation Form */
+                <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <div>
+                      <h4 className="font-bold text-slate-900 text-sm">
+                        Pelaksanaan Tindakan Perbaikan Langsung
+                      </h4>
+                      <p className="text-slate-500 text-[11px]">
+                        Catat langkah koreksi yang dilaksanakan dan uji ulang QC sebelum menutup penyimpangan.
+                      </p>
+                    </div>
+
+                    {selectedNC.status === 'open' && (
+                      <button
+                        type="button"
+                        onClick={() => handleStartNCAction(selectedNC)}
+                        className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1 shadow-2xs"
+                      >
+                        <ArrowRight className="h-3.5 w-3.5" />
+                        <span>Mulai Pelaksanaan</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Quick Action Chips */}
+                  <div className="space-y-1">
+                    <span className="text-[11px] font-semibold text-slate-600">Template Tindakan Cepat (Klik untuk memilih):</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        'Kalibrasi ulang parameter dan re-run kontrol',
+                        'Ganti vial kontrol baru (lot baru)',
+                        'Pembersihan jarum probe dan kuvet ukur',
+                        'Flushing saluran hidrolik dan de-bubble',
+                        'Ganti botol reagen baru dan homogenisasi',
+                      ].map((chip, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => {
+                            const cur = ncActionForm.resolutionAction;
+                            const newVal = cur ? `${cur}; ${chip}` : chip;
+                            setNcActionForm({ ...ncActionForm, resolutionAction: newVal });
+                          }}
+                          className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-medium transition-colors cursor-pointer border border-slate-200"
+                        >
+                          + {chip}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Execution Form Fields */}
+                  <div className="space-y-3 pt-1">
+                    <div>
+                      <label className="block font-bold text-slate-800 mb-1">
+                        Tindakan Perbaikan yang Dilaksanakan *
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={ncActionForm.resolutionAction}
+                        onChange={(e) => setNcActionForm({ ...ncActionForm, resolutionAction: e.target.value })}
+                        required
+                        placeholder="Uraikan tindakan perbaikan yang telah/sedang dilaksanakan..."
+                        className="w-full rounded-lg border border-slate-200 p-2 text-xs focus:border-blue-500 focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-800 mb-1">
+                        Hasil Evaluasi / Re-run Kontrol Pasca Perbaikan (Quality Check)
+                      </label>
+                      <input
+                        type="text"
+                        value={ncActionForm.postActionQcResult}
+                        onChange={(e) => setNcActionForm({ ...ncActionForm, postActionQcResult: e.target.value })}
+                        placeholder="Contoh: Kontrol level 1 re-run diperoleh 101.5 mg/dL, target 100.0 mg/dL, Z-Score +0.6 SD (In-Control)"
+                        className="w-full rounded-lg border border-slate-200 p-2 text-xs font-mono focus:border-blue-500 focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1">Petugas Pelaksana</label>
+                        <input
+                          type="text"
+                          value={ncActionForm.actionExecutedByName}
+                          onChange={(e) => setNcActionForm({ ...ncActionForm, actionExecutedByName: e.target.value })}
+                          className="w-full rounded-lg border border-slate-200 p-2 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1">Tanggal Pelaksanaan</label>
+                        <input
+                          type="date"
+                          value={ncActionForm.actionExecutionDate}
+                          onChange={(e) => setNcActionForm({ ...ncActionForm, actionExecutionDate: e.target.value })}
+                          className="w-full rounded-lg border border-slate-200 p-2 text-xs font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1">Jam Pelaksanaan</label>
+                        <input
+                          type="time"
+                          value={ncActionForm.actionExecutionTime}
+                          onChange={(e) => setNcActionForm({ ...ncActionForm, actionExecutionTime: e.target.value })}
+                          className="w-full rounded-lg border border-slate-200 p-2 text-xs font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Catatan Tambahan</label>
+                      <input
+                        type="text"
+                        value={ncActionForm.resolutionNotes}
+                        onChange={(e) => setNcActionForm({ ...ncActionForm, resolutionNotes: e.target.value })}
+                        placeholder="Catatan tambahan untuk penanggung jawab mutu..."
+                        className="w-full rounded-lg border border-slate-200 p-2 text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Transition Buttons inside Action Area */}
+                  <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleSaveNCActionProgress(selectedNC)}
+                      className="px-3.5 py-2 rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold flex items-center gap-1.5 text-xs transition-colors"
+                    >
+                      <Save className="h-4 w-4" />
+                      <span>Simpan Progres Tindakan</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleCompleteNC(selectedNC)}
+                      className="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center gap-1.5 text-xs transition-colors shadow-sm"
+                    >
+                      <CheckCircle2 className="h-4 w-4" />
+                      <span>Selesaikan & Tutup Penyimpangan (Tandai Selesai / Resolved)</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer Modal */}
             <div className="flex items-center justify-between gap-2 pt-3 border-t border-slate-100">
               <div className="flex items-center gap-1">
                 {canManage && (
@@ -729,19 +1217,24 @@ export const NonConformityView: React.FC<NonConformityViewProps> = ({
               </div>
 
               <div className="flex items-center gap-2">
-                {selectedNC.status !== 'resolved' && (
+                {selectedNC.status !== 'escalated_to_capa' && !selectedNC.linkedCapaId && (
                   <button
                     type="button"
-                    onClick={() => handleResolveNC(selectedNC)}
-                    className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-colors"
+                    onClick={() => {
+                      const targetNC = selectedNC;
+                      setSelectedNC(null);
+                      onNavigateToTab('capa', { fromNC: targetNC });
+                    }}
+                    className="flex items-center gap-1 px-3.5 py-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors border border-indigo-200"
                   >
-                    Tandai Selesai (Resolved)
+                    <FolderGit2 className="h-4 w-4" />
+                    <span>Eskalasi ke Dokumen CAPA</span>
                   </button>
                 )}
                 <button
                   type="button"
                   onClick={() => setSelectedNC(null)}
-                  className="px-4 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-xs font-medium"
+                  className="px-4 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700"
                 >
                   Tutup
                 </button>

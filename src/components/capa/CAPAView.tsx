@@ -98,11 +98,20 @@ export const CAPAView: React.FC<CAPAViewProps> = ({
   const todayMs = new Date().setHours(0,0,0,0);
 
   const filteredCapas = capas.filter(c => {
+    const st = (c.status || 'open').toLowerCase();
     if (statusFilter !== 'all') {
       if (statusFilter === 'overdue') {
-        const isOverdue = new Date(c.overallDueDate).getTime() < todayMs && c.status !== 'closed';
+        const isOverdue = new Date(c.overallDueDate).getTime() < todayMs && st !== 'closed';
         if (!isOverdue) return false;
-      } else if (c.status !== statusFilter) {
+      } else if (statusFilter === 'open') {
+        if (st !== 'open' && st !== 'draft') return false;
+      } else if (statusFilter === 'action_in_progress') {
+        if (st !== 'action_in_progress' && st !== 'investigation' && st !== 'in_progress' && st !== 'action_required') return false;
+      } else if (statusFilter === 'pending_verification') {
+        if (st !== 'pending_verification' && st !== 'waiting_review' && st !== 'effectiveness_check') return false;
+      } else if (statusFilter === 'closed') {
+        if (st !== 'closed') return false;
+      } else if (st !== statusFilter.toLowerCase()) {
         return false;
       }
     }
@@ -410,9 +419,23 @@ export const CAPAView: React.FC<CAPAViewProps> = ({
                     <button
                       type="button"
                       onClick={() => setSelectedCapa(capa)}
-                      className="px-3 py-1.5 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition-colors"
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1 cursor-pointer ${
+                        (capa.status || '').toLowerCase() === 'closed'
+                          ? 'bg-emerald-700 hover:bg-emerald-800 text-white'
+                          : (capa.status || '').toLowerCase() === 'pending_verification'
+                          ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                          : (capa.status || '').toLowerCase() === 'open'
+                          ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                          : 'bg-slate-900 hover:bg-slate-800 text-white'
+                      }`}
                     >
-                      Kelola
+                      {(capa.status || '').toLowerCase() === 'closed' 
+                        ? 'Selesai (Lihat)' 
+                        : (capa.status || '').toLowerCase() === 'pending_verification' 
+                        ? 'Verifikasi Efektivitas' 
+                        : (capa.status || '').toLowerCase() === 'open' 
+                        ? 'Mulai Laksanakan' 
+                        : 'Pelaksanaan Tindakan'}
                     </button>
 
                     {canManage && (
@@ -698,6 +721,10 @@ export const CAPAView: React.FC<CAPAViewProps> = ({
             setCapaToDelete(c);
           }}
           onNavigateToTab={onNavigateToTab}
+          onCapaUpdated={(updated) => {
+            setSelectedCapa(updated);
+            onCapaUpdated(updated);
+          }}
         />
       )}
 

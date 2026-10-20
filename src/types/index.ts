@@ -201,8 +201,17 @@ export interface NonConformity {
   immediateAction: string;
   reportedBy: string;
   reportedByName: string;
-  status: 'open' | 'under_review' | 'resolved' | 'escalated_to_capa';
+  status: 'open' | 'under_review' | 'under_investigation' | 'resolved' | 'escalated_to_capa';
+  actionExecutionDate?: string;
+  actionExecutionTime?: string;
+  actionExecutedBy?: string;
+  actionExecutedByName?: string;
+  postActionQcResult?: string;
   resolvedAt?: string;
+  resolvedBy?: string;
+  resolvedByName?: string;
+  resolutionAction?: string;
+  resolutionNotes?: string;
   linkedCapaId?: string;
   deletedAt?: string;
 }
