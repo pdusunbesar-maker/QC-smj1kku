@@ -1,4 +1,5 @@
 import { QCResult, QCStatistics, WestgardRuleConfig, WestgardViolation } from '../types';
+import { getWestgardContextualGuidance } from './westgardGuidance';
 
 export const DEFAULT_WESTGARD_RULES: WestgardRuleConfig[] = [
   {
@@ -167,6 +168,9 @@ export function evaluateWestgardRules(
     mean: number;
     sd: number;
     zScore: number;
+    instrumentName?: string;
+    parameterName?: string;
+    parameterUnit?: string;
   },
   previousResults: QCResult[],
   activeRules: WestgardRuleConfig[] = DEFAULT_WESTGARD_RULES
@@ -188,30 +192,70 @@ export function evaluateWestgardRules(
 
   const len = allPoints.length;
 
+  const instName = currentResult.instrumentName || previousResults[0]?.instrumentName || 'Instrumen Laboratorium';
+  const paramName = currentResult.parameterName || previousResults[0]?.parameterName || 'Parameter QC';
+  const paramUnit = currentResult.parameterUnit || previousResults[0]?.unit || '';
+
+  const buildViolation = (
+    rule: WestgardViolation['rule'],
+    ruleName: string,
+    type: 'warning' | 'reject',
+    desc: string,
+    pointsInvolved: string[]
+  ): WestgardViolation => {
+    const guidance = getWestgardContextualGuidance(
+      rule,
+      ruleName,
+      type,
+      instName,
+      paramName,
+      z,
+      desc
+    );
+
+    return {
+      rule,
+      ruleName,
+      type,
+      description: desc,
+      pointsInvolved,
+      detectedAt: now,
+      instrumentName: guidance.instrumentName,
+      parameterName: guidance.parameterName,
+      parameterUnit: paramUnit,
+      impact: guidance.impact,
+      probableCauses: guidance.probableCauses,
+      correctiveActions: guidance.correctiveActions,
+      preventiveActions: guidance.preventiveActions,
+    };
+  };
+
   // 1. Rule 1-3s: |z| > 3 (Reject)
   if (rulesMap.get('1_3s')?.enabled && Math.abs(z) > 3) {
-    violations.push({
-      rule: '1_3s',
-      ruleName: '1:3s Violation',
-      type: 'reject',
-      description: `Nilai Z-score ${z > 0 ? '+' : ''}${z.toFixed(2)} melebihi ±3SD`,
-      pointsInvolved: [currentResult.id],
-      detectedAt: now,
-    });
+    violations.push(
+      buildViolation(
+        '1_3s',
+        'Aturan 1:3s (Reject)',
+        'reject',
+        `Nilai Z-score ${z > 0 ? '+' : ''}${z.toFixed(2)} pada ${instName} (${paramName}) melebihi ±3SD`,
+        [currentResult.id]
+      )
+    );
   }
 
   // 2. Rule 2-2s: 2 consecutive points > +2SD OR 2 consecutive points < -2SD (Reject)
   if (rulesMap.get('2_2s')?.enabled && len >= 2) {
     const prevZ = allPoints[len - 2].zScore;
     if ((z > 2 && prevZ > 2) || (z < -2 && prevZ < -2)) {
-      violations.push({
-        rule: '2_2s',
-        ruleName: '2:2s Violation',
-        type: 'reject',
-        description: `Dua hasil berurutan (${prevZ.toFixed(2)} SD & ${z.toFixed(2)} SD) melebihi batas ±2SD pada sisi yang sama`,
-        pointsInvolved: [allPoints[len - 2].id, currentResult.id],
-        detectedAt: now,
-      });
+      violations.push(
+        buildViolation(
+          '2_2s',
+          'Aturan 2:2s (Reject)',
+          'reject',
+          `Dua hasil berurutan (${prevZ.toFixed(2)} SD & ${z.toFixed(2)} SD) pada ${instName} (${paramName}) melebihi batas ±2SD pada sisi yang sama`,
+          [allPoints[len - 2].id, currentResult.id]
+        )
+      );
     }
   }
 
@@ -219,14 +263,15 @@ export function evaluateWestgardRules(
   if (rulesMap.get('R_4s')?.enabled && len >= 2) {
     const prevZ = allPoints[len - 2].zScore;
     if (Math.abs(z - prevZ) >= 4) {
-      violations.push({
-        rule: 'R_4s',
-        ruleName: 'R:4s Violation',
-        type: 'reject',
-        description: `Rentang selisih 2 hasil berurutan adalah ${Math.abs(z - prevZ).toFixed(2)} SD (≥ 4SD)`,
-        pointsInvolved: [allPoints[len - 2].id, currentResult.id],
-        detectedAt: now,
-      });
+      violations.push(
+        buildViolation(
+          'R_4s',
+          'Aturan R:4s (Reject)',
+          'reject',
+          `Rentang selisih 2 hasil berurutan pada ${instName} (${paramName}) adalah ${Math.abs(z - prevZ).toFixed(2)} SD (≥ 4SD)`,
+          [allPoints[len - 2].id, currentResult.id]
+        )
+      );
     }
   }
 
@@ -236,14 +281,15 @@ export function evaluateWestgardRules(
     const allHigh = last4.every(p => p.zScore > 1);
     const allLow = last4.every(p => p.zScore < -1);
     if (allHigh || allLow) {
-      violations.push({
-        rule: '4_1s',
-        ruleName: '4:1s Violation',
-        type: 'reject',
-        description: `Empat hasil berurutan melebihi ±1SD pada sisi ${allHigh ? 'atas (+)' : 'bawah (-)'}`,
-        pointsInvolved: last4.map(p => p.id),
-        detectedAt: now,
-      });
+      violations.push(
+        buildViolation(
+          '4_1s',
+          'Aturan 4:1s (Reject)',
+          'reject',
+          `Empat hasil berurutan pada ${instName} (${paramName}) melebihi ±1SD pada sisi ${allHigh ? 'atas (+)' : 'bawah (-)'}`,
+          last4.map(p => p.id)
+        )
+      );
     }
   }
 
@@ -253,14 +299,15 @@ export function evaluateWestgardRules(
     const allAboveMean = last10.every(p => p.zScore > 0);
     const allBelowMean = last10.every(p => p.zScore < 0);
     if (allAboveMean || allBelowMean) {
-      violations.push({
-        rule: '10x',
-        ruleName: '10x Violation',
-        type: 'warning',
-        description: `Sepuluh hasil berurutan berada di sisi ${allAboveMean ? 'atas (+)' : 'bawah (-)'} Mean`,
-        pointsInvolved: last10.map(p => p.id),
-        detectedAt: now,
-      });
+      violations.push(
+        buildViolation(
+          '10x',
+          'Aturan 10x (Warning)',
+          'warning',
+          `Sepuluh hasil berurutan pada ${instName} (${paramName}) berada di sisi ${allAboveMean ? 'atas (+)' : 'bawah (-)'} Mean`,
+          last10.map(p => p.id)
+        )
+      );
     }
   }
 
@@ -269,14 +316,15 @@ export function evaluateWestgardRules(
   if (rulesMap.get('1_2s')?.enabled && Math.abs(z) > 2) {
     const alreadyHasReject = violations.some(v => v.type === 'reject');
     if (!alreadyHasReject) {
-      violations.push({
-        rule: '1_2s',
-        ruleName: '1:2s Warning',
-        type: 'warning',
-        description: `Hasil berada di luar ±2SD (${z > 0 ? '+' : ''}${z.toFixed(2)} SD)`,
-        pointsInvolved: [currentResult.id],
-        detectedAt: now,
-      });
+      violations.push(
+        buildViolation(
+          '1_2s',
+          'Aturan 1:2s (Warning)',
+          'warning',
+          `Hasil pada ${instName} (${paramName}) berada di luar ±2SD (${z > 0 ? '+' : ''}${z.toFixed(2)} SD)`,
+          [currentResult.id]
+        )
+      );
     }
   }
 
@@ -359,7 +407,14 @@ export interface Shift10xDetection {
   type: 'warning' | 'reject';
   title: string;
   description: string;
+  instrumentName?: string;
+  parameterName?: string;
+  analyzerType?: string;
+  analyzerTypeName?: string;
   instrumentImpact: string;
+  probableCauses?: string[];
+  correctiveActions?: string[];
+  preventiveActions?: string[];
   recommendations: string[];
 }
 
@@ -367,10 +422,15 @@ export interface Shift10xDetection {
  * Deteksi Otomatis Aturan Westgard '10x' (Sistematis) pada Levey-Jennings
  * Mengidentifikasi pergeseran tren akurasi instrumen (systematic shift / calibration drift).
  * Terpicu apabila minimal 10 hasil kontrol berturut-turut berada di sisi Mean yang sama.
+ * Membaca otomatis instrumen dan parameter untuk menghasilkan dampak, kemungkinan penyebab,
+ * serta rekomendasi tindakan korektif dan pencegahan yang spesifik sesuai instrumen.
  */
 export function detect10xConsecutiveShifts(
   points: { id: string; date?: string; value: number; zScore?: number }[],
-  targetMean: number
+  targetMean: number,
+  rawInstrumentName?: string,
+  rawParameterName?: string,
+  rawUnit?: string
 ): Shift10xDetection[] {
   const detections: Shift10xDetection[] = [];
   if (points.length < 10) return detections;
@@ -386,6 +446,19 @@ export function detect10xConsecutiveShifts(
     const meanBiasPercent = targetMean !== 0 ? Number(((meanDiff / targetMean) * 100).toFixed(2)) : 0;
     const directionText = side === 'above' ? 'Atas (+ Mean)' : 'Bawah (- Mean)';
 
+    const guidance = getWestgardContextualGuidance(
+      '10x',
+      'Aturan Westgard 10x (Pergeseran Tren Akurasi)',
+      'warning',
+      rawInstrumentName,
+      rawParameterName,
+      meanDiff,
+      `Pergeseran ${count} titik di sisi ${directionText}`
+    );
+
+    const instLabel = guidance.instrumentName || rawInstrumentName || 'Instrumen Laboratorium';
+    const paramLabel = guidance.parameterName || rawParameterName || 'Parameter QC';
+
     detections.push({
       start,
       end,
@@ -398,14 +471,19 @@ export function detect10xConsecutiveShifts(
       meanDiff,
       meanBiasPercent,
       type: 'warning',
-      title: `Aturan Westgard 10x Terdeteksi (${count} Titik di Sisi ${directionText})`,
-      description: `Terdapat ${count} hasil QC berurutan berada di sisi ${directionText}. Ini mengindikasikan pergeseran sistematik (systematic shift) pada akurasi instrumen.`,
-      instrumentImpact: 'Pergeseran akurasi pengukuran (drift calibration), degradasi reagen/deteriorasi fotometer, atau pengaruh temperatur kamar/flowcell analiser.',
+      instrumentName: instLabel,
+      parameterName: paramLabel,
+      analyzerType: guidance.analyzerType,
+      analyzerTypeName: guidance.analyzerTypeName,
+      title: `Aturan Westgard 10x Terdeteksi pada ${instLabel} (${count} Titik di Sisi ${directionText})`,
+      description: `Terdapat ${count} hasil QC berurutan berada di sisi ${directionText} pada instrumen ${instLabel} untuk parameter ${paramLabel}. Ini mengindikasikan pergeseran sistematik (systematic shift) dengan deviasi rata-rata ${meanDiff > 0 ? '+' : ''}${meanDiff} ${rawUnit || ''} (${meanBiasPercent > 0 ? '+' : ''}${meanBiasPercent}% bias terhadap target mean).`,
+      instrumentImpact: guidance.impact,
+      probableCauses: guidance.probableCauses,
+      correctiveActions: guidance.correctiveActions,
+      preventiveActions: guidance.preventiveActions,
       recommendations: [
-        'Lakukan evaluasi dan re-kalibrasi instrumen hematologi analiser',
-        'Periksa kondisi fisik, kestabilan nomor lot reagen, dan tanggal kedaluwarsa',
-        'Uji ulang dengan vial bahan kontrol baru yang belum mengalami evaporasi',
-        'Verifikasi suhu flowcell/ruang inkubasi dan lakukan flushing jalur cairan alat'
+        ...(guidance.correctiveActions || []),
+        ...(guidance.preventiveActions || [])
       ]
     });
   };

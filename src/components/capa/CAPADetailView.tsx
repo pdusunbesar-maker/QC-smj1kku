@@ -148,7 +148,6 @@ export const CAPADetailView: React.FC<CAPADetailViewProps> = ({
   };
 
   const handleReopenCapa = () => {
-    if (!window.confirm('Buka kembali dokumen CAPA ini untuk tindakan perbaikan lanjutan?')) return;
     const updated: CAPA = {
       ...currentCapa,
       status: 'action_in_progress',

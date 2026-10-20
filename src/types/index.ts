@@ -122,6 +122,13 @@ export interface WestgardViolation {
   description: string;
   pointsInvolved: string[]; // QC Result IDs
   detectedAt: string;
+  instrumentName?: string;
+  parameterName?: string;
+  parameterUnit?: string;
+  impact?: string;
+  probableCauses?: string[];
+  correctiveActions?: string[];
+  preventiveActions?: string[];
 }
 
 export interface QCResult {

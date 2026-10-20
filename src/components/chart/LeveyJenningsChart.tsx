@@ -307,6 +307,16 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
     return detect6ConsecutiveTrends(values);
   }, [plottedPoints]);
 
+  // Instrumen yang terdeteksi aktif untuk parameter pemeriksaan ini
+  const currentInstName = useMemo(() => {
+    return (
+      filteredRawResults[0]?.instrumentName || 
+      results.find(r => r.parameterId === parameter.id)?.instrumentName || 
+      StorageService.getInstruments().find(i => i.id === parameter.instrumentId)?.name || 
+      'Chemistry Analyzer CST-240 (Dirui CS-T240)'
+    );
+  }, [filteredRawResults, results, parameter]);
+
   // Deteksi Otomatis Aturan Westgard 10x (Pergeseran Tren Akurasi Instrumen / Systematic Shift)
   const detected10xShifts = useMemo<Shift10xDetection[]>(() => {
     return detect10xConsecutiveShifts(
@@ -316,9 +326,12 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
         value: p.value,
         zScore: p.zScore
       })),
-      parameter.targetMean
+      parameter.targetMean,
+      currentInstName,
+      parameter.name,
+      parameter.unit
     );
-  }, [plottedPoints, parameter.targetMean]);
+  }, [plottedPoints, parameter.targetMean, currentInstName, parameter.name, parameter.unit]);
 
   // Violations in current selection
   const violationsList = useMemo(() => {
@@ -863,14 +876,20 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
                       Systematic Shift ({detected10xShifts.length} Zona Terdeteksi)
                     </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-900 border border-purple-200">
+                      Instrumen: {currentInstName}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-800 border border-slate-200">
+                      Param: {parameter.name}
+                    </span>
                   </h4>
                   <p className="text-[11px] text-slate-600 mt-0.5">
-                    Sistem mendeteksi rentetan ≥10 titik kontrol berturut-turut pada sisi mean yang sama, mengindikasikan pergeseran akurasi analitik pada instrumen.
+                    Sistem otomatis membaca instrumen <strong className="text-indigo-900">{currentInstName}</strong> dan parameter <strong className="text-indigo-900">{parameter.name}</strong> untuk menganalisis dampak analitik, kemungkinan penyebab, serta rekomendasi tindakan korektif & pencegahan.
                   </p>
                 </div>
               </div>
 
-              {/* Action shortcuts */}
+              {/* Action shortcuts with enriched contextual payload */}
               <div className="flex items-center gap-2 shrink-0">
                 {onCreateCapa && (
                   <button
@@ -878,7 +897,32 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
                     onClick={() => {
                       const latestShift = detected10xShifts[detected10xShifts.length - 1];
                       const targetPt = plottedPoints[latestShift.end];
-                      if (targetPt) onCreateCapa(targetPt.rawResult);
+                      if (targetPt) {
+                        const enrichedResult: QCResult = {
+                          ...targetPt.rawResult,
+                          instrumentName: latestShift.instrumentName || currentInstName,
+                          parameterName: latestShift.parameterName || parameter.name,
+                          violations: [
+                            ...(targetPt.rawResult.violations || []),
+                            {
+                              rule: '10x',
+                              ruleName: 'Aturan Westgard 10x (Systematic Shift)',
+                              type: 'warning',
+                              description: latestShift.description,
+                              pointsInvolved: latestShift.pointIds,
+                              detectedAt: new Date().toISOString(),
+                              instrumentName: latestShift.instrumentName || currentInstName,
+                              parameterName: latestShift.parameterName || parameter.name,
+                              parameterUnit: parameter.unit,
+                              impact: latestShift.instrumentImpact,
+                              probableCauses: latestShift.probableCauses,
+                              correctiveActions: latestShift.correctiveActions,
+                              preventiveActions: latestShift.preventiveActions,
+                            }
+                          ]
+                        };
+                        onCreateCapa(enrichedResult);
+                      }
                     }}
                     className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
                   >
@@ -892,7 +936,32 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
                     onClick={() => {
                       const latestShift = detected10xShifts[detected10xShifts.length - 1];
                       const targetPt = plottedPoints[latestShift.end];
-                      if (targetPt) onCreateNC(targetPt.rawResult);
+                      if (targetPt) {
+                        const enrichedResult: QCResult = {
+                          ...targetPt.rawResult,
+                          instrumentName: latestShift.instrumentName || currentInstName,
+                          parameterName: latestShift.parameterName || parameter.name,
+                          violations: [
+                            ...(targetPt.rawResult.violations || []),
+                            {
+                              rule: '10x',
+                              ruleName: 'Aturan Westgard 10x (Systematic Shift)',
+                              type: 'warning',
+                              description: latestShift.description,
+                              pointsInvolved: latestShift.pointIds,
+                              detectedAt: new Date().toISOString(),
+                              instrumentName: latestShift.instrumentName || currentInstName,
+                              parameterName: latestShift.parameterName || parameter.name,
+                              parameterUnit: parameter.unit,
+                              impact: latestShift.instrumentImpact,
+                              probableCauses: latestShift.probableCauses,
+                              correctiveActions: latestShift.correctiveActions,
+                              preventiveActions: latestShift.preventiveActions,
+                            }
+                          ]
+                        };
+                        onCreateNC(enrichedResult);
+                      }
                     }}
                     className="px-3 py-1.5 rounded-lg border border-indigo-300 bg-white hover:bg-indigo-50 text-indigo-800 font-bold text-xs transition-colors cursor-pointer"
                   >
@@ -902,11 +971,11 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
               </div>
             </div>
 
-            {/* List of Detected 10x Shifts with Diagnostics */}
+            {/* List of Detected 10x Shifts with Contextual Diagnostics */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {detected10xShifts.map((shift, idx) => (
-                <div key={idx} className="p-3 rounded-lg border border-indigo-100 bg-white/90 space-y-2 shadow-2xs">
-                  <div className="flex items-center justify-between text-xs">
+                <div key={idx} className="p-3.5 rounded-xl border border-indigo-100 bg-white/95 space-y-2.5 shadow-2xs">
+                  <div className="flex items-center justify-between text-xs flex-wrap gap-1">
                     <span className="font-bold text-indigo-900 flex items-center gap-1.5">
                       <AlertTriangle className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
                       <span>{shift.title}</span>
@@ -916,19 +985,73 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
                     </span>
                   </div>
 
+                  {/* Modality & Instrument Confirmation Tag */}
+                  <div className="flex items-center gap-2 text-[10px]">
+                    <span className="px-2 py-0.5 rounded font-bold bg-indigo-100/80 text-indigo-900">
+                      Modality: {shift.analyzerTypeName || 'Automated Laboratory Analyzer'}
+                    </span>
+                    <span className="text-slate-500 font-mono">
+                      Bias: <strong>{shift.meanDiff > 0 ? '+' : ''}{shift.meanDiff} {parameter.unit}</strong> ({shift.meanBiasPercent > 0 ? '+' : ''}{shift.meanBiasPercent}%)
+                    </span>
+                  </div>
+
                   <p className="text-[11px] text-slate-700 leading-relaxed">
-                    {shift.description} Nilai rata-rata bergeser sebesar <strong>{shift.meanDiff > 0 ? '+' : ''}{shift.meanDiff} {parameter.unit}</strong> ({shift.meanBiasPercent > 0 ? '+' : ''}{shift.meanBiasPercent}% bias terhadap target mean {parameter.targetMean} {parameter.unit}).
+                    {shift.description}
                   </p>
 
-                  <div className="text-[10px] text-slate-600 bg-indigo-50/60 p-2.5 rounded-lg border border-indigo-100/70 space-y-1">
-                    <p className="font-bold text-indigo-950">🔍 Dampak & Kemungkinan Penyebab:</p>
-                    <p className="text-slate-700">{shift.instrumentImpact}</p>
-                    <p className="font-bold text-indigo-950 pt-1">🛠️ Tindakan Pencegahan / Korektif yang Dianjurkan:</p>
-                    <ul className="list-disc list-inside space-y-0.5 text-slate-700">
-                      {shift.recommendations.map((rec, rIdx) => (
-                        <li key={rIdx}>{rec}</li>
-                      ))}
-                    </ul>
+                  <div className="text-[10px] space-y-2 pt-1 border-t border-slate-100">
+                    {/* Impact Section */}
+                    <div className="bg-rose-50/70 p-2.5 rounded-lg border border-rose-100 text-rose-900 space-y-0.5">
+                      <p className="font-bold flex items-center gap-1">
+                        <span>🔍 Dampak Pengukuran pada {shift.instrumentName || currentInstName}:</span>
+                      </p>
+                      <p className="text-rose-800 leading-relaxed">{shift.instrumentImpact}</p>
+                    </div>
+
+                    {/* Probable Causes Section */}
+                    {shift.probableCauses && shift.probableCauses.length > 0 && (
+                      <div className="bg-amber-50/70 p-2.5 rounded-lg border border-amber-100 text-amber-950 space-y-1">
+                        <p className="font-bold text-amber-900">⚠️ Kemungkinan Penyebab pada {shift.instrumentName || currentInstName}:</p>
+                        <ul className="list-disc list-inside space-y-0.5 text-slate-700">
+                          {shift.probableCauses.map((cause, cIdx) => (
+                            <li key={cIdx}>{cause}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Corrective Actions Section */}
+                    {shift.correctiveActions && shift.correctiveActions.length > 0 ? (
+                      <div className="bg-blue-50/70 p-2.5 rounded-lg border border-blue-100 text-blue-950 space-y-1">
+                        <p className="font-bold text-blue-900">🛠️ Tindakan Korektif yang Dianjurkan untuk {shift.instrumentName || currentInstName}:</p>
+                        <ul className="list-disc list-inside space-y-0.5 text-slate-700">
+                          {shift.correctiveActions.map((ca, caIdx) => (
+                            <li key={caIdx}>{ca}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : (
+                      <div className="bg-indigo-50/60 p-2.5 rounded-lg border border-indigo-100/70 space-y-1">
+                        <p className="font-bold text-indigo-950">🛠️ Rekomendasi Tindakan:</p>
+                        <ul className="list-disc list-inside space-y-0.5 text-slate-700">
+                          {shift.recommendations.map((rec, rIdx) => (
+                            <li key={rIdx}>{rec}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Preventive Actions Section */}
+                    {shift.preventiveActions && shift.preventiveActions.length > 0 && (
+                      <div className="bg-emerald-50/70 p-2.5 rounded-lg border border-emerald-100 text-emerald-950 space-y-1">
+                        <p className="font-bold text-emerald-900">🛡️ Tindakan Pencegahan yang Dianjurkan untuk {shift.instrumentName || currentInstName}:</p>
+                        <ul className="list-disc list-inside space-y-0.5 text-slate-700">
+                          {shift.preventiveActions.map((pa, paIdx) => (
+                            <li key={paIdx}>{pa}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}

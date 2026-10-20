@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   AlertTriangle, 
   Plus, 
@@ -27,6 +27,7 @@ import { NonConformity, Instrument, Parameter, QCResult } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { StorageService } from '../../services/storage';
 import { getLocalDateString, getLocalTimeString } from '../../utils/dateUtils';
+import { getWestgardContextualGuidance, detectAnalyzerType } from '../../utils/westgardGuidance';
 
 interface NonConformityViewProps {
   nonConformities: NonConformity[];
@@ -95,6 +96,17 @@ export const NonConformityView: React.FC<NonConformityViewProps> = ({
     ? parameters.find(p => p.id === initialData.fromQc?.parameterId) || parameters[0]
     : parameters[0];
 
+  const defaultGuidance = useMemo(() => {
+    return getWestgardContextualGuidance(
+      (initialData?.fromQc?.violations?.[0]?.rule as any) || '1_3s',
+      initialData?.fromQc?.violations?.[0]?.ruleName || 'Pelanggaran Aturan Westgard',
+      'reject',
+      defaultInst?.name,
+      defaultParam?.name,
+      initialData?.fromQc?.zScore
+    );
+  }, [defaultInst?.name, defaultParam?.name]);
+
   const [date, setDate] = useState(initialData?.fromQc?.date || getLocalDateString());
   const [time, setTime] = useState(initialData?.fromQc?.time || getLocalTimeString());
   const [unit, setUnit] = useState('Patologi Klinik - Kimia Klinik');
@@ -108,12 +120,58 @@ export const NonConformityView: React.FC<NonConformityViewProps> = ({
   const [category, setCategory] = useState<NonConformity['category']>('analytic');
   const [description, setDescription] = useState(
     initialData?.fromQc
-      ? `Hasil QC parameter ${initialData.fromQc.parameterName} melanggar aturan Westgard: ${initialData.fromQc.violations?.map(v => v.ruleName).join(', ')}. Nilai terukur: ${initialData.fromQc.value} ${initialData.fromQc.unit} (${initialData.fromQc.sdPosition}).`
+      ? `Hasil QC parameter ${initialData.fromQc.parameterName} pada ${initialData.fromQc.instrumentName} melanggar aturan Westgard: ${initialData.fromQc.violations?.map(v => v.ruleName).join(', ')}. Nilai terukur: ${initialData.fromQc.value} ${initialData.fromQc.unit} (${initialData.fromQc.sdPosition}).`
       : ''
   );
-  const [impact, setImpact] = useState('Pemeriksaan klinis pasien ditunda sementara hingga kalibrasi ulang tervalidasi.');
-  const [initialAnalysis, setInitialAnalysis] = useState('Diduga terjadi pergeseran reagen / pembentukan gelembung pada probe instrumen.');
-  const [immediateAction, setImmediateAction] = useState('Melakukan re-run kontrol baru dan re-homogenisasi botol reagen.');
+  const [impact, setImpact] = useState(
+    initialData?.fromQc?.violations?.[0]?.impact ||
+    defaultGuidance.impact ||
+    'Pemeriksaan klinis pasien ditunda sementara hingga kalibrasi ulang tervalidasi.'
+  );
+  const [initialAnalysis, setInitialAnalysis] = useState(
+    initialData?.fromQc?.violations?.[0]?.probableCauses?.join('. ') ||
+    defaultGuidance.probableCauses.slice(0, 3).join('. ') ||
+    'Diduga terjadi pergeseran reagen / pembentukan gelembung pada probe instrumen.'
+  );
+  const [immediateAction, setImmediateAction] = useState(
+    initialData?.fromQc?.violations?.[0]?.correctiveActions?.join('. ') ||
+    [...defaultGuidance.correctiveActions.slice(0, 2), ...defaultGuidance.preventiveActions.slice(0, 1)].join('. ') ||
+    'Melakukan re-run kontrol baru dan re-homogenisasi botol reagen.'
+  );
+
+  const [actionFormError, setActionFormError] = useState<string | null>(null);
+
+  // Secara otomatis membaca instrumen dan parameter terpilih untuk mengisi dampak,
+  // kemungkinan penyebab, serta tindakan korektif dan pencegahan spesifik instrumen
+  useEffect(() => {
+    const inst = instruments.find(i => i.id === instrumentId);
+    const param = parameters.find(p => p.id === parameterId);
+    if (inst && param) {
+      const guidance = getWestgardContextualGuidance(
+        '1_3s',
+        westgardRule || 'Pelanggaran Aturan Westgard',
+        'reject',
+        inst.name,
+        param.name,
+        initialData?.fromQc?.zScore
+      );
+
+      setImpact(guidance.impact);
+      setInitialAnalysis(guidance.probableCauses.slice(0, 3).join('. '));
+      setImmediateAction(
+        [
+          ...guidance.correctiveActions.slice(0, 2),
+          ...guidance.preventiveActions.slice(0, 1)
+        ].join('. ')
+      );
+
+      if (!description || description.startsWith('Hasil QC parameter') || description.startsWith('Hasil pemeriksaan QC untuk parameter')) {
+        setDescription(
+          `Hasil pemeriksaan QC untuk parameter ${param.name} pada instrumen ${inst.name} (${inst.model || inst.brand || ''}) melanggar aturan kontrol mutu ${westgardRule || 'Westgard'}. Nilai pengukuran menyimpang dan memerlukan tindakan perbaikan.`
+        );
+      }
+    }
+  }, [instrumentId, parameterId, westgardRule]);
 
   const canManage = can('manage_capa') || user.role === 'admin' || user.role === 'supervisor';
 
@@ -276,9 +334,11 @@ export const NonConformityView: React.FC<NonConformityViewProps> = ({
 
   const handleCompleteNC = (nc: NonConformity) => {
     if (!ncActionForm.resolutionAction.trim()) {
-      alert('Mohon isi tindakan perbaikan yang telah dilaksanakan sebelum menandai selesai.');
+      setActionFormError('Mohon isi uraian tindakan perbaikan yang telah dilaksanakan sebelum menandai selesai.');
       return;
     }
+    setActionFormError(null);
+
     const updated: NonConformity = {
       ...nc,
       status: 'resolved',
@@ -304,7 +364,6 @@ export const NonConformityView: React.FC<NonConformityViewProps> = ({
   };
 
   const handleReopenNC = (nc: NonConformity) => {
-    if (!window.confirm('Buka kembali laporan penyimpangan ini untuk evaluasi perbaikan lanjutan?')) return;
     const updated: NonConformity = {
       ...nc,
       status: 'under_investigation',
@@ -315,7 +374,7 @@ export const NonConformityView: React.FC<NonConformityViewProps> = ({
     StorageService.saveNonConformity(updated);
     StorageService.logAudit(
       'REOPEN_NC',
-      `Membuka kembali laporan penyimpangan #${nc.id} oleh ${user.name}`,
+      `Membuka kembali laporan penyimpangan #${nc.id} untuk evaluasi perbaikan lanjutan oleh ${user.name}`,
       updated,
       nc
     );
@@ -981,6 +1040,79 @@ export const NonConformityView: React.FC<NonConformityViewProps> = ({
                 )}
               </div>
 
+              {/* Deteksi Otomatis & Rekomendasi Khusus Instrumen */}
+              {(() => {
+                const guidance = getWestgardContextualGuidance(
+                  '1_3s',
+                  selectedNC.westgardRule || 'Pelanggaran Aturan Westgard',
+                  'reject',
+                  selectedNC.instrumentName,
+                  selectedNC.parameterName
+                );
+
+                return (
+                  <div className="rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50/80 via-indigo-50/40 to-white p-3.5 space-y-2.5 text-xs shadow-2xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 border-b border-blue-100 pb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600 text-white font-bold text-xs shadow-xs">
+                          <Sparkles className="h-4 w-4" />
+                        </span>
+                        <div>
+                          <span className="font-bold text-blue-950 block">
+                            Deteksi Otomatis & Rekomendasi Khusus Alat: {selectedNC.instrumentName}
+                          </span>
+                          <span className="text-[10px] text-slate-500 font-mono">
+                            Parameter: {selectedNC.parameterName} · Kategori: {guidance.analyzerTypeName}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-900 border border-blue-200 w-fit">
+                        {guidance.analyzerTypeName}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px]">
+                      {/* Probable Causes */}
+                      <div className="bg-white/90 p-2.5 rounded-lg border border-blue-100 space-y-1">
+                        <p className="font-bold text-slate-900 flex items-center gap-1">
+                          <span>⚠️ Kemungkinan Penyebab pada {selectedNC.instrumentName}:</span>
+                        </p>
+                        <ul className="list-disc list-inside text-slate-700 space-y-0.5">
+                          {guidance.probableCauses.slice(0, 3).map((cause, ci) => (
+                            <li key={ci}>{cause}</li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      {/* Corrective & Preventive Guidance */}
+                      <div className="bg-white/90 p-2.5 rounded-lg border border-blue-100 space-y-1">
+                        <p className="font-bold text-slate-900 flex items-center gap-1">
+                          <span>🛠️ Tindakan Dianjurkan (Klik untuk Tambahkan):</span>
+                        </p>
+                        <div className="flex flex-col gap-1 mt-1">
+                          {[...guidance.correctiveActions.slice(0, 2), ...guidance.preventiveActions.slice(0, 2)].map((rec, ri) => (
+                            <button
+                              key={ri}
+                              type="button"
+                              onClick={() => {
+                                const cur = ncActionForm.resolutionAction;
+                                const newVal = cur ? `${cur}; ${rec}` : rec;
+                                setNcActionForm({ ...ncActionForm, resolutionAction: newVal });
+                              }}
+                              className="text-left text-[10px] p-1.5 rounded bg-blue-50/70 hover:bg-blue-100 text-blue-900 font-medium transition-colors cursor-pointer border border-blue-200 flex items-start gap-1"
+                              title="Klik untuk menambahkan rekomendasi ini ke formulir tindakan"
+                            >
+                              <Plus className="h-3 w-3 shrink-0 mt-0.5 text-blue-600" />
+                              <span>{rec}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Status Specific Section: Resolved vs Action in Progress */}
               {selectedNC.status === 'resolved' ? (
                 /* Completed Summary Card */
@@ -1062,6 +1194,13 @@ export const NonConformityView: React.FC<NonConformityViewProps> = ({
                       </button>
                     )}
                   </div>
+
+                  {actionFormError && (
+                    <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2 font-medium">
+                      <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                      <span>{actionFormError}</span>
+                    </div>
+                  )}
 
                   {/* Quick Action Chips */}
                   <div className="space-y-1">
