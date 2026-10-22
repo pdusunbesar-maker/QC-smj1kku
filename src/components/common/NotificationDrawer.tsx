@@ -72,6 +72,11 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
     }
   };
 
+  const handleMarkAllRead = () => {
+    StorageService.markAllNotificationsRead();
+    onNotificationsUpdated(StorageService.getNotifications());
+  };
+
   const handleNotificationClick = (n: AppNotification) => {
     // 1. Mark notification as read
     StorageService.markNotificationRead(n.id);
