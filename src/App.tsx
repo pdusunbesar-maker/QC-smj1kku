@@ -152,6 +152,22 @@ function AppContent() {
     }
     setActiveTab(tab);
     setNavigationPayload(itemData || null);
+
+    // Automatically resolve parameter & instrument if itemData.id is a QCResult ID or Parameter ID
+    if (itemData?.id) {
+      const matchedQc = qcResults.find(r => r.id === itemData.id);
+      if (matchedQc) {
+        if (!itemData.parameterId) itemData.parameterId = matchedQc.parameterId;
+        if (!itemData.instrumentId) itemData.instrumentId = matchedQc.instrumentId;
+      } else {
+        const matchedParam = parameters.find(p => p.id === itemData.id || p.code.toLowerCase() === itemData.id.toLowerCase());
+        if (matchedParam) {
+          if (!itemData.parameterId) itemData.parameterId = matchedParam.id;
+          if (!itemData.instrumentId) itemData.instrumentId = matchedParam.instrumentId;
+        }
+      }
+    }
+
     if (itemData?.parameterId) {
       setSelectedChartParamId(itemData.parameterId);
       const targetParam = parameters.find(p => p.id === itemData.parameterId);

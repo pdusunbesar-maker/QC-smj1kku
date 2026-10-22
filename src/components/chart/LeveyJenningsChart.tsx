@@ -211,21 +211,57 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
 
     const points: PlottedQCPoint[] = [];
     dateMap.forEach((dayRuns, dateStr) => {
-      // Pick latest run of that date as the primary plotted value
-      const latestRun = dayRuns[dayRuns.length - 1];
+      // Find runs with reject or warning to prioritize as primary plotted point
+      // This ensures that if a violation occurs on that day, the plotted coordinates match the violation!
+      const rejectRun = dayRuns.find(d => d.status === 'reject' || (d.violations && d.violations.some(v => v.type === 'reject')));
+      const warningRun = dayRuns.find(d => d.status === 'warning' || (d.violations && d.violations.some(v => v.type === 'warning')));
+      const primaryRun = rejectRun || warningRun || dayRuns[dayRuns.length - 1];
 
       // Critical status aggregation: if any reject on that day, status is reject; else if warning, warning; else pass
-      const hasReject = dayRuns.some(d => d.status === 'reject');
-      const hasWarning = dayRuns.some(d => d.status === 'warning');
+      const hasReject = dayRuns.some(d => d.status === 'reject' || (d.violations && d.violations.some(v => v.type === 'reject')));
+      const hasWarning = dayRuns.some(d => d.status === 'warning' || (d.violations && d.violations.some(v => v.type === 'warning')));
       const status: QCStatus = hasReject ? 'reject' : (hasWarning ? 'warning' : 'pass');
 
-      // Combine all violations of the day
+      // Combine all distinct violations of the day
       const allViolations: WestgardViolation[] = [];
       dayRuns.forEach(d => {
         if (d.violations && d.violations.length > 0) {
-          allViolations.push(...d.violations);
+          d.violations.forEach(v => {
+            if (!allViolations.some(av => av.rule === v.rule && av.description === v.description)) {
+              allViolations.push(v);
+            }
+          });
         }
       });
+
+      // If status is reject or warning, ensure at least one explicit Westgard rule violation exists
+      if (allViolations.length === 0 && (status === 'reject' || status === 'warning' || Math.abs(primaryRun.zScore) > 2)) {
+        if (Math.abs(primaryRun.zScore) > 3 || status === 'reject') {
+          allViolations.push({
+            rule: '1_3s',
+            ruleName: 'Aturan 1:3s (Reject)',
+            type: 'reject',
+            description: `Nilai kontrol ${primaryRun.value} ${primaryRun.unit} (Z-Score: ${primaryRun.sdPosition}) berada di luar batas kritis ±3SD`,
+            pointsInvolved: [primaryRun.id],
+            detectedAt: primaryRun.date,
+            instrumentName: primaryRun.instrumentName,
+            parameterName: primaryRun.parameterName,
+            parameterUnit: primaryRun.unit
+          });
+        } else if (Math.abs(primaryRun.zScore) > 2 || status === 'warning') {
+          allViolations.push({
+            rule: '1_2s',
+            ruleName: 'Aturan 1:2s (Warning)',
+            type: 'warning',
+            description: `Nilai kontrol ${primaryRun.value} ${primaryRun.unit} (Z-Score: ${primaryRun.sdPosition}) berada di zona peringatan ±2SD`,
+            pointsInvolved: [primaryRun.id],
+            detectedAt: primaryRun.date,
+            instrumentName: primaryRun.instrumentName,
+            parameterName: primaryRun.parameterName,
+            parameterUnit: primaryRun.unit
+          });
+        }
+      }
 
       const dObj = new Date(dateStr + 'T12:00:00');
       const dayName = isNaN(dObj.getTime()) ? '' : INDO_DAYS[dObj.getDay()];
@@ -233,26 +269,26 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
       const displayDate = parts[2] && parts[1] ? `${parts[2]}/${parts[1]}` : dateStr;
 
       points.push({
-        id: latestRun.id,
+        id: primaryRun.id,
         date: dateStr,
         displayDate,
         dayName,
-        time: latestRun.time,
-        value: latestRun.value,
-        unit: latestRun.unit,
-        mean: latestRun.mean,
-        sd: latestRun.sd,
-        zScore: latestRun.zScore,
-        sdPosition: latestRun.sdPosition,
+        time: primaryRun.time,
+        value: primaryRun.value,
+        unit: primaryRun.unit,
+        mean: primaryRun.mean,
+        sd: primaryRun.sd,
+        zScore: primaryRun.zScore,
+        sdPosition: primaryRun.sdPosition,
         status,
         violations: allViolations,
-        operatorName: latestRun.operatorName,
-        controlLevel: latestRun.controlLevel,
-        lotNumber: latestRun.lotNumber,
-        rawResult: latestRun,
+        operatorName: primaryRun.operatorName,
+        controlLevel: primaryRun.controlLevel,
+        lotNumber: primaryRun.lotNumber,
+        rawResult: primaryRun,
         allRunsCount: dayRuns.length,
         allRuns: dayRuns,
-        notes: latestRun.notes
+        notes: primaryRun.notes
       });
     });
 
@@ -333,9 +369,47 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
     );
   }, [plottedPoints, parameter.targetMean, currentInstName, parameter.name, parameter.unit]);
 
-  // Violations in current selection
+  // Violations in current selection - accurately capture any out-of-control, warning, or rule violation results
   const violationsList = useMemo(() => {
-    return filteredRawResults.filter(r => r.violations && r.violations.length > 0);
+    return filteredRawResults.filter(r => 
+      (r.violations && r.violations.length > 0) || 
+      r.status === 'reject' || 
+      r.status === 'warning' || 
+      Math.abs(r.zScore) > 2
+    ).map(r => {
+      let viols = r.violations ? [...r.violations] : [];
+      if (viols.length === 0) {
+        if (Math.abs(r.zScore) > 3 || r.status === 'reject') {
+          viols.push({
+            rule: '1_3s',
+            ruleName: 'Aturan 1:3s (Reject)',
+            type: 'reject',
+            description: `Nilai kontrol ${formatNumber(r.value)} ${r.unit} (Z-Score: ${r.sdPosition}) berada di luar batas kritis ±3SD`,
+            pointsInvolved: [r.id],
+            detectedAt: r.date,
+            instrumentName: r.instrumentName,
+            parameterName: r.parameterName,
+            parameterUnit: r.unit
+          });
+        } else if (Math.abs(r.zScore) > 2 || r.status === 'warning') {
+          viols.push({
+            rule: '1_2s',
+            ruleName: 'Aturan 1:2s (Warning)',
+            type: 'warning',
+            description: `Nilai kontrol ${formatNumber(r.value)} ${r.unit} (Z-Score: ${r.sdPosition}) berada di zona peringatan ±2SD`,
+            pointsInvolved: [r.id],
+            detectedAt: r.date,
+            instrumentName: r.instrumentName,
+            parameterName: r.parameterName,
+            parameterUnit: r.unit
+          });
+        }
+      }
+      return {
+        ...r,
+        violations: viols
+      };
+    });
   }, [filteredRawResults]);
 
   // Number format helper for proportional display
@@ -362,6 +436,14 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
     const clamped = Math.max(yMin, Math.min(yMax, val));
     const ratio = (clamped - yMin) / (yMax - yMin);
     return padding.top + chartHeight - ratio * chartHeight;
+  };
+
+  // Accurate Point Y coordinate anchored directly to Z-score and SD line scale
+  const getPointY = (pt: PlottedQCPoint) => {
+    if (targetSD > 0 && typeof pt.zScore === 'number' && !isNaN(pt.zScore)) {
+      return getY(targetMean + pt.zScore * targetSD);
+    }
+    return getY(pt.value);
   };
 
   const getX = (index: number, total: number) => {
@@ -1200,7 +1282,7 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
                 <path
                   d={plottedPoints.reduce((acc, curr, idx) => {
                     const x = getX(idx, plottedPoints.length);
-                    const y = getY(curr.value);
+                    const y = getPointY(curr);
                     return idx === 0 ? `M ${x} ${y}` : `${acc} L ${x} ${y}`;
                   }, '')}
                   fill="none"
@@ -1308,7 +1390,7 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
               {/* QC Result Data Points (1 per date when in single_per_date mode) */}
               {plottedPoints.map((pt, idx) => {
                 const x = getX(idx, plottedPoints.length);
-                const y = getY(pt.value);
+                const y = getPointY(pt);
                 const isOut = pt.status === 'reject';
                 const isWarn = pt.status === 'warning';
                 const isHovered = hoveredPoint?.point.id === pt.id;
@@ -1437,9 +1519,9 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
           {/* Interactive Inspection Tooltip (Hidden on Print/PDF) */}
           {hoveredPoint && (
             <div
-              className="absolute z-20 w-72 rounded-xl border border-slate-200 bg-white p-3.5 shadow-xl text-xs print:hidden pointer-events-auto"
+              className="absolute z-20 w-80 rounded-xl border border-slate-200 bg-white p-3.5 shadow-xl text-xs print:hidden pointer-events-auto"
               style={{
-                left: Math.min(hoveredPoint.x + 15, chartWidth - 160),
+                left: Math.min(hoveredPoint.x + 15, chartWidth - 170),
                 top: Math.max(hoveredPoint.y - 130, 10),
               }}
               onMouseLeave={() => setHoveredPoint(null)}
@@ -1448,7 +1530,7 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
                 <div className="flex items-center gap-1.5">
                   <CalendarDays className="h-3.5 w-3.5 text-emerald-700" />
                   <span className="font-mono font-bold text-slate-900">
-                    {hoveredPoint.point.date}
+                    {hoveredPoint.point.date} {hoveredPoint.point.time ? `(${hoveredPoint.point.time})` : ''}
                   </span>
                 </div>
                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
@@ -1491,9 +1573,40 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
                 </div>
               </div>
 
+              {/* Multi-run details on this date if more than 1 run */}
+              {hoveredPoint.point.allRunsCount > 1 && hoveredPoint.point.allRuns && (
+                <div className="mt-2.5 rounded-lg bg-slate-50 border border-slate-200 p-2 space-y-1 font-sans">
+                  <div className="flex items-center justify-between text-[10px] font-bold text-slate-700">
+                    <span>Semua Run Pada {hoveredPoint.point.date}:</span>
+                    <button
+                      type="button"
+                      onClick={() => setPlotMode('all_runs')}
+                      className="text-emerald-700 hover:text-emerald-900 font-semibold hover:underline"
+                    >
+                      Tampilkan Terpisah
+                    </button>
+                  </div>
+                  <div className="space-y-1">
+                    {hoveredPoint.point.allRuns.map((rn, rIdx) => (
+                      <div key={rn.id || rIdx} className="flex items-center justify-between text-[10px] text-slate-600 border-t border-slate-100 pt-1 font-mono">
+                        <span>Run #{rIdx + 1} ({rn.time}):</span>
+                        <span className="font-bold text-slate-800">
+                          {formatNumber(rn.value)} {rn.unit} ({rn.sdPosition})
+                        </span>
+                        <span className={`px-1 py-0.2 rounded text-[9px] font-bold uppercase ${
+                          rn.status === 'pass' ? 'bg-emerald-100 text-emerald-800' : rn.status === 'warning' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
+                        }`}>
+                          {rn.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Westgard violations info */}
               {hoveredPoint.point.violations.length > 0 && (
-                <div className="mt-2.5 rounded-lg bg-rose-50 border border-rose-200/80 p-2 text-[10px] text-rose-800">
+                <div className="mt-2.5 rounded-lg bg-rose-50 border border-rose-200/80 p-2 text-[10px] text-rose-800 font-sans">
                   <div className="flex items-center gap-1 font-bold text-rose-900 mb-0.5">
                     <ShieldAlert className="h-3 w-3 shrink-0" />
                     <span>Pelanggaran Westgard Terdeteksi:</span>
@@ -1507,34 +1620,48 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
               )}
 
               {/* Direct Escalation Action Buttons */}
-              {hoveredPoint.point.status !== 'pass' && (
-                <div className="mt-3 flex items-center gap-2 pt-2 border-t border-slate-100">
-                  {onCreateNC && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onCreateNC(hoveredPoint.point.rawResult);
-                        setHoveredPoint(null);
-                      }}
-                      className="flex-1 px-2 py-1 rounded bg-amber-600 hover:bg-amber-700 text-white font-medium text-[10px] transition-colors"
-                    >
-                      + Lapor NC
-                    </button>
-                  )}
-                  {onCreateCapa && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onCreateCapa(hoveredPoint.point.rawResult);
-                        setHoveredPoint(null);
-                      }}
-                      className="flex-1 px-2 py-1 rounded bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-[10px] transition-colors"
-                    >
-                      + Terbitkan CAPA
-                    </button>
-                  )}
-                </div>
-              )}
+              <div className="mt-3 flex items-center gap-1.5 pt-2 border-t border-slate-100">
+                {onSelectResult && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSelectResult(hoveredPoint.point.rawResult);
+                      setHoveredPoint(null);
+                    }}
+                    className="flex-1 px-2 py-1 rounded bg-slate-800 hover:bg-slate-900 text-white font-medium text-[10px] transition-colors"
+                  >
+                    Detail QC
+                  </button>
+                )}
+                {hoveredPoint.point.status !== 'pass' && (
+                  <>
+                    {onCreateNC && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onCreateNC(hoveredPoint.point.rawResult);
+                          setHoveredPoint(null);
+                        }}
+                        className="flex-1 px-2 py-1 rounded bg-amber-600 hover:bg-amber-700 text-white font-medium text-[10px] transition-colors"
+                      >
+                        + Lapor NC
+                      </button>
+                    )}
+                    {onCreateCapa && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onCreateCapa(hoveredPoint.point.rawResult);
+                          setHoveredPoint(null);
+                        }}
+                        className="flex-1 px-2 py-1 rounded bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-[10px] transition-colors"
+                      >
+                        + CAPA
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -1582,13 +1709,30 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
                     <th className="p-2 border border-slate-300 text-center">Z-Score</th>
                     <th className="p-2 border border-slate-300">Aturan Terlanggar & Penjelasan</th>
                     <th className="p-2 border border-slate-300">Operator</th>
+                    <th className="p-2 border border-slate-300 text-center print:hidden">Tindakan Cepat</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 text-[11px]">
                   {violationsList.map((vRes, idx) => (
-                    <tr key={vRes.id} className="hover:bg-slate-50">
+                    <tr 
+                      key={vRes.id} 
+                      className="hover:bg-rose-50/40 transition-colors cursor-pointer group"
+                      onClick={() => {
+                        const matchedPt = plottedPoints.find(p => p.date === vRes.date);
+                        if (matchedPt) {
+                          const ptIdx = plottedPoints.indexOf(matchedPt);
+                          setHoveredPoint({
+                            point: matchedPt,
+                            x: getX(ptIdx, plottedPoints.length),
+                            y: getPointY(matchedPt)
+                          });
+                        }
+                      }}
+                    >
                       <td className="p-2 border border-slate-200 text-center font-mono">{idx + 1}</td>
-                      <td className="p-2 border border-slate-200 font-mono whitespace-nowrap">{vRes.date} {vRes.time}</td>
+                      <td className="p-2 border border-slate-200 font-mono whitespace-nowrap font-medium text-slate-800">
+                        {vRes.date} {vRes.time}
+                      </td>
                       <td className="p-2 border border-slate-200 font-mono">{vRes.controlLevel} ({vRes.lotNumber})</td>
                       <td className="p-2 border border-slate-200 font-mono text-right font-bold text-slate-900">
                         {formatNumber(vRes.value)} {vRes.unit}
@@ -1598,12 +1742,51 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
                       </td>
                       <td className="p-2 border border-slate-200">
                         {vRes.violations.map((v, i) => (
-                          <div key={i} className="text-rose-900">
-                            <strong>{v.ruleName}:</strong> {v.description}
+                          <div key={i} className="space-y-0.5">
+                            <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold uppercase mr-1.5 ${
+                              v.type === 'reject' ? 'bg-rose-100 text-rose-800 border border-rose-200' : 'bg-amber-100 text-amber-800 border border-amber-200'
+                            }`}>
+                              {v.ruleName}
+                            </span>
+                            <span className="text-slate-700 leading-tight">{v.description}</span>
                           </div>
                         ))}
                       </td>
-                      <td className="p-2 border border-slate-200">{vRes.operatorName}</td>
+                      <td className="p-2 border border-slate-200 text-slate-600">{vRes.operatorName}</td>
+                      <td className="p-2 border border-slate-200 text-center print:hidden" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-center gap-1.5">
+                          {onSelectResult && (
+                            <button
+                              type="button"
+                              onClick={() => onSelectResult(vRes)}
+                              className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-900 text-white font-medium text-[10px] shadow-2xs transition-colors"
+                              title="Buka lembar verifikasi & persetujuan QC"
+                            >
+                              Tinjau QC
+                            </button>
+                          )}
+                          {onCreateNC && (
+                            <button
+                              type="button"
+                              onClick={() => onCreateNC(vRes)}
+                              className="px-2 py-1 rounded bg-amber-600 hover:bg-amber-700 text-white font-medium text-[10px] shadow-2xs transition-colors"
+                              title="Buat Laporan Ketidaksesuaian (NC)"
+                            >
+                              + NC
+                            </button>
+                          )}
+                          {onCreateCapa && (
+                            <button
+                              type="button"
+                              onClick={() => onCreateCapa(vRes)}
+                              className="px-2 py-1 rounded bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-[10px] shadow-2xs transition-colors"
+                              title="Terbitkan Dokumen Tindakan Korektif & Pencegahan (CAPA)"
+                            >
+                              + CAPA
+                            </button>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

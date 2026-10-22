@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   CheckCircle2, 
   XCircle, 
@@ -34,6 +34,7 @@ interface QCReviewViewProps {
   onResultUpdated: (updated: QCResult) => void;
   onResultDeleted?: (id: string) => void;
   onNavigateToTab: (tab: string, itemData?: any) => void;
+  initialData?: any;
 }
 
 export const QCReviewView: React.FC<QCReviewViewProps> = ({
@@ -43,6 +44,7 @@ export const QCReviewView: React.FC<QCReviewViewProps> = ({
   onResultUpdated,
   onResultDeleted,
   onNavigateToTab,
+  initialData,
 }) => {
   const { user, can } = useAuth();
   const [filterStatus, setFilterStatus] = useState<string>('pending');
@@ -55,6 +57,20 @@ export const QCReviewView: React.FC<QCReviewViewProps> = ({
   // Review Modal State
   const [selectedResult, setSelectedResult] = useState<QCResult | null>(null);
   const [reviewComment, setReviewComment] = useState('');
+
+  // Auto-select QC result when navigated from notifications or other views
+  useEffect(() => {
+    const targetId = initialData?.id || initialData?.resultId || initialData?.qcId;
+    if (targetId && results.length > 0) {
+      const found = results.find(r => r.id === targetId);
+      if (found) {
+        setSelectedResult(found);
+        setFilterStatus('all'); // Clear status filter to make sure it is fully visible in list as well
+      } else if (initialData?.parameterId) {
+        setFilterParameterId(initialData.parameterId);
+      }
+    }
+  }, [initialData, results]);
 
   // Edit QC Result State
   const [editingResult, setEditingResult] = useState<QCResult | null>(null);

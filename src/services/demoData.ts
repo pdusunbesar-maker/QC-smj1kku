@@ -1480,6 +1480,7 @@ export const INITIAL_NOTIFICATIONS: AppNotification[] = [
     title: 'Review QC Menunggu',
     message: 'Terdapat 1 hasil pemeriksaan QC Glukosa dalam status Warning yang membutuhkan verifikasi Supervisor.',
     linkTab: 'qc-review',
+    linkId: 'QC-DEMO-GLU-029',
     read: false
   },
   {
@@ -1487,8 +1488,9 @@ export const INITIAL_NOTIFICATIONS: AppNotification[] = [
     timestamp: '2026-09-29 08:12:00',
     type: 'danger',
     title: 'Pelanggaran Westgard 2:2s',
-    message: 'Hasil QC Glucose Level 1 tanggal 28-29 September melanggar aturan 2:2s (REJECT).',
-    linkTab: 'westgard',
+    message: 'Hasil QC Glucose Level 1 tanggal 28-29 September melanggar aturan 2:2s (REJECT). Klik untuk melihat grafik.',
+    linkTab: 'levey-jennings',
+    linkId: 'param-cst-glu',
     read: false
   },
   {
@@ -1498,7 +1500,8 @@ export const INITIAL_NOTIFICATIONS: AppNotification[] = [
     title: 'CAPA Baru Diterbitkan',
     message: 'CAPA-2026-001 terkait pergeseran kontrol kimia darah telah dibuat dan dalam penanganan.',
     linkTab: 'capa',
-    read: true
+    linkId: 'CAPA-2026-001',
+    read: false
   },
   {
     id: 'notif-4',
@@ -1507,6 +1510,7 @@ export const INITIAL_NOTIFICATIONS: AppNotification[] = [
     title: 'Jadwal Pemeliharaan Instrumen',
     message: 'Chemistry Analyzer CST-240 (Dirui CS-T240) mendekati jadwal pemeliharaan bulanan pada 25 Oktober 2026.',
     linkTab: 'master-data',
+    linkId: 'inst-cst240',
     read: true
   }
 ];

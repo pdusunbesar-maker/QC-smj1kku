@@ -34,7 +34,7 @@ interface NonConformityViewProps {
   instruments: Instrument[];
   parameters: Parameter[];
   qcResults: QCResult[];
-  initialData?: { fromQc?: QCResult };
+  initialData?: { fromQc?: QCResult; id?: string; ncId?: string };
   onNCAdded: (nc: NonConformity) => void;
   onNCUpdated: (nc: NonConformity) => void;
   onNCDeleted?: (id: string) => void;
@@ -58,6 +58,18 @@ export const NonConformityView: React.FC<NonConformityViewProps> = ({
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [severityFilter, setSeverityFilter] = useState<string>('all');
   const [selectedNC, setSelectedNC] = useState<NonConformity | null>(null);
+
+  // Auto-select NC when navigated with an ID from notifications or links
+  useEffect(() => {
+    const targetId = initialData?.id || initialData?.ncId;
+    if (targetId && nonConformities.length > 0) {
+      const found = nonConformities.find(n => n.id === targetId);
+      if (found) {
+        handleSelectNC(found);
+        setStatusFilter('all');
+      }
+    }
+  }, [initialData, nonConformities]);
 
   // Workflow Action Form State
   const [ncActionForm, setNcActionForm] = useState({

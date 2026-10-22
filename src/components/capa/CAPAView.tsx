@@ -47,14 +47,17 @@ export const CAPAView: React.FC<CAPAViewProps> = ({
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Pre-fill or select CAPA from initialData if coming from QC, NC, or notifications
   useEffect(() => {
     if (initialData?.prefill?.statusFilter) {
       setStatusFilter(initialData.prefill.statusFilter);
     }
-    if (initialData?.prefill?.selectedCapaId) {
-      const found = capas.find(c => c.id === initialData.prefill.selectedCapaId);
+    const targetCapaId = initialData?.id || initialData?.capaId || initialData?.prefill?.selectedCapaId;
+    if (targetCapaId) {
+      const found = capas.find(c => c.id === targetCapaId);
       if (found) {
         setSelectedCapa(found);
+        setStatusFilter('all');
       }
     }
   }, [initialData, capas]);
