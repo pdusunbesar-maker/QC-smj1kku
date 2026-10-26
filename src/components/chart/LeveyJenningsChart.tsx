@@ -36,6 +36,7 @@ import {
   formatIndonesianDate 
 } from '../../utils/dateUtils';
 import { KopEditorModal } from '../common/KopEditorModal';
+import { WestgardAnalysisPanel } from '../westgard/WestgardAnalysisPanel';
 
 interface LeveyJenningsChartProps {
   parameter: Parameter;
@@ -45,6 +46,7 @@ interface LeveyJenningsChartProps {
   onCreateCapa?: (result: QCResult) => void;
   onCreateNC?: (result: QCResult) => void;
   onLabInfoUpdated?: (info: LaboratoryInfo) => void;
+  onRefreshData?: () => void;
 }
 
 export interface PlottedQCPoint {
@@ -80,6 +82,7 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
   onCreateCapa,
   onCreateNC,
   onLabInfoUpdated,
+  onRefreshData,
 }) => {
   const labInfo = propLabInfo || StorageService.getLabInfo();
   const [selectedLevel, setSelectedLevel] = useState<'all' | 'Level 1' | 'Level 2' | 'Level 3'>('all');
@@ -1689,6 +1692,22 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
           <div className="text-[11px] text-slate-500 font-mono">
             {plotMode === 'single_per_date' ? 'Mode Plot: 1 Titik per Tanggal' : 'Mode Plot: Semua Run Terpisah'} · Rentang: <strong>{startDate}</strong> s/d <strong>{endDate}</strong> ({plottedPoints.length} titik plot)
           </div>
+        </div>
+
+        {/* AUTOMATED WESTGARD MULTIRULE ANALYSIS PANEL */}
+        <div className="mt-4 pt-4 border-t border-slate-200 print-avoid-break">
+          <WestgardAnalysisPanel
+            parameter={parameter}
+            results={results}
+            instrumentName={currentInstName}
+            selectedLevel={selectedLevel}
+            startDate={startDate}
+            endDate={endDate}
+            onCreateCapa={onCreateCapa}
+            onCreateNC={onCreateNC}
+            onSelectResult={onSelectResult}
+            onRefreshData={onRefreshData}
+          />
         </div>
 
         {/* WESTGARD VIOLATIONS SUMMARY TABLE (IF ANY) */}

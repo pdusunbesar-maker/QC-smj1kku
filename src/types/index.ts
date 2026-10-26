@@ -101,7 +101,7 @@ export interface Parameter {
   deletedAt?: string;
 }
 
-export type WestgardRuleKey = '1_2s' | '1_3s' | '2_2s' | 'R_4s' | '4_1s' | '10x';
+export type WestgardRuleKey = '1_2s' | '1_3s' | '2_2s' | 'R_4s' | '4_1s' | '10x' | '8x' | '7T';
 
 export interface WestgardRuleConfig {
   key: WestgardRuleKey;
@@ -113,7 +113,7 @@ export interface WestgardRuleConfig {
   recommendation: string;
 }
 
-export type QCStatus = 'pass' | 'warning' | 'reject' | 'fail';
+export type QCStatus = 'pass' | 'warning' | 'reject' | 'fail' | 'indeterminate';
 
 export interface WestgardViolation {
   rule: WestgardRuleKey;

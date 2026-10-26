@@ -17,6 +17,36 @@ import {
 import { DEFAULT_WESTGARD_RULES } from '../utils/qcCalculations';
 import { getSupabase } from './supabase';
 
+let supabaseOfflineUntil = 0;
+
+export function handleSupabaseError(context: string, error: any): void {
+  if (!error) return;
+  const msg = error?.message || (typeof error === 'string' ? error : JSON.stringify(error));
+  const isNetworkFailure = 
+    msg.includes('Failed to fetch') ||
+    msg.includes('NetworkError') ||
+    msg.includes('network') ||
+    msg.includes('fetch') ||
+    msg.includes('Load failed') ||
+    msg.includes('abort') ||
+    msg.includes('Offline');
+
+  if (isNetworkFailure) {
+    // Backoff Supabase remote calls for 30 seconds when network is offline or remote unreachable
+    supabaseOfflineUntil = Date.now() + 30000;
+    console.warn(`[Supabase Offline Mode] ${context}: Jaringan remote tidak terjangkau (${msg}). Aplikasi beroperasi normal dengan data lokal.`);
+  } else {
+    console.warn(`[Supabase ${context}]`, error);
+  }
+}
+
+export function getSafeSupabase() {
+  if (Date.now() < supabaseOfflineUntil) {
+    return null;
+  }
+  return getSupabase();
+}
+
 const DEFAULT_LAB: LaboratoryInfo = {
   id: 'lab-rsud-smj1',
   name: 'INSTALASI PATOLOGI KLINIK & LABORATORIUM TERPADU',
@@ -1005,8 +1035,8 @@ export class StorageService {
   }
 
   static async pushAllToSupabase(): Promise<{ success: boolean; message: string }> {
-    const sb = getSupabase();
-    if (!sb) return { success: false, message: 'Supabase belum dikonfigurasi.' };
+    const sb = getSafeSupabase();
+    if (!sb) return { success: false, message: 'Supabase belum dikonfigurasi atau sedang offline.' };
 
     try {
       await sb.from('laboratories').upsert(mapLabToDbFull(this.labInfo));
@@ -1022,7 +1052,7 @@ export class StorageService {
 
       return { success: true, message: 'Seluruh data berhasil diunggah ke Supabase!' };
     } catch (err: any) {
-      console.error('pushAllToSupabase error:', err);
+      handleSupabaseError('pushAllToSupabase', err);
       return { success: false, message: err.message || 'Gagal mengunggah data ke Supabase.' };
     }
   }
@@ -1125,7 +1155,7 @@ export class StorageService {
 
     this.notifyDataChanged('lab_info');
 
-    const sb = getSupabase();
+    const sb = getSafeSupabase();
     if (sb) {
       try {
         const payload = mapLabToDbFull(this.labInfo);
@@ -1142,10 +1172,10 @@ export class StorageService {
           }
         } else {
           const { error: upsertErr } = await sb.from('laboratories').upsert(payload);
-          if (upsertErr) console.error('Supabase updateLabInfo upsert error:', upsertErr);
+          if (upsertErr) handleSupabaseError('updateLabInfo upsert', upsertErr);
         }
       } catch (err) {
-        console.error('Supabase updateLabInfo network error:', err);
+        handleSupabaseError('updateLabInfo network', err);
       }
     }
 
@@ -1172,17 +1202,17 @@ export class StorageService {
     }
     this.notifyDataChanged('users');
 
-    const sb = getSupabase();
+    const sb = getSafeSupabase();
     if (sb) {
       try {
         const { error } = await sb.from('app_users').upsert(mapUserToDb(user));
         if (error) {
-          console.error('Supabase saveUser error:', error);
+          handleSupabaseError('saveUser', error);
           return { success: false, message: error.message };
         }
         return { success: true };
       } catch (err: any) {
-        console.error('Supabase saveUser network error:', err);
+        handleSupabaseError('saveUser network', err);
         return { success: false, message: err?.message || 'Gagal menyimpan data pengguna ke Supabase.' };
       }
     }
@@ -1193,13 +1223,13 @@ export class StorageService {
     this.users = this.users.filter(u => u.id !== userId);
     this.notifyDataChanged('users');
 
-    const sb = getSupabase();
+    const sb = getSafeSupabase();
     if (sb) {
       try {
         const { error } = await sb.from('app_users').delete().eq('id', userId);
-        if (error) console.error('Supabase deleteUser error:', error);
+        if (error) handleSupabaseError('deleteUser', error);
       } catch (err) {
-        console.error('Supabase deleteUser network error:', err);
+        handleSupabaseError('deleteUser network', err);
       }
     }
   }
@@ -1225,13 +1255,13 @@ export class StorageService {
     else this.roles.push(role);
     this.notifyDataChanged('roles');
 
-    const sb = getSupabase();
+    const sb = getSafeSupabase();
     if (sb) {
       try {
         const { error } = await sb.from('roles').upsert(mapRoleToDb(role));
-        if (error) console.error('Supabase saveRole error:', error);
+        if (error) handleSupabaseError('saveRole', error);
       } catch (err) {
-        console.error('Supabase saveRole network error:', err);
+        handleSupabaseError('saveRole network', err);
       }
     }
     await this.logAudit('UPDATE_MASTER_DATA', `Menyimpan konfigurasi hak akses peran: ${role.name}`);
@@ -1242,13 +1272,13 @@ export class StorageService {
     this.roles = this.roles.filter(r => r.id !== id);
     this.notifyDataChanged('roles');
 
-    const sb = getSupabase();
+    const sb = getSafeSupabase();
     if (sb) {
       try {
         const { error } = await sb.from('roles').delete().eq('id', id);
-        if (error) console.error('Supabase deleteRole error:', error);
+        if (error) handleSupabaseError('deleteRole', error);
       } catch (err) {
-        console.error('Supabase deleteRole network error:', err);
+        handleSupabaseError('deleteRole network', err);
       }
     }
     if (role) {
@@ -1297,13 +1327,13 @@ export class StorageService {
     else this.instruments.push(instrument);
     this.notifyDataChanged('instruments');
 
-    const sb = getSupabase();
+    const sb = getSafeSupabase();
     if (sb) {
       try {
         const { error } = await sb.from('instruments').upsert(mapInstrumentToDb(instrument));
-        if (error) console.error('Supabase saveInstrument error:', error);
+        if (error) handleSupabaseError('saveInstrument', error);
       } catch (err) {
-        console.error('Supabase saveInstrument network error:', err);
+        handleSupabaseError('saveInstrument network', err);
       }
     }
     await this.logAudit('UPDATE_MASTER_DATA', `Menyimpan instrumen: ${instrument.name} (${instrument.code})`);
@@ -1315,13 +1345,13 @@ export class StorageService {
     if (!this.deletedInstIds.includes(id)) this.deletedInstIds.push(id);
     this.notifyDataChanged('instruments');
 
-    const sb = getSupabase();
+    const sb = getSafeSupabase();
     if (sb) {
       try {
         const { error } = await sb.from('instruments').delete().eq('id', id);
-        if (error) console.error('Supabase deleteInstrument error:', error);
+        if (error) handleSupabaseError('deleteInstrument', error);
       } catch (err) {
-        console.error('Supabase deleteInstrument network error:', err);
+        handleSupabaseError('deleteInstrument network', err);
       }
     }
     if (inst) {
@@ -1340,13 +1370,13 @@ export class StorageService {
     else this.controlMaterials.push(material);
     this.notifyDataChanged('controls');
 
-    const sb = getSupabase();
+    const sb = getSafeSupabase();
     if (sb) {
       try {
         const { error } = await sb.from('control_materials').upsert(mapControlToDb(material));
-        if (error) console.error('Supabase saveControlMaterial error:', error);
+        if (error) handleSupabaseError('saveControlMaterial', error);
       } catch (err) {
-        console.error('Supabase saveControlMaterial network error:', err);
+        handleSupabaseError('saveControlMaterial network', err);
       }
     }
     await this.logAudit('UPDATE_MASTER_DATA', `Menyimpan bahan kontrol: ${material.name} (Lot: ${material.lotNumber})`);
@@ -1358,13 +1388,13 @@ export class StorageService {
     if (!this.deletedCtrlIds.includes(id)) this.deletedCtrlIds.push(id);
     this.notifyDataChanged('controls');
 
-    const sb = getSupabase();
+    const sb = getSafeSupabase();
     if (sb) {
       try {
         const { error } = await sb.from('control_materials').delete().eq('id', id);
-        if (error) console.error('Supabase deleteControlMaterial error:', error);
+        if (error) handleSupabaseError('deleteControlMaterial', error);
       } catch (err) {
-        console.error('Supabase deleteControlMaterial network error:', err);
+        handleSupabaseError('deleteControlMaterial network', err);
       }
     }
     if (mat) {
@@ -1419,18 +1449,18 @@ export class StorageService {
     let syncedToSupabase = false;
     let errorMessage: string | undefined;
 
-    const sb = getSupabase();
+    const sb = getSafeSupabase();
     if (sb) {
       try {
         const { error } = await sb.from('test_parameters').upsert(mapParamToDb(normalizedParam));
         if (error) {
-          console.error('Supabase saveParameter error:', error);
+          handleSupabaseError('saveParameter', error);
           errorMessage = error.message;
         } else {
           syncedToSupabase = true;
         }
       } catch (err: any) {
-        console.error('Supabase saveParameter network error:', err);
+        handleSupabaseError('saveParameter network', err);
         errorMessage = err?.message || 'Gagal koneksi ke server Supabase';
       }
     }
@@ -1489,18 +1519,18 @@ export class StorageService {
     let syncedToSupabase = false;
     let errorMessage: string | undefined;
 
-    const sb = getSupabase();
+    const sb = getSafeSupabase();
     if (sb) {
       try {
         const { error } = await sb.from('test_parameters').upsert(this.parameters.map(mapParamToDb));
         if (error) {
-          console.error('Supabase saveParameters bulk error:', error);
+          handleSupabaseError('saveParameters bulk', error);
           errorMessage = error.message;
         } else {
           syncedToSupabase = true;
         }
       } catch (err: any) {
-        console.error('Supabase saveParameters bulk network error:', err);
+        handleSupabaseError('saveParameters bulk network', err);
         errorMessage = err?.message || 'Gagal koneksi sinkronisasi parameter ke Supabase';
       }
     }
@@ -1517,14 +1547,14 @@ export class StorageService {
     this.notifyDataChanged('parameters');
 
     let syncedToSupabase = false;
-    const sb = getSupabase();
+    const sb = getSafeSupabase();
     if (sb) {
       try {
         const { error } = await sb.from('test_parameters').delete().eq('id', id);
-        if (error) console.error('Supabase deleteParameter error:', error);
+        if (error) handleSupabaseError('deleteParameter', error);
         else syncedToSupabase = true;
       } catch (err) {
-        console.error('Supabase deleteParameter network error:', err);
+        handleSupabaseError('deleteParameter network', err);
       }
     }
     if (param) {
@@ -1535,6 +1565,12 @@ export class StorageService {
 
   // --- Westgard Rules ---
   static getWestgardRules(): WestgardRuleConfig[] {
+    const existingKeys = new Set(this.westgardRules.map(r => r.key));
+    const missing = DEFAULT_WESTGARD_RULES.filter(r => !existingKeys.has(r.key));
+    if (missing.length > 0) {
+      this.westgardRules = [...this.westgardRules, ...missing];
+      writeLocalCache(CACHE_KEYS.WESTGARD_RULES, this.westgardRules);
+    }
     return this.westgardRules;
   }
 
@@ -1543,7 +1579,7 @@ export class StorageService {
     writeLocalCache(CACHE_KEYS.WESTGARD_RULES, this.westgardRules);
     this.notifyDataChanged('westgard');
 
-    const sb = getSupabase();
+    const sb = getSafeSupabase();
     if (sb) {
       try {
         const rows = rules.map(r => ({
@@ -1555,9 +1591,10 @@ export class StorageService {
           enabled: r.enabled,
           recommendation: r.recommendation,
         }));
-        await sb.from('westgard_rules').upsert(rows);
+        const { error } = await sb.from('westgard_rules').upsert(rows);
+        if (error) handleSupabaseError('saveWestgardRules', error);
       } catch (err) {
-        console.error('Supabase saveWestgardRules error:', err);
+        handleSupabaseError('saveWestgardRules network', err);
       }
     }
     return { success: true };
@@ -1620,11 +1657,11 @@ export class StorageService {
     }
     this.notifyDataChanged('qc_results');
 
-    const sb = getSupabase();
+    const sb = getSafeSupabase();
     if (sb) {
       const target = idx >= 0 ? this.qcResults[idx] : result;
       const { error } = await sb.from('qc_results').upsert(mapQCResultToDb(target));
-      if (error) console.error('Supabase saveQCResult error:', error);
+      if (error) handleSupabaseError('saveQCResult', error);
     }
   }
 
@@ -1633,10 +1670,10 @@ export class StorageService {
     if (!this.deletedQcIds.includes(id)) this.deletedQcIds.push(id);
     this.notifyDataChanged('qc_results');
 
-    const sb = getSupabase();
+    const sb = getSafeSupabase();
     if (sb) {
       const { error } = await sb.from('qc_results').update({ deleted_at: new Date().toISOString(), is_deleted: true }).eq('id', id);
-      if (error) console.error('Supabase deleteQCResult error:', error);
+      if (error) handleSupabaseError('deleteQCResult', error);
     }
   }
 
@@ -1651,10 +1688,10 @@ export class StorageService {
     else this.nonConformities.unshift(nc);
     this.notifyDataChanged('non_conformities');
 
-    const sb = getSupabase();
+    const sb = getSafeSupabase();
     if (sb) {
       const { error } = await sb.from('non_conformities').upsert(mapNCToDb(nc));
-      if (error) console.error('Supabase saveNonConformity error:', error);
+      if (error) handleSupabaseError('saveNonConformity', error);
     }
   }
 
@@ -1662,10 +1699,10 @@ export class StorageService {
     this.nonConformities = this.nonConformities.filter(n => n.id !== id);
     this.notifyDataChanged('non_conformities');
 
-    const sb = getSupabase();
+    const sb = getSafeSupabase();
     if (sb) {
       const { error } = await sb.from('non_conformities').update({ deleted_at: new Date().toISOString() }).eq('id', id);
-      if (error) console.error('Supabase deleteNonConformity error:', error);
+      if (error) handleSupabaseError('deleteNonConformity', error);
     }
   }
 
@@ -1680,10 +1717,10 @@ export class StorageService {
     else this.capas.unshift(capa);
     this.notifyDataChanged('capa');
 
-    const sb = getSupabase();
+    const sb = getSafeSupabase();
     if (sb) {
       const { error } = await sb.from('capa').upsert(mapCAPAToDb(capa));
-      if (error) console.error('Supabase saveCAPA error:', error);
+      if (error) handleSupabaseError('saveCAPA', error);
     }
   }
 
@@ -1691,10 +1728,10 @@ export class StorageService {
     this.capas = this.capas.filter(c => c.id !== id);
     this.notifyDataChanged('capa');
 
-    const sb = getSupabase();
+    const sb = getSafeSupabase();
     if (sb) {
       const { error } = await sb.from('capa').update({ deleted_at: new Date().toISOString() }).eq('id', id);
-      if (error) console.error('Supabase deleteCAPA error:', error);
+      if (error) handleSupabaseError('deleteCAPA', error);
     }
   }
 
@@ -1719,13 +1756,13 @@ export class StorageService {
     this.qcHematologi.unshift(item);
     this.notifyDataChanged('qc_hematologi');
 
-    const sb = getSupabase();
+    const sb = getSafeSupabase();
     if (sb) {
       try {
         const { error } = await sb.from('qc_hematologi').upsert(mapQCHematologiToDb(item));
-        if (error) console.error('Supabase saveQCHematologi error:', error);
+        if (error) handleSupabaseError('saveQCHematologi', error);
       } catch (err) {
-        console.error('Supabase saveQCHematologi network error:', err);
+        handleSupabaseError('saveQCHematologi network', err);
       }
     }
   }
@@ -1755,13 +1792,13 @@ export class StorageService {
     if (this.auditLogs.length > 200) this.auditLogs.pop();
     this.notifyDataChanged('audit_logs');
 
-    const sb = getSupabase();
+    const sb = getSafeSupabase();
     if (sb) {
       try {
         const { error } = await sb.from('audit_logs').insert(mapAuditToDb(newLog));
-        if (error) console.error('Supabase logAudit error:', error);
+        if (error) handleSupabaseError('logAudit', error);
       } catch (err) {
-        console.error('Supabase logAudit network error:', err);
+        handleSupabaseError('logAudit network', err);
       }
     }
   }
@@ -1775,13 +1812,13 @@ export class StorageService {
     this.notifications.unshift(notification);
     this.notifyDataChanged('notifications');
 
-    const sb = getSupabase();
+    const sb = getSafeSupabase();
     if (sb) {
       try {
         const { error } = await sb.from('notifications').upsert(mapNotifToDb(notification));
-        if (error) console.error('Supabase addNotification error:', error);
+        if (error) handleSupabaseError('addNotification', error);
       } catch (err) {
-        console.error('Supabase addNotification network error:', err);
+        handleSupabaseError('addNotification network', err);
       }
     }
   }
@@ -1792,13 +1829,13 @@ export class StorageService {
       this.notifications[idx].read = true;
       this.notifyDataChanged('notifications');
 
-      const sb = getSupabase();
+      const sb = getSafeSupabase();
       if (sb) {
         try {
           const { error } = await sb.from('notifications').update({ read: true }).eq('id', id);
-          if (error) console.error('Supabase markNotificationAsRead error:', error);
+          if (error) handleSupabaseError('markNotificationAsRead', error);
         } catch (err) {
-          console.error('Supabase markNotificationAsRead network error:', err);
+          handleSupabaseError('markNotificationAsRead network', err);
         }
       }
     }

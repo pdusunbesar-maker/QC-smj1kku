@@ -1,69 +1,38 @@
 import { QCResult, QCStatistics, WestgardRuleConfig, WestgardViolation } from '../types';
 import { getWestgardContextualGuidance } from './westgardGuidance';
+import { 
+  calculateDeterministicZScore, 
+  evaluateDeterministicWestgard, 
+  evaluateDatasetWestgard,
+  QCPointInput, 
+  RunStatus, 
+  WestgardNumericalProof, 
+  DEFAULT_ENGINE_RULES,
+  WestgardEvaluationResult,
+  NonTriggeredRuleDetail,
+  UnevaluatedRuleDetail
+} from './westgardEngine';
 
-export const DEFAULT_WESTGARD_RULES: WestgardRuleConfig[] = [
-  {
-    key: '1_2s',
-    name: 'Aturan 1:2s',
-    shortDesc: '1 hasil di luar ±2SD',
-    description: 'Satu nilai kontrol berada di luar rentang Mean ± 2SD.',
-    type: 'warning',
-    enabled: true,
-    recommendation: 'Aturan peringatan (Warning). Periksa tren grafik, reagen, dan kondisi alat. Boleh dilanjutkan jika aturan Westgard lain tidak terlanggar.'
-  },
-  {
-    key: '1_3s',
-    name: 'Aturan 1:3s',
-    shortDesc: '1 hasil di luar ±3SD',
-    description: 'Satu nilai kontrol berada di luar rentang Mean ± 3SD.',
-    type: 'reject',
-    enabled: true,
-    recommendation: 'REJECT! Kemungkinan kesalahan acak (random error) atau pergeseran besar. Jangan rilis hasil pasien! Ulangi tes dengan kontrol baru atau kalibrasi ulang.'
-  },
-  {
-    key: '2_2s',
-    name: 'Aturan 2:2s',
-    shortDesc: '2 hasil berturut-turut di luar ±2SD sisi sama',
-    description: 'Dua hasil kontrol berturut-turut berada di sisi yang sama dan melebihi ±2SD.',
-    type: 'reject',
-    enabled: true,
-    recommendation: 'REJECT! Indikasi kesalahan sistematik (systematic error). Periksa kalibrasi instrumen, lot reagen, atau temperatur inkubator.'
-  },
-  {
-    key: 'R_4s',
-    name: 'Aturan R:4s',
-    shortDesc: 'Selisih 2 hasil berturut-turut ≥ 4SD',
-    description: 'Satu hasil melebihi +2SD dan hasil berikutnya/bersebelahan melebihi -2SD (rentang selisih ≥ 4SD).',
-    type: 'reject',
-    enabled: true,
-    recommendation: 'REJECT! Indikasi kuat kesalahan acak (random error). Periksa gelembung udara, pipetting, atau kestabilan listrik/optik alat.'
-  },
-  {
-    key: '4_1s',
-    name: 'Aturan 4:1s',
-    shortDesc: '4 hasil berturut-turut di luar ±1SD sisi sama',
-    description: 'Empat hasil kontrol berturut-turut berada di sisi yang sama dan melebihi ±1SD.',
-    type: 'reject',
-    enabled: true,
-    recommendation: 'REJECT! Indikasi pergeseran sistematik (systematic shift). Segera lakukan pemeliharaan instrumen atau kalibrasi ulang parameter.'
-  },
-  {
-    key: '10x',
-    name: 'Aturan 10x',
-    shortDesc: '10 hasil berturut-turut pada sisi mean yang sama',
-    description: 'Sepuluh hasil kontrol berturut-turut berada di sisi yang sama terhadap Mean.',
-    type: 'warning',
-    enabled: true,
-    recommendation: 'WARNING / REVIEW! Indikasi pergeseran sistematik bertahap (systematic drift). Lakukan investigasi reagen dan evaluasi kalibrasi.'
-  }
-];
+export { 
+  evaluateDatasetWestgard,
+  calculateDeterministicZScore,
+  evaluateDeterministicWestgard,
+  type WestgardEvaluationResult,
+  type NonTriggeredRuleDetail,
+  type UnevaluatedRuleDetail,
+  type RunStatus,
+  type WestgardNumericalProof
+};
+
+export const DEFAULT_WESTGARD_RULES: WestgardRuleConfig[] = DEFAULT_ENGINE_RULES;
 
 /**
  * Calculate Z-Score: (value - mean) / SD
+ * Retains full precision floating-point arithmetic without premature rounding.
  */
 export function calculateZScore(value: number, mean: number, sd: number): number {
-  if (sd === 0) return 0;
-  return Number(((value - mean) / sd).toFixed(3));
+  if (sd === 0 || isNaN(sd) || sd <= 0) return 0;
+  return (value - mean) / sd;
 }
 
 /**
@@ -158,8 +127,10 @@ export function calculateQCStatistics(
 }
 
 /**
- * Evaluate Westgard Rules for a single QC Result given historical sequence
- * resultsHistory should be ordered chronologically (oldest to newest), with current at the end
+/**
+ * Evaluate Westgard Rules deterministically for a single QC Result given historical sequence.
+ * Delegates to evaluateDeterministicWestgard in westgardEngine.ts with full floating-point precision,
+ * strict multi-rule validation, within-run R4s logic, and numerical proofs generation.
  */
 export function evaluateWestgardRules(
   currentResult: {
@@ -167,179 +138,110 @@ export function evaluateWestgardRules(
     value: number;
     mean: number;
     sd: number;
-    zScore: number;
+    zScore?: number;
+    instrumentId?: string;
     instrumentName?: string;
+    parameterId?: string;
     parameterName?: string;
     parameterUnit?: string;
+    controlLevel?: 'Level 1' | 'Level 2' | 'Level 3';
+    lotNumber?: string;
+    date?: string;
+    time?: string;
+    timestamp?: number;
+    runSessionId?: string;
   },
   previousResults: QCResult[],
-  activeRules: WestgardRuleConfig[] = DEFAULT_WESTGARD_RULES
+  activeRules: WestgardRuleConfig[] = DEFAULT_WESTGARD_RULES,
+  options?: {
+    sameRunOtherLevels?: QCResult[];
+  }
 ): {
-  status: 'pass' | 'warning' | 'reject';
+  status: 'pass' | 'warning' | 'reject' | 'indeterminate';
+  runStatus: RunStatus;
   violations: WestgardViolation[];
+  numericalProofs: WestgardNumericalProof[];
+  evaluationResult: ReturnType<typeof evaluateDeterministicWestgard>;
 } {
-  const violations: WestgardViolation[] = [];
-  const rulesMap = new Map(activeRules.map(r => [r.key, r]));
+  const curDate = currentResult.date || new Date().toISOString().split('T')[0];
+  const curTime = currentResult.time || '12:00';
+  const curTimestamp = currentResult.timestamp || (currentResult.date ? new Date(`${curDate}T${curTime}:00`).getTime() : Date.now());
 
-  const z = currentResult.zScore;
-  const now = new Date().toISOString();
-
-  // Combine history + current point
-  const allPoints = [
-    ...previousResults.map(p => ({ id: p.id, zScore: p.zScore })),
-    { id: currentResult.id, zScore: z }
-  ];
-
-  const len = allPoints.length;
-
-  const instName = currentResult.instrumentName || previousResults[0]?.instrumentName || 'Instrumen Laboratorium';
-  const paramName = currentResult.parameterName || previousResults[0]?.parameterName || 'Parameter QC';
-  const paramUnit = currentResult.parameterUnit || previousResults[0]?.unit || '';
-
-  const buildViolation = (
-    rule: WestgardViolation['rule'],
-    ruleName: string,
-    type: 'warning' | 'reject',
-    desc: string,
-    pointsInvolved: string[]
-  ): WestgardViolation => {
-    const guidance = getWestgardContextualGuidance(
-      rule,
-      ruleName,
-      type,
-      instName,
-      paramName,
-      z,
-      desc
-    );
-
-    return {
-      rule,
-      ruleName,
-      type,
-      description: desc,
-      pointsInvolved,
-      detectedAt: now,
-      instrumentName: guidance.instrumentName,
-      parameterName: guidance.parameterName,
-      parameterUnit: paramUnit,
-      impact: guidance.impact,
-      probableCauses: guidance.probableCauses,
-      correctiveActions: guidance.correctiveActions,
-      preventiveActions: guidance.preventiveActions,
-    };
+  const currentPoint: QCPointInput = {
+    id: currentResult.id,
+    value: currentResult.value,
+    date: curDate,
+    time: curTime,
+    timestamp: curTimestamp,
+    instrumentId: currentResult.instrumentId || previousResults[0]?.instrumentId || 'default-inst',
+    instrumentName: currentResult.instrumentName || previousResults[0]?.instrumentName || 'Instrumen Laboratorium',
+    parameterId: currentResult.parameterId || previousResults[0]?.parameterId || 'default-param',
+    parameterName: currentResult.parameterName || previousResults[0]?.parameterName || 'Parameter QC',
+    unit: currentResult.parameterUnit || previousResults[0]?.unit || '',
+    controlLevel: currentResult.controlLevel || previousResults[0]?.controlLevel || 'Level 1',
+    lotNumber: currentResult.lotNumber || previousResults[0]?.lotNumber || 'default-lot',
+    targetMean: currentResult.mean,
+    targetSD: currentResult.sd,
+    runSessionId: currentResult.runSessionId,
   };
 
-  // 1. Rule 1-3s: |z| > 3 (Reject)
-  if (rulesMap.get('1_3s')?.enabled && Math.abs(z) > 3) {
-    violations.push(
-      buildViolation(
-        '1_3s',
-        'Aturan 1:3s (Reject)',
-        'reject',
-        `Nilai Z-score ${z > 0 ? '+' : ''}${z.toFixed(2)} pada ${instName} (${paramName}) melebihi ±3SD`,
-        [currentResult.id]
-      )
-    );
-  }
+  const historicalPoints: QCPointInput[] = previousResults.map(r => ({
+    id: r.id,
+    value: r.value,
+    date: r.date,
+    time: r.time,
+    timestamp: r.timestamp || new Date(`${r.date}T${r.time || '00:00'}:00`).getTime(),
+    instrumentId: r.instrumentId,
+    instrumentName: r.instrumentName,
+    parameterId: r.parameterId,
+    parameterName: r.parameterName,
+    unit: r.unit,
+    controlLevel: r.controlLevel,
+    lotNumber: r.lotNumber,
+    targetMean: r.mean,
+    targetSD: r.sd,
+  }));
 
-  // 2. Rule 2-2s: 2 consecutive points > +2SD OR 2 consecutive points < -2SD (Reject)
-  if (rulesMap.get('2_2s')?.enabled && len >= 2) {
-    const prevZ = allPoints[len - 2].zScore;
-    if ((z > 2 && prevZ > 2) || (z < -2 && prevZ < -2)) {
-      violations.push(
-        buildViolation(
-          '2_2s',
-          'Aturan 2:2s (Reject)',
-          'reject',
-          `Dua hasil berurutan (${prevZ.toFixed(2)} SD & ${z.toFixed(2)} SD) pada ${instName} (${paramName}) melebihi batas ±2SD pada sisi yang sama`,
-          [allPoints[len - 2].id, currentResult.id]
-        )
-      );
-    }
-  }
+  const otherLevels: QCPointInput[] = options?.sameRunOtherLevels
+    ? options.sameRunOtherLevels.map(r => ({
+        id: r.id,
+        value: r.value,
+        date: r.date,
+        time: r.time,
+        timestamp: r.timestamp || new Date(`${r.date}T${r.time || '00:00'}:00`).getTime(),
+        instrumentId: r.instrumentId,
+        instrumentName: r.instrumentName,
+        parameterId: r.parameterId,
+        parameterName: r.parameterName,
+        unit: r.unit,
+        controlLevel: r.controlLevel,
+        lotNumber: r.lotNumber,
+        targetMean: r.mean,
+        targetSD: r.sd,
+      }))
+    : [];
 
-  // 3. Rule R-4s: Difference between 2 consecutive points >= 4SD (Reject)
-  if (rulesMap.get('R_4s')?.enabled && len >= 2) {
-    const prevZ = allPoints[len - 2].zScore;
-    if (Math.abs(z - prevZ) >= 4) {
-      violations.push(
-        buildViolation(
-          'R_4s',
-          'Aturan R:4s (Reject)',
-          'reject',
-          `Rentang selisih 2 hasil berurutan pada ${instName} (${paramName}) adalah ${Math.abs(z - prevZ).toFixed(2)} SD (≥ 4SD)`,
-          [allPoints[len - 2].id, currentResult.id]
-        )
-      );
-    }
-  }
+  const evalResult = evaluateDeterministicWestgard(currentPoint, historicalPoints, {
+    activeRules,
+    sameRunOtherLevels: otherLevels,
+  });
 
-  // 4. Rule 4-1s: 4 consecutive points > +1SD OR 4 consecutive points < -1SD (Reject)
-  if (rulesMap.get('4_1s')?.enabled && len >= 4) {
-    const last4 = allPoints.slice(len - 4);
-    const allHigh = last4.every(p => p.zScore > 1);
-    const allLow = last4.every(p => p.zScore < -1);
-    if (allHigh || allLow) {
-      violations.push(
-        buildViolation(
-          '4_1s',
-          'Aturan 4:1s (Reject)',
-          'reject',
-          `Empat hasil berurutan pada ${instName} (${paramName}) melebihi ±1SD pada sisi ${allHigh ? 'atas (+)' : 'bawah (-)'}`,
-          last4.map(p => p.id)
-        )
-      );
-    }
-  }
-
-  // 5. Rule 10x: 10 consecutive points on same side of mean (Warning/Review)
-  if (rulesMap.get('10x')?.enabled && len >= 10) {
-    const last10 = allPoints.slice(len - 10);
-    const allAboveMean = last10.every(p => p.zScore > 0);
-    const allBelowMean = last10.every(p => p.zScore < 0);
-    if (allAboveMean || allBelowMean) {
-      violations.push(
-        buildViolation(
-          '10x',
-          'Aturan 10x (Warning)',
-          'warning',
-          `Sepuluh hasil berurutan pada ${instName} (${paramName}) berada di sisi ${allAboveMean ? 'atas (+)' : 'bawah (-)'} Mean`,
-          last10.map(p => p.id)
-        )
-      );
-    }
-  }
-
-  // 6. Rule 1-2s: |z| > 2 (Warning)
-  // Evaluated if no reject rules apply or as warning
-  if (rulesMap.get('1_2s')?.enabled && Math.abs(z) > 2) {
-    const alreadyHasReject = violations.some(v => v.type === 'reject');
-    if (!alreadyHasReject) {
-      violations.push(
-        buildViolation(
-          '1_2s',
-          'Aturan 1:2s (Warning)',
-          'warning',
-          `Hasil pada ${instName} (${paramName}) berada di luar ±2SD (${z > 0 ? '+' : ''}${z.toFixed(2)} SD)`,
-          [currentResult.id]
-        )
-      );
-    }
-  }
-
-  // Determine overall status
-  const hasReject = violations.some(v => v.type === 'reject');
-  const hasWarning = violations.some(v => v.type === 'warning');
-
-  let status: 'pass' | 'warning' | 'reject' = 'pass';
-  if (hasReject) {
+  let status: 'pass' | 'warning' | 'reject' | 'indeterminate' = 'pass';
+  if (evalResult.runStatus === 'REJECT') {
     status = 'reject';
-  } else if (hasWarning) {
+  } else if (evalResult.runStatus === 'WARNING') {
     status = 'warning';
+  } else if (evalResult.runStatus === 'INDETERMINATE') {
+    status = 'indeterminate';
   }
 
-  return { status, violations };
+  return {
+    status,
+    runStatus: evalResult.runStatus,
+    violations: evalResult.violations,
+    numericalProofs: evalResult.numericalProofs,
+    evaluationResult: evalResult,
+  };
 }
 
 /**

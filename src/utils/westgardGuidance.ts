@@ -213,8 +213,8 @@ export function getWestgardContextualGuidance(
         };
       }
 
-      if (ruleKey === '2_2s' || ruleKey === '4_1s' || ruleKey === '10x') {
-        // Systematic Shift / Drift in Chemistry Analyzer
+      if (ruleKey === '2_2s' || ruleKey === '4_1s' || ruleKey === '10x' || ruleKey === '8x' || ruleKey === '7T') {
+        // Systematic Shift / Drift / Trend in Chemistry Analyzer
         const isTenX = ruleKey === '10x';
         return {
           analyzerType,

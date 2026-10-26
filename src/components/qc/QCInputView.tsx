@@ -126,13 +126,40 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
       const sd = param.targetSD;
       const zScore = calculateZScore(val, mean, sd);
       const sdPosition = formatSDPosition(zScore);
-      const history = existingResults.filter(r => r.parameterId === param.id);
+      const history = existingResults.filter(
+        r => r.parameterId === param.id && 
+             r.instrumentId === currentInst.id && 
+             r.controlLevel === ibLevel && 
+             r.lotNumber === ibLotNumber
+      );
+      const sameRunOtherLevels = existingResults.filter(
+        r => r.parameterId === param.id &&
+             r.instrumentId === currentInst.id &&
+             r.date === date &&
+             r.controlLevel !== ibLevel
+      );
       const tempId = `QC-IB-${Date.now()}-${param.code}`;
       const westgardRules = StorageService.getWestgardRules();
       const { status, violations } = evaluateWestgardRules(
-        { id: tempId, value: val, mean, sd, zScore },
+        { 
+          id: tempId, 
+          value: val, 
+          mean, 
+          sd, 
+          zScore,
+          instrumentId: currentInst.id,
+          instrumentName: currentInst.name,
+          parameterId: param.id,
+          parameterName: param.name,
+          parameterUnit: param.unit,
+          controlLevel: ibLevel,
+          lotNumber: ibLotNumber,
+          date,
+          time,
+        },
         history,
-        westgardRules
+        westgardRules,
+        { sameRunOtherLevels }
       );
 
       if (status === 'pass') passCount++;
@@ -326,15 +353,43 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
     const zScore = calculateZScore(val, mean, sd);
     const sdPosition = formatSDPosition(zScore);
 
-    // Get previous results for this parameter to test Westgard multi-rules
-    const history = existingResults.filter(r => r.parameterId === currentParam.id);
+    // Get previous results for this parameter, instrument, control level & lot to test Westgard multi-rules strictly
+    const history = existingResults.filter(
+      r => r.parameterId === currentParam.id &&
+           r.instrumentId === selectedInstrumentId &&
+           r.controlLevel === selectedLevel &&
+           r.lotNumber === lotNumber
+    );
+
+    const sameRunOtherLevels = existingResults.filter(
+      r => r.parameterId === currentParam.id &&
+           r.instrumentId === selectedInstrumentId &&
+           r.date === date &&
+           r.controlLevel !== selectedLevel
+    );
 
     const tempId = `QC-TEMP-${Date.now()}`;
     const westgardRules = StorageService.getWestgardRules();
     const { status, violations } = evaluateWestgardRules(
-      { id: tempId, value: val, mean, sd, zScore },
+      { 
+        id: tempId, 
+        value: val, 
+        mean, 
+        sd, 
+        zScore,
+        instrumentId: selectedInstrumentId,
+        instrumentName: currentInstrument?.name,
+        parameterId: currentParam.id,
+        parameterName: currentParam.name,
+        parameterUnit: currentParam.unit,
+        controlLevel: selectedLevel,
+        lotNumber,
+        date,
+        time,
+      },
       history,
-      westgardRules
+      westgardRules,
+      { sameRunOtherLevels }
     );
 
     return {
@@ -346,7 +401,7 @@ export const QCInputView: React.FC<QCInputViewProps> = ({
       status,
       violations,
     };
-  }, [inputValue, currentParam, existingResults]);
+  }, [inputValue, currentParam, existingResults, selectedInstrumentId, selectedLevel, lotNumber, date, time, currentInstrument]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
