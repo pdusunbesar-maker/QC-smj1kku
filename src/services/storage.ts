@@ -660,7 +660,7 @@ export class StorageService {
   private static notifications: AppNotification[] = readLocalCache(CACHE_KEYS.NOTIFICATIONS, []);
   private static qcLots: QCLot[] = readLocalCache(CACHE_KEYS.QC_LOTS, []);
   private static qcHematologi: QCHematologi[] = readLocalCache(CACHE_KEYS.QC_HEMATOLOGI, []);
-  private static deletedQcIds: string[] = [];
+  private static deletedQcIds: string[] = readLocalCache('lqcms_deleted_qc_ids_v2', []);
   private static deletedInstIds: string[] = [];
   private static deletedCtrlIds: string[] = [];
   private static deletedParamIds: string[] = [];
@@ -1667,13 +1667,21 @@ export class StorageService {
 
   static async deleteQCResult(id: string): Promise<void> {
     this.qcResults = this.qcResults.filter(r => r.id !== id);
-    if (!this.deletedQcIds.includes(id)) this.deletedQcIds.push(id);
+    if (!this.deletedQcIds.includes(id)) {
+      this.deletedQcIds.push(id);
+      writeLocalCache('lqcms_deleted_qc_ids_v2', this.deletedQcIds);
+    }
+    writeLocalCache(CACHE_KEYS.QC_RESULTS, this.qcResults);
     this.notifyDataChanged('qc_results');
 
     const sb = getSafeSupabase();
     if (sb) {
-      const { error } = await sb.from('qc_results').update({ deleted_at: new Date().toISOString(), is_deleted: true }).eq('id', id);
-      if (error) handleSupabaseError('deleteQCResult', error);
+      try {
+        const { error } = await sb.from('qc_results').update({ deleted_at: new Date().toISOString(), is_deleted: true }).eq('id', id);
+        if (error) handleSupabaseError('deleteQCResult', error);
+      } catch (err) {
+        handleSupabaseError('deleteQCResult network', err);
+      }
     }
   }
 

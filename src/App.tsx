@@ -324,9 +324,19 @@ function AppContent() {
                     parameter={selectedChartParam}
                     results={qcResults}
                     labInfo={labInfo}
+                    activeRules={westgardRules}
                     onLabInfoUpdated={(info) => setLabInfo(info)}
                     onCreateCapa={(res) => handleNavigateToTab('capa', { fromQc: res })}
                     onCreateNC={(res) => handleNavigateToTab('non-conformity', { fromQc: res })}
+                    onResultDeleted={(deletedId) => {
+                      setQcResults(StorageService.getQCResults());
+                      setAuditLogs(StorageService.getAuditLogs());
+                      setNotifications(StorageService.getNotifications());
+                    }}
+                    onRefreshData={() => {
+                      setQcResults(StorageService.getQCResults());
+                      setAuditLogs(StorageService.getAuditLogs());
+                    }}
                   />
                 )}
               </div>
