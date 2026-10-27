@@ -223,29 +223,51 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
     return Number(num).toFixed(dec);
   };
 
-  // Helper: Filter violations for a result based on currently active SOP rules
+  // Helper: Filter violations for a result based on currently active SOP rules and current numerical values
   const filterActiveViolations = (r: QCResult): WestgardViolation[] => {
-    const activeViols = (r.violations || []).filter(v => isRuleEnabled(v.rule));
+    // 1. Recalculate deterministic zScore from value, targetMean, and targetSD to ensure it always matches latest edited value
+    const mean = r.mean || parameter.targetMean;
+    const sd = r.sd || parameter.targetSD;
+    const calculatedZ = (sd && sd > 0) ? (r.value - mean) / sd : (typeof r.zScore === 'number' ? r.zScore : 0);
+    const absZ = Math.abs(calculatedZ);
 
+    // 2. Filter raw violations:
+    // Only keep violations whose rule is currently enabled AND that are numerically valid for this result:
+    // - If |z| <= 3.0, it CANNOT be a 1:3s violation
+    // - If |z| <= 2.0, it CANNOT be a 1:2s violation
+    // - If |z| <= 2.0, individual run cannot be a 2:2s or R:4s violation
+    // - If |z| <= 1.0, it cannot be a 4:1s violation
+    const validRawViols = (r.violations || []).filter(v => {
+      if (!isRuleEnabled(v.rule)) return false;
+      if (v.rule === '1_3s' && absZ <= 3.0) return false;
+      if (v.rule === '1_2s' && absZ <= 2.0) return false;
+      if (['2_2s', 'R_4s'].includes(v.rule) && absZ <= 2.0) return false;
+      if (v.rule === '4_1s' && absZ <= 1.0) return false;
+      return true;
+    });
+
+    const activeViols = [...validRawViols];
+
+    // 3. Fallback checks if point numerically exceeds limits and rule is active:
     if (activeViols.length === 0) {
-      if (Math.abs(r.zScore) > 3 && isRuleEnabled('1_3s')) {
+      if (absZ > 3.0 && isRuleEnabled('1_3s')) {
         activeViols.push({
           rule: '1_3s',
           ruleName: 'Aturan 1:3s (Reject)',
           type: 'reject',
-          description: `Nilai kontrol ${formatNumber(r.value)} ${r.unit} (Z-Score: ${r.sdPosition}) berada di luar batas kritis ±3SD`,
+          description: `Nilai kontrol ${formatNumber(r.value)} ${r.unit} (Z-Score: ${r.sdPosition || calculatedZ.toFixed(2)}) berada di luar batas kritis ±3SD`,
           pointsInvolved: [r.id],
           detectedAt: r.date,
           instrumentName: r.instrumentName,
           parameterName: r.parameterName,
           parameterUnit: r.unit
         });
-      } else if (Math.abs(r.zScore) > 2 && isRuleEnabled('1_2s')) {
+      } else if (absZ > 2.0 && isRuleEnabled('1_2s')) {
         activeViols.push({
           rule: '1_2s',
           ruleName: 'Aturan 1:2s (Warning)',
           type: 'warning',
-          description: `Nilai kontrol ${formatNumber(r.value)} ${r.unit} (Z-Score: ${r.sdPosition}) berada di zona peringatan ±2SD`,
+          description: `Nilai kontrol ${formatNumber(r.value)} ${r.unit} (Z-Score: ${r.sdPosition || calculatedZ.toFixed(2)}) berada di zona peringatan ±2SD`,
           pointsInvolved: [r.id],
           detectedAt: r.date,
           instrumentName: r.instrumentName,
@@ -300,7 +322,7 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
       });
     }
 
-    // Single Plot per Date (1 Plot Saja per Tanggal)
+    // Single Plot per Date (1 Plot Saja per Tanggal - disesuaikan dengan HASIL TERBARU)
     const dateMap = new Map<string, QCResult[]>();
     filteredRawResults.forEach(r => {
       const list = dateMap.get(r.date) || [];
@@ -310,25 +332,13 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
 
     const points: PlottedQCPoint[] = [];
     dateMap.forEach((dayRuns, dateStr) => {
-      // Find runs with reject or warning to prioritize as primary plotted point
-      const rejectRun = dayRuns.find(d => filterActiveViolations(d).some(v => v.type === 'reject'));
-      const warningRun = dayRuns.find(d => filterActiveViolations(d).some(v => v.type === 'warning'));
-      const primaryRun = rejectRun || warningRun || dayRuns[dayRuns.length - 1];
+      // Urutkan pengujian pada tanggal ini secara kronologis: hasil pengujian paling akhir berada di indeks terakhir
+      dayRuns.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0) || (a.time || '').localeCompare(b.time || ''));
 
-      // Combine all active distinct violations of the day
-      const allViolations: WestgardViolation[] = [];
-      dayRuns.forEach(d => {
-        const dViols = filterActiveViolations(d);
-        dViols.forEach(v => {
-          if (!allViolations.some(av => av.rule === v.rule && av.description === v.description)) {
-            allViolations.push(v);
-          }
-        });
-      });
-
-      const hasReject = allViolations.some(v => v.type === 'reject');
-      const hasWarning = allViolations.some(v => v.type === 'warning');
-      const status: QCStatus = hasReject ? 'reject' : (hasWarning ? 'warning' : 'pass');
+      // HASIL TERBARU: Titik plot, status, dan evaluasi pelanggaran Westgard disesuaikan dengan data terbaru
+      const latestRun = dayRuns[dayRuns.length - 1];
+      const latestViolations = filterActiveViolations(latestRun);
+      const latestStatus = getEffectiveQCStatus(latestViolations);
 
       const dObj = new Date(dateStr + 'T12:00:00');
       const dayName = isNaN(dObj.getTime()) ? '' : INDO_DAYS[dObj.getDay()];
@@ -336,26 +346,26 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
       const displayDate = parts[2] && parts[1] ? `${parts[2]}/${parts[1]}` : dateStr;
 
       points.push({
-        id: primaryRun.id,
+        id: latestRun.id,
         date: dateStr,
         displayDate,
         dayName,
-        time: primaryRun.time,
-        value: primaryRun.value,
-        unit: primaryRun.unit,
-        mean: primaryRun.mean,
-        sd: primaryRun.sd,
-        zScore: primaryRun.zScore,
-        sdPosition: primaryRun.sdPosition,
-        status,
-        violations: allViolations,
-        operatorName: primaryRun.operatorName,
-        controlLevel: primaryRun.controlLevel,
-        lotNumber: primaryRun.lotNumber,
-        rawResult: primaryRun,
+        time: latestRun.time,
+        value: latestRun.value,
+        unit: latestRun.unit,
+        mean: latestRun.mean,
+        sd: latestRun.sd,
+        zScore: latestRun.zScore,
+        sdPosition: latestRun.sdPosition,
+        status: latestStatus,
+        violations: latestViolations,
+        operatorName: latestRun.operatorName,
+        controlLevel: latestRun.controlLevel,
+        lotNumber: latestRun.lotNumber,
+        rawResult: latestRun,
         allRunsCount: dayRuns.length,
         allRuns: dayRuns,
-        notes: primaryRun.notes
+        notes: latestRun.notes
       });
     });
 
@@ -437,8 +447,24 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
     );
   }, [plottedPoints, parameter.targetMean, currentInstName, parameter.name, parameter.unit, enabledRulesMap]);
 
-  // Violations in current selection - accurately capture any active out-of-control or warning results
+  // Violations in current selection - accurately capture any active out-of-control or warning results based on latest data
   const violationsList = useMemo(() => {
+    if (plotMode === 'single_per_date') {
+      // Pada mode 1 plot per tanggal, tabel pelanggaran langsung mengikuti hasil terbaru dari titik plot:
+      // Apabila hasil terbaru pass dan tidak ada pelanggaran, maka otomatis tidak ditampilkan di tabel pelanggaran
+      return plottedPoints
+        .filter(p => p.status !== 'pass' && p.violations.length > 0)
+        .map(p => ({
+          ...p.rawResult,
+          value: p.value,
+          zScore: p.zScore,
+          sdPosition: p.sdPosition,
+          status: p.status,
+          violations: p.violations
+        }));
+    }
+
+    // Pada mode semua run, evaluasi masing-masing run berdasarkan nilai numerik terbarunya
     return filteredRawResults
       .map(r => {
         const viols = filterActiveViolations(r);
@@ -449,8 +475,8 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
           violations: viols
         };
       })
-      .filter(r => r.violations.length > 0 || r.status === 'reject' || r.status === 'warning');
-  }, [filteredRawResults, enabledRulesMap]);
+      .filter(r => r.violations.length > 0 && r.status !== 'pass');
+  }, [filteredRawResults, plottedPoints, plotMode, enabledRulesMap]);
 
   // Chart Geometry
   const width = 980;
@@ -1742,7 +1768,7 @@ export const LeveyJenningsChart: React.FC<LeveyJenningsChartProps> = ({
         <div className="mt-4 pt-4 border-t border-slate-200 print-avoid-break">
           <WestgardAnalysisPanel
             parameter={parameter}
-            results={filteredRawResults}
+            results={plotMode === 'single_per_date' ? plottedPoints.map(p => p.rawResult) : filteredRawResults}
             instrumentName={currentInstName}
             selectedLevel={selectedLevel}
             startDate={startDate}

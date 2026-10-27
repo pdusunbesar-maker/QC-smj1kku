@@ -25,7 +25,7 @@ import { Instrument, Parameter, QCResult } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { getLocalDateString } from '../../utils/dateUtils';
 import { StorageService } from '../../services/storage';
-import { calculateZScore, formatSDPosition } from '../../utils/qcCalculations';
+import { calculateZScore, formatSDPosition, evaluateWestgardRules } from '../../utils/qcCalculations';
 
 interface QCReviewViewProps {
   results: QCResult[];
@@ -172,7 +172,35 @@ export const QCReviewView: React.FC<QCReviewViewProps> = ({
     const val = Number(editForm.value);
     const z = calculateZScore(val, editingResult.mean, editingResult.sd);
     const sdPos = formatSDPosition(z);
-    const status = Math.abs(z) > 3 ? 'fail' : Math.abs(z) > 2 ? 'warning' : 'pass';
+    const status: 'pass' | 'warning' | 'reject' = Math.abs(z) > 3 ? 'reject' : Math.abs(z) > 2 ? 'warning' : 'pass';
+
+    // Recalculate Westgard violations: if pass, violations array must be emptied immediately
+    let violations: any[] = [];
+    if (status !== 'pass') {
+      const westgardRules = StorageService.getWestgardRules();
+      const otherResults = results.filter(r => r.id !== editingResult.id && !r.isDeleted && !r.deletedAt);
+      const evalResult = evaluateWestgardRules(
+        {
+          id: editingResult.id,
+          value: val,
+          mean: editingResult.mean,
+          sd: editingResult.sd,
+          zScore: z,
+          instrumentId: editingResult.instrumentId,
+          instrumentName: editingResult.instrumentName,
+          parameterId: editingResult.parameterId,
+          parameterName: editingResult.parameterName,
+          parameterUnit: editingResult.unit,
+          controlLevel: editingResult.controlLevel,
+          lotNumber: editForm.lotNumber,
+          date: editForm.date,
+          time: editForm.time,
+        },
+        otherResults,
+        westgardRules
+      );
+      violations = evalResult.violations || [];
+    }
 
     const updated: QCResult = {
       ...editingResult,
@@ -184,12 +212,14 @@ export const QCReviewView: React.FC<QCReviewViewProps> = ({
       zScore: z,
       sdPosition: sdPos,
       status,
+      violations,
+      reviewStatus: status === 'pass' ? 'accepted' : (editingResult.reviewStatus || 'pending')
     };
 
     StorageService.saveQCResult(updated);
     StorageService.logAudit(
       'UPDATE_QC_RESULT',
-      `Mengoreksi hasil QC #${updated.id} [${updated.parameterName}] dari ${editingResult.value} menjadi ${val} ${updated.unit} oleh ${user.name}`,
+      `Mengoreksi hasil QC #${updated.id} [${updated.parameterName}] dari ${editingResult.value} menjadi ${val} ${updated.unit} (Status: ${status.toUpperCase()}) oleh ${user.name}`,
       updated,
       editingResult
     );
